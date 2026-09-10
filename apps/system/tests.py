@@ -229,6 +229,37 @@ class MessageTests(BaseSystemTestCase):
         reply.refresh_from_db()
         self.assertFalse(reply.is_new_for(self.operator))
 
+    def test_opening_conversation_preserves_unread_until_thread_is_opened(self):
+        conv = self._conv()
+        first = MessageThread.objects.create(
+            conversation=conv, created_by=self.admin, title="Первая тема"
+        )
+        second = MessageThread.objects.create(
+            conversation=conv, created_by=self.admin, title="Вторая тема"
+        )
+        first_reply = MessageReply.objects.create(
+            thread=first, author=self.admin, body="Первое непрочитанное"
+        )
+        second_reply = MessageReply.objects.create(
+            thread=second, author=self.admin, body="Второе непрочитанное"
+        )
+        self.client.force_login(self.operator)
+
+        conversation = self.client.get(reverse("system:conversation", args=[conv.pk]))
+        self.assertEqual(conversation.status_code, 200)
+        self.assertContains(conversation, "непрочитанных: 2")
+        self.assertTrue(first_reply.is_new_for(self.operator))
+        self.assertTrue(second_reply.is_new_for(self.operator))
+
+        self.client.get(reverse("system:thread", args=[first.pk]))
+        first_reply.refresh_from_db()
+        second_reply.refresh_from_db()
+        self.assertFalse(first_reply.is_new_for(self.operator))
+        self.assertTrue(second_reply.is_new_for(self.operator))
+
+        conversation = self.client.get(reverse("system:conversation", args=[conv.pk]))
+        self.assertContains(conversation, "непрочитанных: 1")
+
     def test_thread_reactions_toggle(self):
         conv = self._conv()
         thread = MessageThread.objects.create(

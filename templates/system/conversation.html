@@ -45,6 +45,7 @@
             <strong>{{ t.title }}</strong>
             <span class="text-muted">{{ t.replies.count }} сообщ. · {{ t.created_by.full_name }} · {{ t.created_at|date:"d.m.Y H:i" }}</span>
           </span>
+          {% if t.unread_count %}<span class="nav__badge">{{ t.unread_count }} непрочит.</span>{% endif %}
           {% if t.is_closed %}<span class="badge badge--open">Закрыта</span>{% endif %}
         </a>
         {% empty %}

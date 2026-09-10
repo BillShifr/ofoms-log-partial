@@ -12,6 +12,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db.models import Count
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -342,24 +343,44 @@ EMOJI_SET = ("👍", "👎", "❤️", "😊", "❗")
 
 def _conversation_unread_counts(user) -> dict:
     """Словарь {conversation_id: число непрочитанных сообщений}."""
-    replies = (
+    rows = (
         MessageReply.objects.filter(thread__conversation__participants=user)
         .exclude(author=user)
-        .select_related("thread__conversation")
+        .exclude(read_by=user)
+        .values("thread__conversation_id")
+        .annotate(total=Count("id"))
     )
-    counts = {}
-    for r in replies:
-        if not r.read_by.filter(pk=user.pk).exists():
-            cid = r.thread.conversation_id
-            counts[cid] = counts.get(cid, 0) + 1
-    return counts
+    return {row["thread__conversation_id"]: row["total"] for row in rows}
+
+
+def _thread_unread_counts(user, conversation) -> dict:
+    rows = (
+        MessageReply.objects.filter(thread__conversation=conversation)
+        .exclude(author=user)
+        .exclude(read_by=user)
+        .values("thread_id")
+        .annotate(total=Count("id"))
+    )
+    return {row["thread_id"]: row["total"] for row in rows}
 
 
 def _mark_read_for_user(user, thread_qs):
-    """Помечает как прочитанные все сообщения потока(ов) для user."""
-    qs = MessageReply.objects.filter(thread__in=thread_qs).exclude(author=user).exclude(read_by=user)
-    for r in qs.order_by("-id")[:500]:
-        r.read_by.add(user)
+    """Атомарно помечает все сообщения выбранных тем прочитанными."""
+    reply_ids = list(
+        MessageReply.objects.filter(thread__in=thread_qs)
+        .exclude(author=user)
+        .exclude(read_by=user)
+        .values_list("id", flat=True)
+    )
+    relation = MessageReply._meta.get_field("read_by")
+    through = relation.remote_field.through
+    reply_key = f"{relation.m2m_field_name()}_id"
+    user_key = f"{relation.m2m_reverse_field_name()}_id"
+    through.objects.bulk_create(
+        [through(**{reply_key: reply_id, user_key: user.pk}) for reply_id in reply_ids],
+        ignore_conflicts=True,
+        batch_size=500,
+    )
 
 
 def _participant_or_404(user, conversation):
@@ -449,9 +470,12 @@ def conversation_detail(request, pk):
         Conversation.objects.prefetch_related("participants"), pk=pk
     )
     _participant_or_404(request.user, conv)
-    _mark_read_for_user(request.user, MessageThread.objects.filter(conversation=conv))
-    threads = MessageThread.objects.filter(conversation=conv).select_related("created_by")
-    unread_counts = _conversation_unread_counts(request.user)
+    threads = list(
+        MessageThread.objects.filter(conversation=conv).select_related("created_by")
+    )
+    unread_counts = _thread_unread_counts(request.user, conv)
+    for thread in threads:
+        thread.unread_count = unread_counts.get(thread.pk, 0)
     return render(
         request,
         "system/conversation.html",
@@ -460,7 +484,7 @@ def conversation_detail(request, pk):
             "threads": threads,
             "thread_form": ThreadForm(),
             "conversations": _conversations_meta(request.user),
-            "unread_total": unread_counts.get(conv.pk, 0),
+            "unread_total": sum(unread_counts.values()),
             "active_nav": "messages",
             "emoji_set": EMOJI_SET,
         },

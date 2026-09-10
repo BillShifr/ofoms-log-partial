@@ -5,7 +5,8 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import Group
 
 from apps.core.models import EventLog
-from apps.employee.models import ORGS, Employee
+from apps.core.roles import GROUP_ROLE_MAP, ROLE_GROUP_MAP, SMO_ROLES, TFOMS_ROLES
+from apps.employee.models import ORGS, TFOMS, Employee
 from apps.system.models import (
     Conversation,
     MessageReply,
@@ -43,7 +44,29 @@ class EmployeeFilterForm(forms.Form):
         self.fields["org"].choices = [("", "Все")] + [(o, lbl) for o, lbl in ORGS]
 
 
-class EmployeeCreateForm(UserCreationForm):
+class RoleAssignmentMixin:
+    """Ограничивает назначение зарегистрированными ролями подходящей организации."""
+
+    def _configure_roles(self):
+        self.fields["roles"].queryset = Group.objects.filter(
+            name__in=ROLE_GROUP_MAP.values()
+        ).order_by("name")
+
+    def clean_roles(self):
+        roles = self.cleaned_data.get("roles")
+        org = self.cleaned_data.get("org")
+        if not roles or org is None:
+            return roles
+        allowed_codes = TFOMS_ROLES if org == TFOMS else SMO_ROLES
+        invalid = [group.name for group in roles if GROUP_ROLE_MAP.get(group.name) not in allowed_codes]
+        if invalid:
+            raise forms.ValidationError(
+                "Роли не соответствуют выбранной организации: " + ", ".join(invalid)
+            )
+        return roles
+
+
+class EmployeeCreateForm(RoleAssignmentMixin, UserCreationForm):
     """Регистрация учётной записи пользователя (ТЗ разд. 3.5)."""
 
     roles = forms.ModelMultipleChoiceField(
@@ -57,13 +80,17 @@ class EmployeeCreateForm(UserCreationForm):
         model = Employee
         fields = ("username", "last_name", "first_name", "job_title", "org")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._configure_roles()
+
     def save(self, commit=True):
         user = super().save(commit=commit)
         user.groups.set(self.cleaned_data.get("roles", ()))
         return user
 
 
-class EmployeeUpdateForm(forms.ModelForm):
+class EmployeeUpdateForm(RoleAssignmentMixin, forms.ModelForm):
     """Редактирование учётной записи: профиль, активность, роли."""
 
     roles = forms.ModelMultipleChoiceField(
@@ -79,6 +106,7 @@ class EmployeeUpdateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._configure_roles()
         if self.instance.pk:
             self.fields["roles"].initial = self.instance.groups.all()
 

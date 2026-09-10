@@ -51,9 +51,29 @@
       <div class="field field--roles">
         <label>Роли (группы)</label>
         {{ form.roles }}
+        {% for error in form.roles.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
       </div>
     </details>
     {% endif %}
+
+    <details class="collapsible" data-key="user-section-access-matrix">
+      <summary class="collapsible__toggle">Матрица прав ролей</summary>
+      <p class="text-muted">Матрица отражает фактическую серверную политику. Права нескольких назначенных ролей объединяются.</p>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Роль</th>{% for label in capability_headers %}<th>{{ label }}</th>{% endfor %}</tr></thead>
+          <tbody>
+          {% for row in capability_matrix %}
+            <tr><th scope="row">{{ row.role }}</th>
+            {% for item in row.capabilities %}
+              <td aria-label="{{ item.label }}">{% if item.allowed %}<span class="badge badge--closed">Да</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            {% endfor %}
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
 
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Сохранить</button>

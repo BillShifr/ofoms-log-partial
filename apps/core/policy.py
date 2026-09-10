@@ -10,6 +10,16 @@ EXCHANGE_UPLOAD = "exchange.upload"
 EXCHANGE_READ = "exchange.read"
 REPORTS_READ = "reports.read"
 
+CAPABILITY_LABELS = {
+    JOURNAL_READ: "Просмотр журнала",
+    JOURNAL_CREATE: "Регистрация обращений",
+    JOURNAL_CHANGE: "Обработка обращений",
+    JOURNAL_REDIRECT: "Переадресация",
+    EXCHANGE_READ: "Просмотр обмена",
+    EXCHANGE_UPLOAD: "Загрузка обмена",
+    REPORTS_READ: "Просмотр отчётности",
+}
+
 ALL_ROLES = {
     Roles.OP1,
     Roles.OP2,
@@ -55,3 +65,19 @@ def user_has_capability(user, capability: str) -> bool:
         return True
     allowed = CAPABILITY_ROLES.get(capability)
     return allowed is not None and bool(role_codes_for_user(user) & allowed)
+
+
+def capability_matrix():
+    """Строки фактической RBAC-матрицы для административного UI."""
+    from apps.core.roles import ROLE_CHOICES
+
+    return [
+        {
+            "role": role_label,
+            "capabilities": [
+                {"label": label, "allowed": role_code in CAPABILITY_ROLES[capability]}
+                for capability, label in CAPABILITY_LABELS.items()
+            ],
+        }
+        for role_code, role_label in ROLE_CHOICES
+    ]

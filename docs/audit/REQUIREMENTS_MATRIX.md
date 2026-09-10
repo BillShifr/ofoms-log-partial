@@ -15,5 +15,5 @@
 | Персональные настройки таблиц | ТЗ 3.2 | все | system/prefs, journal/list | UserTableViewPref | view tests | Видимость, сохранённый порядок, сортировка, фиксация и групповые заголовки применяются к реестру | реализовано |
 | Сообщения | ТЗ 3.3 | все | system/messages | conversations/threads/replies/read markers | view + permission tests | Нет realtime; базовый поток и unread корректны | реализовано |
 | События с start/end и фильтрами | ТЗ 3.4 | Admin | system/events | EventLog/middleware + point/pending lifecycle | model/view tests | — | реализовано |
-| Пользователи, группы и права | ТЗ 3.5 | Admin | system/users | CRUD/groups | tests | Нет UI матрицы granular permissions | частично |
+| Пользователи, группы и права | ТЗ 3.5 | Admin | system/users | CRUD/known roles/org validation/capability matrix | form/view tests | Нет модели периода действия полномочий | частично |
 | Автоматизированные задачи manual/schedule | ТЗ 3.6 | Admin | system/tasks + compose scheduler | registry/runs/atomic claim/stale recovery | view/command/compose checks | Отдельный scheduler поставляется; зависшие запуски закрываются по настраиваемому таймауту | реализовано |

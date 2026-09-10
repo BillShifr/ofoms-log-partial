@@ -142,7 +142,11 @@ def user_create(request):
             return redirect("system:users")
     else:
         form = EmployeeCreateForm()
-    return render(request, "system/user_form.html", {"form": form, "title": "Новый пользователь", "active_nav": "users"})
+    return render(
+        request,
+        "system/user_form.html",
+        _user_form_context(form, "Новый пользователь"),
+    )
 
 
 @admin_required
@@ -165,7 +169,24 @@ def user_update(request, pk):
             return redirect("system:users")
     else:
         form = EmployeeUpdateForm(instance=user)
-    return render(request, "system/user_form.html", {"form": form, "user": user, "title": f"Пользователь: {user.username}", "active_nav": "users"})
+    return render(
+        request,
+        "system/user_form.html",
+        _user_form_context(form, f"Пользователь: {user.username}", user=user),
+    )
+
+
+def _user_form_context(form, title, *, user=None):
+    from apps.core.policy import CAPABILITY_LABELS, capability_matrix
+
+    return {
+        "form": form,
+        "user": user,
+        "title": title,
+        "capability_headers": CAPABILITY_LABELS.values(),
+        "capability_matrix": capability_matrix(),
+        "active_nav": "users",
+    }
 
 
 @admin_required

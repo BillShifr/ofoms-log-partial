@@ -95,13 +95,13 @@ class UserManagementTests(BaseSystemTestCase):
                 "password2": PASSWORD,
                 "last_name": "Новаков",
                 "org": "81001",
-                "roles": [Group.objects.get(name="ОП1").pk],
+                "roles": [Group.objects.get(name="СП1").pk],
             },
         )
         self.assertEqual(resp.status_code, 302)
         user = Employee.objects.get(username="new_user")
         self.assertEqual(user.org, 81001)
-        self.assertTrue(user.groups.filter(name="ОП1").exists())
+        self.assertTrue(user.groups.filter(name="СП1").exists())
         self.assertTrue(
             EventLog.objects.filter(
                 event_type=EventLog.EventType.CREATE, target__contains="new_user"
@@ -118,13 +118,36 @@ class UserManagementTests(BaseSystemTestCase):
             {
                 "last_name": "Иванов",
                 "org": "81000",
-                "roles": [Group.objects.get(name="СП1").pk],
+                "roles": [Group.objects.get(name="ОП1").pk],
                 "is_active": "on",
             },
         )
         self.assertEqual(resp.status_code, 302)
         user.refresh_from_db()
-        self.assertTrue(user.groups.filter(name="СП1").exists())
+        self.assertTrue(user.groups.filter(name="ОП1").exists())
+
+    def test_role_must_match_selected_organization(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("system:user_create"),
+            {
+                "username": "invalid_role_org",
+                "password1": PASSWORD,
+                "password2": PASSWORD,
+                "org": "81001",
+                "roles": [Group.objects.get(name="ОП1").pk],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Роли не соответствуют выбранной организации")
+        self.assertFalse(Employee.objects.filter(username="invalid_role_org").exists())
+
+    def test_user_form_shows_server_capability_matrix(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("system:user_create"))
+        self.assertContains(response, "Матрица прав ролей")
+        self.assertContains(response, "Регистрация обращений")
+        self.assertContains(response, "СП3 — страховой представитель 3 уровня")
 
     def test_block_and_unblock(self):
         self.client.force_login(self.admin)

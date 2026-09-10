@@ -8,7 +8,7 @@ import time
 
 from django.http import HttpResponse
 
-from apps.core.models import EventLog
+from apps.core.models import EventLog, log_event
 
 _IGNORED_PREFIXES = ("/static/", "/media/", "/healthz", "/favicon.ico")
 _IGNORED_ADMIN_SEGMENTS = ("/admin/jsi18n",)
@@ -57,7 +57,7 @@ class AuditMiddleware:
         if event_type is not None or (
             request.method not in ("GET", "HEAD") and not request.path.startswith("/admin/")
         ):
-            EventLog.objects.create(
+            log_event(
                 module="http",
                 event_type=event_type or EventLog.EventType.OTHER,
                 result=(

@@ -14,6 +14,6 @@
 | Временные токены и единый репозиторий | ТЗ 3.1 | все | core/tokens | token helpers | unit tests | Нет интеграционного endpoint/repository adapter | отсутствует |
 | Персональные настройки таблиц | ТЗ 3.2 | все | system/prefs | UserTableViewPref | tests | Фиксация/группировка ограничены журналом | частично |
 | Сообщения | ТЗ 3.3 | все | system/messages | conversations/threads/replies/read markers | view + permission tests | Нет realtime; базовый поток и unread корректны | реализовано |
-| События с start/end и фильтрами | ТЗ 3.4 | Admin | system/events | EventLog/middleware | tests | finished_at не заполняется согласованно | частично |
+| События с start/end и фильтрами | ТЗ 3.4 | Admin | system/events | EventLog/middleware + point/pending lifecycle | model/view tests | — | реализовано |
 | Пользователи, группы и права | ТЗ 3.5 | Admin | system/users | CRUD/groups | tests | Нет UI матрицы granular permissions | частично |
 | Автоматизированные задачи manual/schedule | ТЗ 3.6 | Admin | system/tasks | registry/runs/atomic claim | view/command tests | Нет остановки зависшего процесса и cron-конфигурации поставки | частично |

@@ -438,6 +438,7 @@ class TaskJob(models.Model):
             event_type=EventLog.EventType.TASK,
             user=user,
             target=f"task:{self.pk}:{self.command}",
+            pending=True,
         )
         try:
             log = run_command(self.command, self.params or {})

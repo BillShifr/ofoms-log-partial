@@ -5,6 +5,7 @@
 """
 
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
@@ -89,10 +90,11 @@ def log_event(
     detail: str = "",
     obj: "EventLog | None" = None,
     duration_ms: int | None = None,
+    pending: bool = False,
 ) -> "EventLog":
     """Утилита записи события в журнал. Если передан obj — завершает запись."""
     if obj is None:
-        return EventLog.objects.create(
+        entry = EventLog.objects.create(
             module=module,
             event_type=event_type,
             result=result,
@@ -101,14 +103,18 @@ def log_event(
             ip=ip,
             detail=detail,
         )
-    if duration_ms is not None:
-        obj.duration_ms = duration_ms
-    if duration_ms is not None:
-        obj.finished_at = timezone.now()
+        if not pending:
+            entry.duration_ms = duration_ms if duration_ms is not None else 0
+            entry.finished_at = entry.started_at + timedelta(milliseconds=entry.duration_ms)
+            entry.save(update_fields=["duration_ms", "finished_at"])
+        return entry
+    obj.finished_at = timezone.now()
+    obj.duration_ms = (
+        duration_ms
+        if duration_ms is not None
+        else max(0, int((obj.finished_at - obj.started_at).total_seconds() * 1000))
+    )
     obj.result = result
     obj.detail = detail or obj.detail
-    update = ["result", "detail"]
-    if duration_ms is not None:
-        update += ["duration_ms", "finished_at"]
-    obj.save(update_fields=update)
+    obj.save(update_fields=["result", "detail", "duration_ms", "finished_at"])
     return obj

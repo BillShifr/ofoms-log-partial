@@ -5,7 +5,7 @@ from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from apps.core.models import EventLog
+from apps.core.models import EventLog, log_event
 from apps.core.tokens import decode_token, issue_token, resolve_user
 from apps.core.validators import ComplexityPasswordValidator
 
@@ -101,6 +101,22 @@ class EventLogTests(TestCase):
         self.assertEqual(entry.module, "test")
         self.assertEqual(str(entry.user_id), "None" if entry.user_id is None else str(entry.user_id))
         self.assertEqual(EventLog.objects.count(), 1)
+
+    def test_point_event_has_consistent_end_and_duration(self):
+        entry = log_event(module="test", event_type=EventLog.EventType.CREATE)
+        self.assertEqual(entry.finished_at, entry.started_at)
+        self.assertEqual(entry.duration_ms, 0)
+
+    def test_pending_event_is_completed_without_explicit_duration(self):
+        entry = log_event(
+            module="test", event_type=EventLog.EventType.TASK, pending=True
+        )
+        self.assertIsNone(entry.finished_at)
+        completed = log_event(
+            module="test", event_type=EventLog.EventType.TASK, obj=entry
+        )
+        self.assertIsNotNone(completed.finished_at)
+        self.assertIsNotNone(completed.duration_ms)
 
 
 class FoldTests(TestCase):

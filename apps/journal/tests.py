@@ -6,6 +6,7 @@
 
 import datetime
 import tempfile
+from unittest.mock import patch
 
 from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
@@ -168,16 +169,25 @@ class JournalScreenTests(TestCase):
         )
 
     def test_sort_links_preserve_filters_and_expose_direction(self):
+        self._make_irp()
+        self._make_irp()
         self.client.force_login(self.tfoms_user)
-        response = self.client.get(
-            reverse("journal:list"),
-            {"z_f": "Петров", "status": "open", "sort": "date_create", "page": 2},
-        )
+        with patch("apps.journal.views.PAGE_SIZE", 1):
+            response = self.client.get(
+                reverse("journal:list"),
+                {
+                    "z_f": "Петров",
+                    "status": "open",
+                    "sort": "date_create",
+                    "page": 2,
+                },
+            )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'aria-sort="ascending"')
         self.assertContains(response, "z_f=%D0%9F%D0%B5%D1%82%D1%80%D0%BE%D0%B2")
         self.assertContains(response, "status=open")
         self.assertNotContains(response, "page=2")
+        self.assertContains(response, "page=1")
 
     def test_filter_finds_cyrillic_case_insensitive(self):
         # Локаль PG = C: __icontains не сворачивает кириллицу — ищем через fold

@@ -214,11 +214,19 @@ class JournalScreenTests(TestCase):
 
     def test_detail_shows_requisites(self):
         irp = self._make_irp()
+        IrpHistory.objects.create(
+            irp=irp,
+            user=self.tfoms_user,
+            field_name="status",
+            old_value="",
+            new_value="created",
+        )
         self.client.force_login(self.tfoms_user)
         resp = self.client.get(reverse("journal:detail", args=[irp.pk]))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Петров")
         self.assertContains(resp, irp.get_irp_type_display())
+        self.assertContains(resp, 'class="data" data-client-sort')
 
     def test_create_records_history(self):
         self.client.force_login(self.tfoms_user)

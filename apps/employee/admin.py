@@ -36,10 +36,6 @@ def unlock_accounts(modeladmin, request, queryset):
     modeladmin.message_user(request, f"Разблокировано учётных записей: {n}")
 
 
-# TODO(Этап 4): автоматическое продление/прекращение действия ролей — дата
-# окончания полномочий (ТЗ разд. 3.5). Пока фиксируется в журнале событий.
-
-
 @admin.register(Employee)
 class EmployeeAdmin(UserAdmin):
     model = Employee

@@ -51,9 +51,9 @@
       </thead>
       <tbody>
         {% for e in page.object_list %}
-        <tr class="js-event-row" title="{% if e.detail %}{{ e.detail }}{% else %}Событие {{ e.get_event_type_display }} (модуль {{ e.module }}){% endif %}">
+        <tr class="js-event-row" data-sort-group="event-{{ e.pk }}" title="{% if e.detail %}{{ e.detail }}{% else %}Событие {{ e.get_event_type_display }} (модуль {{ e.module }}){% endif %}">
           <td data-type="num">{{ e.id }}</td>
-          <td>{{ e.started_at|date:"d.m.Y H:i:s" }}</td>
+          <td data-value="{{ e.started_at|date:'Y-m-d\TH:i:s' }}">{{ e.started_at|date:"d.m.Y H:i:s" }}</td>
           <td>{% if e.finished_at %}<span data-value="{{ e.finished_at|date:'Y-m-d\TH:i:s' }}">{{ e.finished_at|date:"d.m.Y H:i:s" }}</span>{% endif %}</td>
           <td>{{ e.get_event_type_display }}</td>
           <td>{{ e.module }}</td>
@@ -67,7 +67,7 @@
           <td class="mono">{{ e.ip|default:"—" }}</td>
           <td data-type="num">{{ e.duration_ms|default:"—" }}</td>
         </tr>
-        <tr class="row-detail js-event-detail" hidden>
+        <tr class="row-detail js-event-detail" data-sort-group="event-{{ e.pk }}" hidden>
           <td colspan="10">{{ e.detail|default:"Описание события отсутствует." }}</td>
         </tr>
         {% empty %}

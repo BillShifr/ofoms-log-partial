@@ -197,6 +197,8 @@ class EventLogScreenTests(BaseSystemTestCase):
         resp = self.client.get(reverse("system:events"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "irp:1")
+        event = EventLog.objects.filter(target="irp:1").get()
+        self.assertContains(resp, f'data-sort-group="event-{event.pk}"', count=2)
         resp = self.client.get(
             reverse("system:events"), {"module": "auth", "result": "failed"}
         )
@@ -544,6 +546,13 @@ class TaskTests(BaseSystemTestCase):
         self.assertTrue(
             EventLog.objects.filter(event_type=EventLog.EventType.TASK, target=f"task:{task.pk}:noop").exists()
         )
+
+    def test_task_and_log_rows_share_sort_group(self):
+        task = self._make_task(last_log="Последний лог")
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("system:tasks"))
+        self.assertContains(response, f'data-sort-group="task-{task.pk}"', count=2)
+        self.assertContains(response, "data-no-sort")
 
     def test_running_task_cannot_be_started_twice(self):
         task = self._make_task(status=TaskJob.Status.RUNNING)

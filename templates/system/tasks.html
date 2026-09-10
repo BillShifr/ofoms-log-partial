@@ -20,12 +20,12 @@
           <th>Приоритет</th>
           <th>Режим</th>
           <th>Последний запуск</th>
-          <th></th>
+          <th data-no-sort></th>
         </tr>
       </thead>
       <tbody>
         {% for t in tasks %}
-        <tr data-href="{% url 'system:task_update' t.pk %}">
+        <tr data-href="{% url 'system:task_update' t.pk %}" data-sort-group="task-{{ t.pk }}">
           <td>{{ t.name }}</td>
           <td class="mono" data-tip="{{ command_tips|get_item:t.command|default:t.command }}">{{ t.command }}</td>
           <td>
@@ -42,7 +42,7 @@
             {% else %}<span class="badge badge--cancelled">Низкий</span>{% endif %}
           </td>
           <td>{{ t.get_run_mode_display }}</td>
-          <td>{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
+          <td data-value="{{ t.last_finished_at|date:'Y-m-d\TH:i:s' }}">{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
           <td class="text-nowrap">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:task_update' t.pk %}">Карточка</a>
             <form method="post" action="{% url 'system:task_run' t.pk %}" class="inline-form">{% csrf_token %}
@@ -54,7 +54,7 @@
           </td>
         </tr>
         {% if t.last_log %}
-        <tr class="task-log-row" data-href="{% url 'system:task_update' t.pk %}">
+        <tr class="task-log-row" data-href="{% url 'system:task_update' t.pk %}" data-sort-group="task-{{ t.pk }}">
           <td colspan="8" class="text-muted mono">{{ t.last_log|slice:":500" }}</td>
         </tr>
         {% endif %}

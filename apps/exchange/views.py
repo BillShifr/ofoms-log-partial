@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from apps.core.models import EventLog, log_event
+from apps.core.policy import EXCHANGE_UPLOAD, user_has_capability
 from apps.employee.models import ORGS, TFOMS
 from apps.exchange.forms import UploadFileForm
 from apps.exchange.importers import (
@@ -33,6 +34,8 @@ def _allowed_orgs(user):
 @login_required
 @require_http_methods(["GET", "POST"])
 def exchange_upload(request):
+    if not user_has_capability(request.user, EXCHANGE_UPLOAD):
+        raise PermissionDenied
     form = UploadFileForm(
         user=request.user, org_choices=_allowed_orgs(request.user)
     )

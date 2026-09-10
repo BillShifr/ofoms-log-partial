@@ -6,10 +6,12 @@ upsert по guid/n_irp, ограничение доступа к протоко�
 import uuid
 from pathlib import Path
 
+from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
 from apps.exchange.flc import FLCP_ERROR, build_flcp, error_result, ok_result
 from apps.exchange.forms import UploadFileForm
@@ -67,6 +69,7 @@ class ExchangeTestMixin:
     def setUp(self):
         import tempfile
 
+        ensure_role_groups()
         self.theme = IrpTheme.objects.create(
             code_name="TT.01", title="Тестовая тема", version=3
         )
@@ -81,6 +84,7 @@ class ExchangeTestMixin:
         self.smo = Employee.objects.create_user(
             username="smo", password="GoodPass!1", org=81001
         )
+        self.smo.groups.add(Group.objects.get(name="СП1"))
         # Временные каталоги обмена (не трогаем рабочие exchange/)
         self.in_dir = tempfile.mkdtemp()
         self.out_dir = tempfile.mkdtemp()
@@ -268,6 +272,13 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
     def test_upload_requires_login(self):
         resp = self.client.get(reverse("exchange:upload"))
         self.assertEqual(resp.status_code, 302)
+
+    def test_user_without_role_cannot_open_upload(self):
+        user = Employee.objects.create_user(
+            username="exchange_no_role", password="GoodPass!1", org=81000
+        )
+        self.client.force_login(user)
+        self.assertEqual(self.client.get(reverse("exchange:upload")).status_code, 403)
 
     def test_smo_sees_only_own_logs(self):
         ImportLog.objects.create(

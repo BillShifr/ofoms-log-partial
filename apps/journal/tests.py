@@ -7,9 +7,11 @@
 import datetime
 import tempfile
 
+from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
 from apps.journal.models import Irp, IrpFile, IrpHistory, IrpTheme
 
@@ -74,6 +76,7 @@ class JournalScreenTests(TestCase):
     """Тесты экранов журнала (Этап 2)."""
 
     def setUp(self):
+        ensure_role_groups()
         self.theme = IrpTheme.objects.create(
             code_name="ZZ.ZZ", title="Доступ", version=3
         )
@@ -83,6 +86,8 @@ class JournalScreenTests(TestCase):
         self.smo_user = Employee.objects.create_user(
             username="smo_agent", password="GoodPass!1", org=81001
         )
+        self.tfoms_user.groups.add(Group.objects.get(name="ОП1"))
+        self.smo_user.groups.add(Group.objects.get(name="СП1"))
 
     def _make_irp(self, owner=None):
         owner = owner or self.tfoms_user
@@ -239,6 +244,7 @@ class RoutingTests(TestCase):
     """Этап 4: ответы (п. 215), файлы (п. 200), переадресация (п. 212)."""
 
     def setUp(self):
+        ensure_role_groups()
         self.theme = IrpTheme.objects.create(
             code_name="RR.RR", title="Маршрутизация", version=3
         )
@@ -248,6 +254,20 @@ class RoutingTests(TestCase):
         self.smo_user = Employee.objects.create_user(
             username="routing_smo", password="GoodPass!1", org=81001
         )
+        self.tfoms_user.groups.add(Group.objects.get(name="ОП1"))
+        self.smo_user.groups.add(Group.objects.get(name="СП1"))
+
+    def test_user_without_role_cannot_change_journal(self):
+        unassigned = Employee.objects.create_user(
+            username="no_role", password="GoodPass!1", org=81000
+        )
+        irp = self._make_irp()
+        self.client.force_login(unassigned)
+        response = self.client.post(
+            reverse("journal:answer", args=[irp.pk]), {"text": "Недопустимо"}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(irp.answers.exists())
 
     def _make_irp(self, owner=None):
         owner = owner or self.tfoms_user

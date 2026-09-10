@@ -22,6 +22,12 @@ from django.views.decorators.http import require_http_methods
 
 from apps.core.fold import contains_folded
 from apps.core.models import EventLog, log_event
+from apps.core.policy import (
+    JOURNAL_CHANGE,
+    JOURNAL_CREATE,
+    JOURNAL_REDIRECT,
+    user_has_capability,
+)
 from apps.employee.models import TFOMS
 from apps.journal.forms import IrpAnswerForm, IrpFilterForm, IrpForm, IrpRedirectForm
 from apps.journal.models import RESULTS, Irp, IrpAnswer, IrpFile, IrpHistory
@@ -196,6 +202,7 @@ def irp_print(request, pk):
 @require_http_methods(["GET", "POST"])
 def irp_create(request):
     """Ручная регистрация обращения (ТЗ разд. 2.2, Способ 1)."""
+    _require_capability(request, JOURNAL_CREATE)
     if request.method == "POST":
         form = IrpForm(request.POST, user=request.user)
         if form.is_valid():
@@ -227,6 +234,7 @@ def irp_create(request):
 def irp_edit(request, pk):
     """Редактирование карточки обращения с фиксацией изменений в истории."""
     irp = _get_irp_for_user(request, pk)
+    _require_capability(request, JOURNAL_CHANGE)
     if request.method == "POST":
         form = IrpForm(request.POST, instance=irp, user=request.user)
         # ModelForm мутирует instance при валидации — снимок до is_valid()
@@ -259,6 +267,7 @@ def irp_edit(request, pk):
 def irp_answer_create(request, pk):
     """Добавление ответа на обращение (ТЗ п. 215: предварительный ответ)."""
     irp = _get_irp_for_user(request, pk)
+    _require_capability(request, JOURNAL_CHANGE)
     form = IrpAnswerForm(request.POST)
     if form.is_valid():
         answer = form.save(commit=False)
@@ -284,6 +293,7 @@ def irp_answer_create(request, pk):
 def irp_file_upload(request, pk):
     """Прикрепление файла к обращению или к ответу (ТЗ п. 200)."""
     irp = _get_irp_for_user(request, pk)
+    _require_capability(request, JOURNAL_CHANGE)
     uploaded = request.FILES.get("file")
     if uploaded:
         from apps.system.validators import validate_document_file
@@ -336,6 +346,7 @@ def irp_file_download(request, pk):
 def irp_redirect(request, pk):
     """Переадресация обращения (ТЗ п. 212) + запись в историю."""
     irp = _get_irp_for_user(request, pk)
+    _require_capability(request, JOURNAL_REDIRECT)
     if request.method == "POST":
         form = IrpRedirectForm(request.POST, instance=irp, user=request.user)
         before = {f: getattr(irp, f) for f in form.fields}
@@ -376,6 +387,11 @@ def _get_irp_for_user(request, pk):
     if request.user.org != TFOMS and irp.employee_one.org != request.user.org:
         raise PermissionDenied
     return irp
+
+
+def _require_capability(request, capability):
+    if not user_has_capability(request.user, capability):
+        raise PermissionDenied
 
 
 def _write_history(irp, user, old=None, created=False):

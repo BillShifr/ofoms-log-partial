@@ -13,6 +13,10 @@ from apps.system.validators import validate_document_file
 logger = logging.getLogger("apps.system")
 
 
+class TaskAlreadyRunning(RuntimeError):
+    """Задание уже захвачено другим worker-процессом."""
+
+
 class NewsCategory(models.Model):
     """Категория/тема новости (PRD v3 §2.7)."""
 
@@ -396,7 +400,11 @@ class TaskJob(models.Model):
     @property
     def due(self) -> bool:
         """Готово к автозапуску по интервалу."""
-        if not self.enabled or self.run_mode != TaskJob.RunMode.SCHEDULED:
+        if (
+            not self.enabled
+            or self.status == TaskJob.Status.RUNNING
+            or self.run_mode != TaskJob.RunMode.SCHEDULED
+        ):
             return False
         if not self.interval_minutes:
             return False
@@ -413,6 +421,15 @@ class TaskJob(models.Model):
 
         started_at = timezone.now()
         triggered_by = "user" if user is not None else "auto"
+        claimed = (
+            TaskJob.objects.filter(pk=self.pk)
+            .exclude(status=TaskJob.Status.RUNNING)
+            .update(status=TaskJob.Status.RUNNING, last_started_at=started_at)
+        )
+        if not claimed:
+            raise TaskAlreadyRunning(f"Задание {self.pk} уже выполняется")
+        self.status = TaskJob.Status.RUNNING
+        self.last_started_at = started_at
         run = TaskRun.objects.create(
             task=self, triggered_by=triggered_by, started_at=started_at
         )
@@ -442,9 +459,14 @@ class TaskJob(models.Model):
         self.last_finished_at = finished_at
         self.last_result = result
         self.last_log = log
+        self.status = TaskJob.Status.COMPLETED if ok else TaskJob.Status.FAILED
         self.save(
             update_fields=[
-                "last_started_at", "last_finished_at", "last_result", "last_log",
+                "status",
+                "last_started_at",
+                "last_finished_at",
+                "last_result",
+                "last_log",
             ]
         )
 

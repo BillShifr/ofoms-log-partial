@@ -23,6 +23,7 @@ from apps.system.models import (
     NewsCategory,
     NewsItem,
     SystemDocument,
+    TaskAlreadyRunning,
     TaskFile,
     TaskJob,
     TaskRun,
@@ -520,6 +521,20 @@ class TaskTests(BaseSystemTestCase):
         self.assertTrue(
             EventLog.objects.filter(event_type=EventLog.EventType.TASK, target=f"task:{task.pk}:noop").exists()
         )
+
+    def test_running_task_cannot_be_started_twice(self):
+        task = self._make_task(status=TaskJob.Status.RUNNING)
+        with self.assertRaises(TaskAlreadyRunning):
+            task.run(user=self.admin)
+        self.assertFalse(TaskRun.objects.exists())
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("system:task_run", args=[task.pk]), follow=True
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "уже выполняется")
+        self.assertFalse(TaskRun.objects.exists())
 
     def test_failed_command_logged(self):
         task = self._make_task(command="missing_cmd")

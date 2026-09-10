@@ -48,6 +48,7 @@ from apps.system.models import (
     NewsCategory,
     NewsItem,
     SystemDocument,
+    TaskAlreadyRunning,
     TaskFile,
     TaskJob,
     TaskNote,
@@ -822,13 +823,11 @@ def task_update(request, pk):
 @require_http_methods(["POST"])
 def task_run(request, pk):
     task = get_object_or_404(TaskJob, pk=pk)
-    task.status = TaskJob.Status.RUNNING
-    task.save(update_fields=["status"])
-    run = task.run(user=request.user)
-    task.status = (
-        TaskJob.Status.COMPLETED if run.result == EventLog.Result.OK else TaskJob.Status.FAILED
-    )
-    task.save(update_fields=["status"])
+    try:
+        run = task.run(user=request.user)
+    except TaskAlreadyRunning:
+        messages.warning(request, f"Задание «{task.name}» уже выполняется.")
+        return redirect("system:task_update", pk=task.pk)
     if run.result == EventLog.Result.OK:
         messages.success(request, f"Задание «{task.name}» выполнено успешно.")
     else:

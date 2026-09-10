@@ -4,7 +4,7 @@
 интервал (due). Запуск по требованию: управляющий планировщик (systemd
 timer / Cron) вызывает: python manage.py run_tasks
 """
-from apps.system.models import TaskJob
+from apps.system.models import TaskAlreadyRunning, TaskJob
 from django.core.management.base import BaseCommand
 
 
@@ -29,7 +29,13 @@ class Command(BaseCommand):
             self.stdout.write("Нет заданий для запуска.")
             return
         for task in qs:
-            run = task.run(user=None)
+            try:
+                run = task.run(user=None)
+            except TaskAlreadyRunning:
+                self.stdout.write(
+                    self.style.WARNING(f"task {task.pk}: уже выполняется, пропущено")
+                )
+                continue
             label = run.result if run.result else "?"
             self.stdout.write(
                 self.style.WARNING(f"task {task.pk} [{task.command}]: {label}")

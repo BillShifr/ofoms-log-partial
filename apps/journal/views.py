@@ -106,7 +106,8 @@ def irp_list(request):
         request.user, JOURNAL_TABLE_KEY, [c["key"] for c in JOURNAL_COLUMNS]
     )
     visible_keys = pref.columns or [c["key"] for c in JOURNAL_COLUMNS]
-    cols = [dict(c) for c in JOURNAL_COLUMNS if c["key"] in visible_keys]
+    columns_by_key = {c["key"]: c for c in JOURNAL_COLUMNS}
+    cols = [dict(columns_by_key[key]) for key in visible_keys if key in columns_by_key]
 
     # Сортировка: явный параметр запроса > персональная настройка > по умолчанию
     sort = request.GET.get("sort")

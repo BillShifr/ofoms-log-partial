@@ -1219,6 +1219,8 @@ def table_prefs(request, table_key):
         sort_dir = request.POST.get("sort_dir", "-")
         if sort_field not in meta["allowed_sorts"]:
             sort_field = ""
+        if sort_dir not in ("", "-"):
+            sort_dir = "-"
         pref.columns = selected_sorted
         pref.sorting = {"field": sort_field, "dir": sort_dir} if sort_field else {}
         pref.fixed_first = request.POST.get("fixed_first") == "on"
@@ -1235,13 +1237,20 @@ def table_prefs(request, table_key):
 
     current = set(pref.columns or [])
     sorting = pref.sorting or {}
+    saved_order = pref.columns or [c["key"] for c in meta["columns"]]
+    order_by_key = {key: index for index, key in enumerate(saved_order, start=1)}
+    columns = sorted(
+        meta["columns"],
+        key=lambda column: order_by_key.get(column["key"], len(order_by_key) + 1),
+    )
     return render(
         request,
         "system/table_prefs.html",
         {
             "table_key": table_key,
             "meta": meta,
-            "columns": meta["columns"],
+            "columns": columns,
+            "order_by_key": order_by_key,
             "current": current,
             "pref": pref,
             "sort_field": sorting.get("field", ""),

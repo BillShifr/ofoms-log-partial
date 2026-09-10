@@ -713,6 +713,35 @@ class PrefTests(BaseSystemTestCase):
         self.assertNotContains(resp, "Принял")
         self.assertNotContains(resp, ">Дата</a>")
 
+        self.assertEqual([column["key"] for column in resp.context["cols"]], ["id", "z_f", "status"])
+
+    def test_journal_applies_saved_column_order(self):
+        self._make_irp()
+        UserTableViewPref.objects.create(
+            user=self.operator,
+            table_key=JOURNAL_TABLE_KEY,
+            columns=["status", "z_f", "id"],
+        )
+        self.client.force_login(self.operator)
+        response = self.client.get(reverse("journal:list"))
+        self.assertEqual(
+            [column["key"] for column in response.context["cols"]],
+            ["status", "z_f", "id"],
+        )
+
+    def test_preferences_form_preserves_saved_column_order(self):
+        UserTableViewPref.objects.create(
+            user=self.operator,
+            table_key=JOURNAL_TABLE_KEY,
+            columns=["status", "id"],
+        )
+        self.client.force_login(self.operator)
+        response = self.client.get(
+            reverse("system:table_prefs", args=[JOURNAL_TABLE_KEY])
+        )
+        content = response.content.decode()
+        self.assertLess(content.index('value="status"'), content.index('value="id"'))
+
     def test_journal_uses_pref_sort(self):
         self._make_irp()
         UserTableViewPref.objects.create(

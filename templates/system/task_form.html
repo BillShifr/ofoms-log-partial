@@ -133,7 +133,7 @@
   <div class="tab-panel" data-panel="files">
     {% for f in files %}
     <div class="message">
-      <span class="text-nowrap">Файл: <a href="{{ f.file.url }}" target="_blank">{{ f.file.name|cut:"tasks/" }}</a></span>
+      <span class="text-nowrap">Файл: <a href="{% url 'system:task_file_download' f.pk %}">{{ f.file.name|cut:"tasks/" }}</a></span>
       <span class="text-muted"> · {{ f.uploaded_by.full_name|default:f.uploaded_by.username }} · {{ f.created_at|date:"d.m.Y H:i" }}</span>
     </div>
     {% empty %}

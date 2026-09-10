@@ -26,6 +26,7 @@ urlpatterns = [
     path("messages/thread/<int:pk>/", views.thread_detail, name="thread"),
     path("messages/thread/<int:pk>/reply/", views.thread_reply, name="reply"),
     path("messages/thread/<int:pk>/react/", views.thread_react, name="react"),
+    path("messages/attachments/<int:pk>/download/", views.message_attachment_download, name="message_attachment_download"),
     # Задачи (3.6)
     path("tasks/", views.task_list, name="tasks"),
     path("tasks/assignees/suggest/", views.task_assignee_suggest, name="task_assignee_suggest"),
@@ -33,6 +34,7 @@ urlpatterns = [
     path("tasks/<int:pk>/", views.task_update, name="task_update"),
     path("tasks/<int:pk>/run/", views.task_run, name="task_run"),
     path("tasks/<int:pk>/toggle/", views.task_toggle, name="task_toggle"),
+    path("tasks/files/<int:pk>/download/", views.task_file_download, name="task_file_download"),
     # Документация (3.7)
     path("docs/", views.doc_list, name="docs"),
     path("docs/suggest/", views.doc_suggest, name="doc_suggest"),

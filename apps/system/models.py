@@ -515,7 +515,11 @@ class TaskFile(models.Model):
     task = models.ForeignKey(
         TaskJob, on_delete=models.CASCADE, related_name="files", verbose_name="Задание"
     )
-    file = models.FileField(upload_to=task_upload_to, verbose_name="Файл")
+    file = models.FileField(
+        upload_to=task_upload_to,
+        validators=[validate_document_file],
+        verbose_name="Файл",
+    )
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="Загрузил"
     )

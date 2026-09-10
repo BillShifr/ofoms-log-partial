@@ -15,7 +15,7 @@ import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -286,6 +286,16 @@ def irp_file_upload(request, pk):
     irp = _get_irp_for_user(request, pk)
     uploaded = request.FILES.get("file")
     if uploaded:
+        from apps.system.validators import validate_document_file
+
+        try:
+            validate_document_file(uploaded)
+        except Exception:  # noqa: BLE001 -- return a stable user-facing error
+            messages.error(
+                request,
+                "Файл не прикреплён: недопустимый тип или размер файла.",
+            )
+            return redirect(reverse("journal:detail", args=[irp.pk]))
         answer_id = request.POST.get("answer")
         answer = None
         if answer_id:
@@ -304,6 +314,21 @@ def irp_file_upload(request, pk):
         )
         messages.success(request, "Файл прикреплён.")
     return redirect(reverse("journal:detail", args=[irp.pk]))
+
+
+@login_required
+@require_http_methods(["GET"])
+def irp_file_download(request, pk):
+    """Выдаёт вложение только пользователю с доступом к обращению."""
+    attachment = get_object_or_404(
+        IrpFile.objects.select_related("irp__employee_one"), pk=pk
+    )
+    _get_irp_for_user(request, attachment.irp_id)
+    return FileResponse(
+        attachment.file.open("rb"),
+        filename=attachment.file.name.rsplit("/", 1)[-1],
+        as_attachment=True,
+    )
 
 
 @login_required

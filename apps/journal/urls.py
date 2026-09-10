@@ -26,6 +26,7 @@ urlpatterns = [
     path("<int:pk>/print/", views.irp_print, name="print"),
     path("<int:pk>/answer/", views.irp_answer_create, name="answer"),
     path("<int:pk>/file/", views.irp_file_upload, name="file"),
+    path("files/<int:pk>/download/", views.irp_file_download, name="file_download"),
     path("<int:pk>/redirect/", views.irp_redirect, name="redirect"),
     path("<int:pk>/cover/", views.irp_cover, name="cover"),
 ]

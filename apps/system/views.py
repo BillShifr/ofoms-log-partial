@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.http import Http404, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -46,6 +46,7 @@ from apps.system.models import (
     NewsCategory,
     NewsItem,
     SystemDocument,
+    TaskFile,
     TaskJob,
     TaskNote,
     UserTableViewPref,
@@ -559,6 +560,22 @@ def thread_reply(request, pk):
 
 
 @login_required
+@require_http_methods(["GET"])
+def message_attachment_download(request, pk):
+    """Выдаёт вложение только участнику родительского диалога."""
+    attachment = get_object_or_404(
+        MessageAttachment.objects.select_related("reply__thread__conversation"),
+        pk=pk,
+    )
+    _participant_or_404(request.user, attachment.reply.thread.conversation)
+    return FileResponse(
+        attachment.file.open("rb"),
+        filename=attachment.file.name.rsplit("/", 1)[-1],
+        as_attachment=True,
+    )
+
+
+@login_required
 @require_http_methods(["POST"])
 def thread_react(request, pk):
     """Переключение реакции пользователя на сообщение."""
@@ -805,6 +822,18 @@ def task_toggle(request, pk):
     return redirect("system:tasks")
 
 
+@admin_required
+@require_http_methods(["GET"])
+def task_file_download(request, pk):
+    """Выдаёт служебное вложение задачи только администратору."""
+    attachment = get_object_or_404(TaskFile, pk=pk)
+    return FileResponse(
+        attachment.file.open("rb"),
+        filename=attachment.file.name.rsplit("/", 1)[-1],
+        as_attachment=True,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Документация (ТЗ разд. 3.7)
 # ---------------------------------------------------------------------------
@@ -893,8 +922,6 @@ def doc_upload(request):
 @require_http_methods(["GET"])
 def doc_download(request, pk):
     """Скачивание документа с учётом счётчика загрузок (PRD v3 §2.8)."""
-    from django.http import FileResponse
-
     doc = get_object_or_404(SystemDocument, pk=pk)
     SystemDocument.objects.filter(pk=pk).update(downloads_count=doc.downloads_count + 1)
     log_event(

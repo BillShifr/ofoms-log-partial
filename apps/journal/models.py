@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.employee.models import ORGS, Employee
+from apps.system.validators import validate_document_file
 
 # ---------------------------------------------------------------------------
 # Справочники (коды закреплены форматом обмена, МИС/реестрами)
@@ -364,7 +365,11 @@ class IrpFile(models.Model):
         null=True, blank=True, related_name="files",
         on_delete=models.CASCADE, verbose_name="Ответ",
     )
-    file = models.FileField(upload_to=irp_file_path, verbose_name="Файл")
+    file = models.FileField(
+        upload_to=irp_file_path,
+        validators=[validate_document_file],
+        verbose_name="Файл",
+    )
     uploader = models.ForeignKey(
         Employee, on_delete=models.PROTECT, verbose_name="Загрузил"
     )

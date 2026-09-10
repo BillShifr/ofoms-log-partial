@@ -17,11 +17,13 @@ from apps.journal.models import Irp, IrpTheme
 from apps.journal.table import JOURNAL_TABLE_KEY
 from apps.system.models import (
     Conversation,
+    MessageAttachment,
     MessageReply,
     MessageThread,
     NewsCategory,
     NewsItem,
     SystemDocument,
+    TaskFile,
     TaskJob,
     TaskRun,
     UserTableViewPref,
@@ -291,6 +293,29 @@ class MessageTests(BaseSystemTestCase):
         reply = MessageReply.objects.get(thread=thread)
         self.assertEqual(reply.attachments.count(), 0)
 
+    def test_attachment_download_is_limited_to_conversation_participants(self):
+        conv = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=conv, created_by=self.admin, title="Закрытая тема"
+        )
+        reply = MessageReply.objects.create(thread=thread, author=self.admin, body="Файл")
+        attachment = MessageAttachment.objects.create(
+            reply=reply,
+            file=SimpleUploadedFile("private.txt", b"private"),
+            uploaded_by=self.admin,
+        )
+        self.client.force_login(self.smo)
+        denied = self.client.get(
+            reverse("system:message_attachment_download", args=[attachment.pk])
+        )
+        self.assertEqual(denied.status_code, 403)
+        self.client.force_login(self.operator)
+        allowed = self.client.get(
+            reverse("system:message_attachment_download", args=[attachment.pk])
+        )
+        self.assertEqual(allowed.status_code, 200)
+        self.assertEqual(b"".join(allowed.streaming_content), b"private")
+
 
 @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
 class DocTests(BaseSystemTestCase):
@@ -484,6 +509,25 @@ class TaskTests(BaseSystemTestCase):
         resp = self.client.post(reverse("system:task_run", args=[task.pk]))
         self.assertEqual(resp.status_code, 403)
         self.assertFalse(TaskRun.objects.exists())
+
+    def test_task_file_download_requires_admin(self):
+        task = self._make_task()
+        attachment = TaskFile.objects.create(
+            task=task,
+            file=SimpleUploadedFile("result.txt", b"result"),
+            uploaded_by=self.admin,
+        )
+        self.client.force_login(self.operator)
+        denied = self.client.get(
+            reverse("system:task_file_download", args=[attachment.pk])
+        )
+        self.assertEqual(denied.status_code, 403)
+        self.client.force_login(self.admin)
+        allowed = self.client.get(
+            reverse("system:task_file_download", args=[attachment.pk])
+        )
+        self.assertEqual(allowed.status_code, 200)
+        self.assertEqual(b"".join(allowed.streaming_content), b"result")
 
     def test_note_add_edit_delete(self):
         self.client.force_login(self.admin)

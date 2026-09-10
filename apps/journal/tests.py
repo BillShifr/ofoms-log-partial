@@ -352,6 +352,37 @@ class RoutingTests(TestCase):
         )
         self.assertEqual(resp.status_code, 403)
 
+    def test_file_download_enforces_parent_irp_scope(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        irp = self._make_irp(owner=self.tfoms_user)
+        attachment = IrpFile.objects.create(
+            irp=irp,
+            file=SimpleUploadedFile("private.txt", b"private"),
+            uploader=self.tfoms_user,
+        )
+        self.client.force_login(self.smo_user)
+        denied = self.client.get(reverse("journal:file_download", args=[attachment.pk]))
+        self.assertEqual(denied.status_code, 403)
+        self.client.force_login(self.tfoms_user)
+        allowed = self.client.get(reverse("journal:file_download", args=[attachment.pk]))
+        self.assertEqual(allowed.status_code, 200)
+        self.assertEqual(b"".join(allowed.streaming_content), b"private")
+
+    def test_file_upload_rejects_unsafe_extension(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        irp = self._make_irp()
+        self.client.force_login(self.tfoms_user)
+        response = self.client.post(
+            reverse("journal:file", args=[irp.pk]),
+            {"file": SimpleUploadedFile("payload.php", b"<?php")},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(irp.files.exists())
+        self.assertContains(response, "Файл не прикреплён")
+
     def test_redirect_updates_route_and_history(self):
         irp = self._make_irp()
         self.client.force_login(self.tfoms_user)

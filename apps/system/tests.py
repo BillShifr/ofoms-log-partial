@@ -49,9 +49,11 @@ class BaseSystemTestCase(TestCase):
         self.operator = Employee.objects.create_user(
             username="op_sys", password=PASSWORD, org=81000
         )
+        self.operator.groups.add(Group.objects.get(name="ОП1"))
         self.smo = Employee.objects.create_user(
             username="smo_sys", password=PASSWORD, org=81001
         )
+        self.smo.groups.add(Group.objects.get(name="СП1"))
 
 
 class AccessTests(BaseSystemTestCase):
@@ -68,6 +70,7 @@ class AccessTests(BaseSystemTestCase):
             self.assertEqual(resp.status_code, 403, name)
 
     def test_admin_can_open_admin_screens(self):
+        self.admin.groups.add(Group.objects.get(name="ОП1"))
         self.client.force_login(self.admin)
         for name in ("users", "user_create", "events", "tasks", "task_create"):
             resp = self.client.get(reverse(f"system:{name}"))

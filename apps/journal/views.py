@@ -25,6 +25,7 @@ from apps.core.models import EventLog, log_event
 from apps.core.policy import (
     JOURNAL_CHANGE,
     JOURNAL_CREATE,
+    JOURNAL_READ,
     JOURNAL_REDIRECT,
     user_has_capability,
 )
@@ -47,6 +48,7 @@ def irp_suggest(request):
 
     GET ?field=<n_irp|z_f|z_enp>&q=<не менее 3 символов> => JSON-список значений.
     """
+    _require_capability(request, JOURNAL_READ)
     field = request.GET.get("field", "")
     q = (request.GET.get("q") or "").strip()
     if field not in ("n_irp", "z_f", "z_enp") or len(q) < 3:
@@ -63,6 +65,7 @@ def irp_suggest(request):
 @login_required
 def irp_list(request):
     """Реестр обращений: таблица + панель фильтров + пагинация."""
+    _require_capability(request, JOURNAL_READ)
     qs = Irp.objects.select_related("theme", "employee_one", "employee_it")
 
     # СМО видят только свои обращения (принцип v1 get_queryset)
@@ -383,6 +386,7 @@ def irp_cover(request, pk):
 
 
 def _get_irp_for_user(request, pk):
+    _require_capability(request, JOURNAL_READ)
     irp = get_object_or_404(Irp, pk=pk)
     if request.user.org != TFOMS and irp.employee_one.org != request.user.org:
         raise PermissionDenied

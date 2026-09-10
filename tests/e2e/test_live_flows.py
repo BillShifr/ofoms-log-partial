@@ -12,7 +12,9 @@ from urllib.parse import urlencode
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 
 from apps.core.models import EventLog
+from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
+from django.contrib.auth.models import Group
 from django.test import LiveServerTestCase
 
 TOKEN_RE = re.compile(r'name="csrfmiddlewaretoken" value="([^"]+)"')
@@ -52,9 +54,11 @@ class _LiveHttp:
 
 class LiveFlowsTests(LiveServerTestCase):
     def setUp(self):
+        ensure_role_groups()
         self.operator = Employee.objects.create_user(
             username="e2e_op", password=PASSWORD, org=81000
         )
+        self.operator.groups.add(Group.objects.get(name="ОП1"))
 
     def _client(self):
         return _LiveHttp(self.live_server_url)

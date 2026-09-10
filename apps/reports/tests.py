@@ -3,9 +3,11 @@
 import datetime
 import uuid
 
+from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 
+from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
 from apps.journal.models import Irp, IrpTheme
 from apps.reports.export import write_pdf, write_xlsx_bytes
@@ -25,6 +27,7 @@ class ReportRegistryTests(TestCase):
 
 class BaseReportTestCase(TestCase):
     def setUp(self):
+        ensure_role_groups()
         self.theme = IrpTheme.objects.create(
             code_name="A.B", title="Качество услуг", version=3
         )
@@ -34,6 +37,8 @@ class BaseReportTestCase(TestCase):
         self.smo_user = Employee.objects.create_user(
             username="rep_smo", password="GoodPass!1", org=81001
         )
+        self.tfoms_user.groups.add(Group.objects.get(name="ОП1"))
+        self.smo_user.groups.add(Group.objects.get(name="СП1"))
 
     def _make(self, owner=None, irp_type=1, how=1, way=1, zh_d=None,
               date_close=None, result=None, text="Текст", line_one=None, pr_out=None):
@@ -215,6 +220,13 @@ class ReportScreenTests(BaseReportTestCase):
     def test_index_requires_login(self):
         resp = self.client.get(reverse("reports:index"))
         self.assertEqual(resp.status_code, 302)
+
+    def test_index_denies_user_without_role(self):
+        user = Employee.objects.create_user(
+            username="rep_no_role", password="GoodPass!1", org=81000
+        )
+        self.client.force_login(user)
+        self.assertEqual(self.client.get(reverse("reports:index")).status_code, 403)
 
     def test_index_lists_reports(self):
         self.client.force_login(self.tfoms_user)

@@ -116,6 +116,13 @@ class JournalScreenTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertIn("/accounts/login", resp.url)
 
+    def test_list_denies_user_without_role(self):
+        user = Employee.objects.create_user(
+            username="journal_no_role", password="GoodPass!1", org=81000
+        )
+        self.client.force_login(user)
+        self.assertEqual(self.client.get(reverse("journal:list")).status_code, 403)
+
     def test_list_shows_irp(self):
         self._make_irp()
         self.client.force_login(self.tfoms_user)

@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from apps.core.models import EventLog, log_event
-from apps.core.policy import EXCHANGE_UPLOAD, user_has_capability
+from apps.core.policy import EXCHANGE_READ, EXCHANGE_UPLOAD, user_has_capability
 from apps.employee.models import ORGS, TFOMS
 from apps.exchange.forms import UploadFileForm
 from apps.exchange.importers import (
@@ -102,6 +102,8 @@ def _process_upload(user, org, uploaded) -> ImportLog:
 
 @login_required
 def exchange_logs(request):
+    if not user_has_capability(request.user, EXCHANGE_READ):
+        raise PermissionDenied
     qs = ImportLog.objects.all()
     if request.user.org != TFOMS and not request.user.is_superuser:
         qs = qs.filter(org=request.user.org)
@@ -115,6 +117,8 @@ def exchange_logs(request):
 
 @login_required
 def exchange_protocol(request, pk):
+    if not user_has_capability(request.user, EXCHANGE_READ):
+        raise PermissionDenied
     log = get_object_or_404(ImportLog, pk=pk)
     if (
         request.user.org != TFOMS

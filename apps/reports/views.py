@@ -6,6 +6,7 @@ from django.shortcuts import render
 from django.views.decorators.http import require_GET
 
 from apps.core.models import EventLog, log_event
+from apps.core.policy import REPORTS_READ, user_has_capability
 from apps.reports.export import write_pdf, write_xlsx_bytes
 from apps.reports.forms import ReportFilterForm
 from apps.reports.reports import REPORT_INDEX, REPORTS
@@ -30,6 +31,7 @@ def _get_spec(slug):
 @login_required
 @require_GET
 def reports_index(request):
+    _require_reports_access(request)
     return render(
         request,
         "reports/index.html",
@@ -40,6 +42,7 @@ def reports_index(request):
 @login_required
 @require_GET
 def report_detail(request, slug):
+    _require_reports_access(request)
     spec = _get_spec(slug)
     form = ReportFilterForm(request.GET or None, user=request.user)
     rows = None
@@ -67,6 +70,7 @@ def report_detail(request, slug):
 @login_required
 @require_GET
 def report_export(request, slug, fmt):
+    _require_reports_access(request)
     spec = _get_spec(slug)
     if fmt not in EXPORT_META:
         raise Http404
@@ -87,3 +91,10 @@ def report_export(request, slug, fmt):
         f'attachment; filename="pril{spec.number}_{spec.slug}.{extension}"'
     )
     return response
+
+
+def _require_reports_access(request):
+    if not user_has_capability(request.user, REPORTS_READ):
+        from django.core.exceptions import PermissionDenied
+
+        raise PermissionDenied

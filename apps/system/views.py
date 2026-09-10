@@ -19,7 +19,8 @@ from django.views.decorators.http import require_http_methods
 
 from apps.core.fold import contains_folded
 from apps.core.models import EventLog, log_event
-from apps.core.roles import Roles, role_code_for_user
+from apps.core.policy import role_codes_for_user
+from apps.core.roles import Roles
 from apps.employee.models import Employee
 from apps.journal.table import JOURNAL_COLUMNS, JOURNAL_TABLE_KEY, SORTABLE_FIELDS
 from apps.system.forms import (
@@ -59,7 +60,7 @@ def _is_admin(user) -> bool:
     return bool(
         user
         and user.is_authenticated
-        and (user.is_superuser or role_code_for_user(user) == Roles.ADMIN)
+        and (user.is_superuser or Roles.ADMIN in role_codes_for_user(user))
     )
 
 

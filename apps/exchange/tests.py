@@ -280,6 +280,20 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
         self.client.force_login(user)
         self.assertEqual(self.client.get(reverse("exchange:upload")).status_code, 403)
 
+    def test_user_without_role_cannot_read_exchange(self):
+        user = Employee.objects.create_user(
+            username="exchange_reader_no_role", password="GoodPass!1", org=81000
+        )
+        log = ImportLog.objects.create(
+            org=81000, kind="irp", filename="denied.xml", status="ok", rows=0
+        )
+        self.client.force_login(user)
+        self.assertEqual(self.client.get(reverse("exchange:logs")).status_code, 403)
+        self.assertEqual(
+            self.client.get(reverse("exchange:protocol", args=[log.pk])).status_code,
+            403,
+        )
+
     def test_smo_sees_only_own_logs(self):
         ImportLog.objects.create(
             org=81001, kind="irp", filename="a.xml", status="ok", rows=1

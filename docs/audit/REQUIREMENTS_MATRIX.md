@@ -7,7 +7,7 @@
 | Реестр, карточка, маркировка, поиск и сортировка | ТЗ 2.1 | ТФОМС, СМО | journal | models/views/templates | Django tests | Нет печати списка; infinite scroll не реализован | частично |
 | 4 способа регистрации и единый ФЛК | ТЗ 2.2 | ТФОМС, СМО | journal/exchange | forms/importers/command | exchange tests | Импорт atomic; нет эталонного Приложения 10 для доказательства формата | частично |
 | История, результат, переадресация, предварительный ответ | ТЗ 2.3 | ОП/СП | journal | IrpHistory/answers/redirect | routing tests | Нет формальной FSM/transition permissions | частично |
-| Ролевой deny-by-default доступ | ТЗ 2.4, 3.1 | Admin, ОП, СП, СМО | core/journal/exchange | groups + org scope | отдельные permission tests | Нет полной action matrix | реализовано неверно |
+| Ролевой deny-by-default доступ | ТЗ 2.4, 3.1 | Admin, ОП, СП, СМО | core/journal/exchange/reports | capability policy + org scope | отдельные permission tests | Нет формальной FSM переходов | частично |
 | 9 отчётных форм и фильтры | ТЗ 2.5 | ТФОМС, СМО | reports | registry/export | reports tests | Нет оригинальных Приложений 1–9 | неоднозначно |
 | Защищённая выдача вложений | ТЗ 3.1 | все | journal/system downloads | object-scoped FileResponse | regression tests | Web-сервер не должен публиковать media напрямую | реализовано |
 | Блокировка после 10 попыток и стойкие пароли | ТЗ 3.1 | все | core/auth | backend/signals/validator | core tests | Счётчик подвержен гонке; окно не используется | частично |

@@ -5,9 +5,23 @@ from apps.core.roles import GROUP_ROLE_MAP, Roles
 JOURNAL_CREATE = "journal.create"
 JOURNAL_CHANGE = "journal.change"
 JOURNAL_REDIRECT = "journal.redirect"
+JOURNAL_READ = "journal.read"
 EXCHANGE_UPLOAD = "exchange.upload"
+EXCHANGE_READ = "exchange.read"
+REPORTS_READ = "reports.read"
+
+ALL_ROLES = {
+    Roles.OP1,
+    Roles.OP2,
+    Roles.SP1,
+    Roles.SP2,
+    Roles.SP3,
+    Roles.ADMIN,
+    Roles.CALL_ADMIN,
+}
 
 CAPABILITY_ROLES = {
+    JOURNAL_READ: ALL_ROLES,
     JOURNAL_CREATE: {Roles.OP1, Roles.SP1, Roles.ADMIN},
     JOURNAL_CHANGE: {
         Roles.OP1,
@@ -19,6 +33,8 @@ CAPABILITY_ROLES = {
     },
     JOURNAL_REDIRECT: {Roles.OP1, Roles.SP1, Roles.ADMIN},
     EXCHANGE_UPLOAD: {Roles.OP1, Roles.SP1, Roles.ADMIN},
+    EXCHANGE_READ: ALL_ROLES,
+    REPORTS_READ: ALL_ROLES,
 }
 
 

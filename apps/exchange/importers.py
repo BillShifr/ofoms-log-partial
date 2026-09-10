@@ -16,6 +16,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.db import transaction
 from lxml import etree
 
 from apps.employee.models import Employee
@@ -23,6 +24,7 @@ from apps.exchange import flc
 from apps.journal.models import Irp, IrpTheme, XmlFiles
 
 XSD_DIR = Path(__file__).resolve().parent / "xsd"
+MAX_EXCHANGE_FILE_SIZE = 20 * 1024 * 1024
 
 
 @dataclass
@@ -95,15 +97,25 @@ class XsdExchangeFile:
 
     def validate(self):
         """XSD-валидация и разбор XML."""
+        if self.real_file.stat().st_size > MAX_EXCHANGE_FILE_SIZE:
+            self.errors.append(
+                flc.error_result("FILE", "Размер файла превышает 20 МБ")
+            )
+            return
         schema_path = Path(self.xsd_name)
         if not schema_path.is_absolute():
             schema_path = XSD_DIR / schema_path
         with open(schema_path, "rb") as f:
             schema = etree.XMLSchema(etree.XML(f.read()))
-        parser = etree.XMLParser(schema=schema)
+        parser = etree.XMLParser(
+            schema=schema,
+            resolve_entities=False,
+            no_network=True,
+            huge_tree=False,
+        )
         try:
             with open(self.real_file, "rb") as f:
-                self.xml = etree.fromstring(f.read(), parser)
+                self.xml = etree.parse(f, parser).getroot()
             self.validated = True
         except Exception as e:  # XML / XSD ошибка — протокол 41
             self.errors.append(flc.error_result("XML", str(e)))
@@ -115,7 +127,15 @@ class XsdExchangeFile:
         """Полный цикл: валидация, загрузка, архив, протокол."""
         self.validate()
         if self.validated:
-            self.load_db()
+            try:
+                with transaction.atomic():
+                    self.load_db()
+                    if self.errors:
+                        transaction.set_rollback(True)
+            except Exception as exc:  # noqa: BLE001 -- convert to FLCP and rollback
+                self.errors.append(flc.error_result("IMPORT", str(exc)))
+            if self.errors:
+                self.rows = 0
         self._archive()
         return ImportResult(
             filename=self.basename,
@@ -131,7 +151,7 @@ class XsdExchangeFile:
     def _archive(self):
         org_dir = self._archive_dir / str(self.org)
         org_dir.mkdir(parents=True, exist_ok=True)
-        dest = org_dir / self.basename
+        dest = available_artifact_path(org_dir / self.basename)
         try:
             os.replace(self.real_file, dest)
         except OSError:
@@ -140,7 +160,7 @@ class XsdExchangeFile:
     def write_flcp(self, result: ImportResult) -> Path:
         org_dir = self._out_dir / str(self.org)
         org_dir.mkdir(parents=True, exist_ok=True)
-        out = org_dir / self.basename
+        out = available_artifact_path(org_dir / self.basename)
         with open(out, "wb") as f:
             f.write(result.flcp_bytes())
         return out
@@ -460,28 +480,35 @@ class ExcelIrpFile:
 
         wb = None
         try:
-            wb = load_workbook(self.real_file, read_only=True, data_only=True)
-            ws = wb.active
-            rows = ws.iter_rows(values_only=True)
-            try:
-                header = list(next(rows))
-            except StopIteration:
-                header = []
-            mapping = self._map_header(header)
-            for r in rows:
-                if all(v in (None, "") for v in r):
-                    continue
-                raw = {
-                    field: r[idx] if idx < len(r) else None
-                    for field, idx in mapping.items()
-                }
-                rec = _excel_row_to_irp(raw)
-                self._import_one(rec)
+            if self.real_file.stat().st_size > MAX_EXCHANGE_FILE_SIZE:
+                raise ValueError("Размер файла превышает 20 МБ")
+            with transaction.atomic():
+                wb = load_workbook(self.real_file, read_only=True, data_only=True)
+                ws = wb.active
+                rows = ws.iter_rows(values_only=True)
+                try:
+                    header = list(next(rows))
+                except StopIteration:
+                    header = []
+                mapping = self._map_header(header)
+                for r in rows:
+                    if all(v in (None, "") for v in r):
+                        continue
+                    raw = {
+                        field: r[idx] if idx < len(r) else None
+                        for field, idx in mapping.items()
+                    }
+                    rec = _excel_row_to_irp(raw)
+                    self._import_one(rec)
+                if self.errors:
+                    transaction.set_rollback(True)
         except Exception as e:
             self.errors.append(flc.error_result("EXCEL", str(e)))
         finally:
             if wb is not None:
                 wb.close()
+        if self.errors:
+            self.rows = 0
         self._archive()
         return ImportResult(
             filename=self.basename,
@@ -563,12 +590,12 @@ class ExcelIrpFile:
     def _archive(self):
         org_dir = self._archive_dir / str(self.org)
         org_dir.mkdir(parents=True, exist_ok=True)
-        os.replace(self.real_file, org_dir / self.basename)
+        os.replace(self.real_file, available_artifact_path(org_dir / self.basename))
 
     def write_flcp(self, result: ImportResult) -> Path:
         org_dir = self._out_dir / str(self.org)
         org_dir.mkdir(parents=True, exist_ok=True)
-        out = org_dir / self.basename
+        out = available_artifact_path(org_dir / self.basename)
         with open(out, "wb") as f:
             f.write(result.flcp_bytes())
         return out
@@ -590,6 +617,15 @@ def discover_files(in_dir, org, masks) -> list[Path]:
             if os.path.isfile(p)
         )
     return sorted(set(files), key=lambda p: p.name)
+
+
+def available_artifact_path(path: Path) -> Path:
+    """Preserve the original name once and never overwrite an existing artifact."""
+    if not path.exists():
+        return path
+    import uuid
+
+    return path.with_name(f"{path.stem}-{uuid.uuid4().hex[:8]}{path.suffix}")
 
 
 def import_all(orgs=None):

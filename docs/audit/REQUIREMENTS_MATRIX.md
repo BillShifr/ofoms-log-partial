@@ -5,7 +5,7 @@
 | Требование | Источник | Роли | Модуль/маршрут | Реализация | Проверка | Разрыв | Статус |
 |---|---|---|---|---|---|---|---|
 | Реестр, карточка, маркировка, поиск и сортировка | ТЗ 2.1 | ТФОМС, СМО | journal | models/views/templates | Django tests | Нет печати списка; infinite scroll не реализован | частично |
-| 4 способа регистрации и единый ФЛК | ТЗ 2.2 | ТФОМС, СМО | journal/exchange | forms/importers/command | exchange tests | Нет доказательства идентичного ФЛК; импорт не atomic | частично |
+| 4 способа регистрации и единый ФЛК | ТЗ 2.2 | ТФОМС, СМО | journal/exchange | forms/importers/command | exchange tests | Импорт atomic; нет эталонного Приложения 10 для доказательства формата | частично |
 | История, результат, переадресация, предварительный ответ | ТЗ 2.3 | ОП/СП | journal | IrpHistory/answers/redirect | routing tests | Нет формальной FSM/transition permissions | частично |
 | Ролевой deny-by-default доступ | ТЗ 2.4, 3.1 | Admin, ОП, СП, СМО | core/journal/exchange | groups + org scope | отдельные permission tests | Нет полной action matrix | реализовано неверно |
 | 9 отчётных форм и фильтры | ТЗ 2.5 | ТФОМС, СМО | reports | registry/export | reports tests | Нет оригинальных Приложений 1–9 | неоднозначно |
@@ -17,4 +17,3 @@
 | События с start/end и фильтрами | ТЗ 3.4 | Admin | system/events | EventLog/middleware | tests | finished_at не заполняется согласованно | частично |
 | Пользователи, группы и права | ТЗ 3.5 | Admin | system/users | CRUD/groups | tests | Нет UI матрицы granular permissions | частично |
 | Автоматизированные задачи manual/schedule | ТЗ 3.6 | Admin | system/tasks | registry/runs/command | tests | Нет блокировки параллельного запуска | частично |
-

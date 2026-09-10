@@ -14,7 +14,12 @@ from django.views.decorators.http import require_http_methods
 from apps.core.models import EventLog, log_event
 from apps.employee.models import ORGS, TFOMS
 from apps.exchange.forms import UploadFileForm
-from apps.exchange.importers import EmployeeXMLFile, ExcelIrpFile, IrpXMLFile
+from apps.exchange.importers import (
+    EmployeeXMLFile,
+    ExcelIrpFile,
+    IrpXMLFile,
+    available_artifact_path,
+)
 from apps.exchange.models import ImportLog
 
 
@@ -62,7 +67,7 @@ def _process_upload(user, org, uploaded) -> ImportLog:
     safe_name = os.path.basename(uploaded.name or "file")
     in_org = settings.EXCHANGE_IN / str(org)
     in_org.mkdir(parents=True, exist_ok=True)
-    dest = in_org / safe_name
+    dest = available_artifact_path(in_org / safe_name)
     with open(dest, "wb") as f:
         for chunk in uploaded.chunks():
             f.write(chunk)

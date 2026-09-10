@@ -6,11 +6,13 @@ upsert по guid/n_irp, ограничение доступа к протоко�
 import uuid
 from pathlib import Path
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from apps.employee.models import Employee
 from apps.exchange.flc import FLCP_ERROR, build_flcp, error_result, ok_result
+from apps.exchange.forms import UploadFileForm
 from apps.exchange.importers import EmployeeXMLFile, ExcelIrpFile, IrpXMLFile
 from apps.exchange.models import ImportLog
 from apps.journal.models import Irp, IrpTheme
@@ -173,6 +175,32 @@ class IrpImportTests(ExchangeTestMixin, TestCase):
         self.assertFalse(out.ok)
         self.assertEqual(Irp.objects.count(), 0)
 
+    def test_file_is_atomic_when_later_row_is_invalid(self):
+        first_id = str(uuid.uuid4())
+        second_id = str(uuid.uuid4())
+        first = _irp_xml("TT.01", str(self.emp1.guid), first_id).decode("windows-1251")
+        second_row = f"""
+  <IRP>
+    <n_irp>{second_id}</n_irp><irp_type>1</irp_type>
+    <date_create>2026-05-14</date_create><way>1</way><how>2</how>
+    <theme>XX.NOPE</theme><otv_t>1</otv_t><otv_kon>81000</otv_kon>
+    <employee_1>{self.emp1.guid}</employee_1><data_plan>2026-06-13</data_plan>
+    <z_sv><z_f>Ошибочный</z_f></z_sv>
+  </IRP>
+"""
+        content = first.replace("</IRP_LIST>", second_row + "</IRP_LIST>").encode(
+            "windows-1251"
+        )
+        path = Path(self.in_dir) / "G1R_atomic.xml"
+        path.write_bytes(content)
+        result = IrpXMLFile(81000, path, **self._imp_kwargs()).process()
+        self.assertFalse(result.ok)
+        self.assertEqual(result.rows, 0)
+        self.assertFalse(Irp.objects.filter(n_irp__in=[first_id, second_id]).exists())
+        from apps.journal.models import XmlFiles
+
+        self.assertEqual(XmlFiles.objects.count(), 0)
+
 
 class FlcValidationTests(ExchangeTestMixin, TestCase):
     def test_missing_required_field_reported(self):
@@ -316,6 +344,28 @@ class UploadPostTests(ExchangeTestMixin, TestCase):
         resp = self._post(b"data", "note.txt")
         self.assertEqual(resp.status_code, 200)  # ошибка формы, не 500
         self.assertContains(resp, "Неизвестный тип файла")
+
+    def test_upload_rejects_declared_oversize_before_writing(self):
+        oversized = SimpleUploadedFile(
+            "G1R_large.xml", b"x", content_type="application/xml"
+        )
+        oversized.size = 20 * 1024 * 1024 + 1
+        form = UploadFileForm(
+            data={"org": "81000"},
+            files={"file": oversized},
+            org_choices=[(81000, "ТФОМС")],
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("Размер файла не должен превышать 20 МБ", str(form.errors))
+        self.assertFalse((self._in / "81000" / "G1R_large.xml").exists())
+
+    def test_repeated_upload_does_not_overwrite_archive_or_protocol(self):
+        self._post(SAMPLE_USERS, "users260514001.xml")
+        self._post(SAMPLE_USERS, "users260514001.xml")
+        archived = list((self._arch / "81000").glob("users260514001*"))
+        protocols = list((self._out / "81000").glob("users260514001*"))
+        self.assertEqual(len(archived), 2)
+        self.assertEqual(len(protocols), 2)
 
     def test_upload_rejects_smo_foreign_org(self):
         self.client.force_login(self.smo)

@@ -1,0 +1,292 @@
+"""Тесты модуля отчётов: реестр, фильтры, расчётные формы, экспорт (Этап 5)."""
+
+import datetime
+import uuid
+
+from django.test import TestCase
+from django.urls import reverse
+
+from apps.employee.models import Employee
+from apps.journal.models import Irp, IrpTheme
+from apps.reports.export import write_pdf, write_xlsx_bytes
+from apps.reports.forms import ReportFilterForm
+from apps.reports.reports import REPORT_INDEX, REPORTS, ReportFilters
+
+
+class ReportRegistryTests(TestCase):
+    def test_nine_reports(self):
+        self.assertEqual(len(REPORTS), 9)
+
+    def test_slugs_unique(self):
+        slugs = [r.slug for r in REPORTS]
+        self.assertEqual(len(slugs), len(set(slugs)))
+        self.assertEqual(len(REPORT_INDEX), 9)
+
+
+class BaseReportTestCase(TestCase):
+    def setUp(self):
+        self.theme = IrpTheme.objects.create(
+            code_name="A.B", title="Качество услуг", version=3
+        )
+        self.tfoms_user = Employee.objects.create_user(
+            username="rep_op", password="GoodPass!1", org=81000
+        )
+        self.smo_user = Employee.objects.create_user(
+            username="rep_smo", password="GoodPass!1", org=81001
+        )
+
+    def _make(self, owner=None, irp_type=1, how=1, way=1, zh_d=None,
+              date_close=None, result=None, text="Текст", line_one=None, pr_out=None):
+        owner = owner or self.tfoms_user
+        return Irp.objects.create(
+            n_irp=str(uuid.uuid4()),
+            irp_type=irp_type,
+            date_create=datetime.date.today(),
+            way=way,
+            how=how,
+            theme=self.theme,
+            otv_t=1,
+            otv_kon=owner.org,
+            employee_one=owner,
+            data_plan=datetime.date.today() + datetime.timedelta(days=30),
+            z_f="Петров",
+            text=text,
+            zh_d=zh_d,
+            date_close=date_close,
+            result=result,
+            line_one=line_one,
+            pr_out=pr_out,
+        )
+
+    def _filters(self, **kwargs):
+        return ReportFilters(**kwargs)
+
+
+class ReportQueriesTests(BaseReportTestCase):
+    def test_scope_smo_sees_only_own(self):
+        self._make(irp_type=2)
+        self._make(owner=self.smo_user, irp_type=2)
+        rows = REPORT_INDEX["r4_complaints"].build(self.smo_user.org, self._filters())
+        self.assertEqual(rows[0]["total"], 1)
+
+    def test_tfoms_sees_all(self):
+        self._make(irp_type=2)
+        self._make(owner=self.smo_user, irp_type=2)
+        rows = REPORT_INDEX["r4_complaints"].build(self.tfoms_user.org, self._filters())
+        self.assertEqual(rows[0]["total"], 2)
+
+    def test_only_closed_filter(self):
+        self._make(irp_type=2, date_close=datetime.date.today())
+        self._make(irp_type=2)
+        rows = REPORT_INDEX["r4_complaints"].build(
+            self.tfoms_user.org, self._filters(only_closed=True)
+        )
+        self.assertEqual(rows[0]["total"], 1)
+        self.assertEqual(rows[0]["closed"], 1)
+
+    def test_r1_by_volume_totals(self):
+        self._make(irp_type=1, date_close=datetime.date.today())
+        self._make(irp_type=2)
+        rows = REPORT_INDEX["r1_volume"].build(self.tfoms_user.org, self._filters())
+        total = rows[-1]
+        self.assertEqual(total["total"], 2)
+        self.assertEqual(total["t1"], 1)
+        self.assertEqual(total["t2"], 1)
+        self.assertEqual(total["closed"], 1)
+
+    def test_r2_by_type_percent(self):
+        self._make(irp_type=1)
+        self._make(irp_type=1)
+        self._make(irp_type=2)
+        rows = REPORT_INDEX["r2_type"].build(self.tfoms_user.org, self._filters())
+        self.assertEqual(rows[-1]["total"], 3)
+        self.assertEqual(rows[0]["percent"], "66,7")
+
+    def test_r3_protection_buckets(self):
+        self._make(irp_type=2, zh_d="1.1")
+        self._make(irp_type=2, zh_d="1.2")
+        self._make(irp_type=2, zh_d="2")
+        rows = REPORT_INDEX["r3_protection"].build(self.tfoms_user.org, self._filters())
+        detail = rows[0]
+        self.assertEqual(detail["well"], 2)
+        self.assertEqual(detail["pre"], 1)
+        self.assertEqual(detail["court"], 1)
+        self.assertEqual(detail["bad"], 1)
+        self.assertEqual(detail["total"], 3)
+        self.assertEqual(rows[-1]["total"], 3)
+
+    def test_r5_applications_statuses(self):
+        self._make(irp_type=4, result=3, date_close=datetime.date.today())
+        self._make(irp_type=4, result=4, date_close=datetime.date.today())
+        self._make(irp_type=4)
+        rows = REPORT_INDEX["r5_applications"].build(self.tfoms_user.org, self._filters())
+        total = rows[-1]
+        self.assertEqual(total["total"], 3)
+        self.assertEqual(total["satisfied"], 1)
+        self.assertEqual(total["rejected"], 1)
+        self.assertEqual(total["pending"], 1)
+
+    def test_r6_clarification_hotline(self):
+        self._make(irp_type=1, how=1, result=1, date_close=datetime.date.today())
+        self._make(irp_type=1, how=3)
+        rows = REPORT_INDEX["r6_clarification"].build(self.tfoms_user.org, self._filters())
+        total = rows[-1]
+        self.assertEqual(total["total"], 2)
+        self.assertEqual(total["hotline"], 1)
+        self.assertEqual(total["consulted"], 1)
+
+    def test_r7_hotline_complaints_lines(self):
+        self._make(irp_type=2, how=1, line_one=1)
+        self._make(irp_type=2, how=1, line_one=2, pr_out=1)
+        self._make(irp_type=2, how=2)  # не горячая линия
+        rows = REPORT_INDEX["r7_hotline_complaints"].build(
+            self.tfoms_user.org, self._filters()
+        )
+        total = rows[-1]
+        self.assertEqual(total["total"], 2)
+        self.assertEqual(total["op1"], 1)
+        self.assertEqual(total["op2"], 1)
+        self.assertEqual(total["redirected"], 1)
+
+    def test_r9_personal_rows(self):
+        irp = self._make(text="Многофункциональный центр", date_close=datetime.date.today(), result=2)
+        rows = REPORT_INDEX["r9_personal"].build(self.tfoms_user.org, self._filters())
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["fio"], "Петров")
+        self.assertEqual(rows[0]["status"], "закрыто")
+        self.assertEqual(rows[0]["text"], "Многофункциональный центр")
+        self.assertEqual(rows[0]["n_irp"], irp.n_irp)
+
+    def test_date_range_filter(self):
+        self._make()
+        old = self._make()
+        old.date_create = datetime.date(2020, 1, 1)
+        old.save()
+        rows = REPORT_INDEX["r2_type"].build(
+            self.tfoms_user.org,
+            self._filters(
+                date_from=datetime.date.today() - datetime.timedelta(days=1),
+                date_to=datetime.date.today(),
+            ),
+        )
+        self.assertEqual(rows[-1]["total"], 1)
+
+
+class FilterFormTests(TestCase):
+    def setUp(self):
+        self.tfoms_user = Employee.objects.create_user(
+            username="ff_op", password="GoodPass!1", org=81000
+        )
+        self.smo_user = Employee.objects.create_user(
+            username="ff_smo", password="GoodPass!1", org=81001
+        )
+
+    def test_invalid_period(self):
+        form = ReportFilterForm(
+            {
+                "date_from": datetime.date(2026, 1, 10).isoformat(),
+                "date_to": datetime.date(2026, 1, 1).isoformat(),
+            },
+            user=self.tfoms_user,
+        )
+        self.assertFalse(form.is_valid())
+
+    def test_to_filters(self):
+        form = ReportFilterForm(
+            {
+                "date_from": datetime.date(2026, 1, 1).isoformat(),
+                "how": "1",
+                "only_closed": "on",
+            },
+            user=self.tfoms_user,
+        )
+        self.assertTrue(form.is_valid())
+        f = form.to_filters()
+        self.assertEqual(f.how, 1)
+        self.assertTrue(f.only_closed)
+
+    def test_smo_own_only_index(self):
+        form = ReportFilterForm(user=self.smo_user)
+        choices = dict(form.fields["otv_kon"].choices)
+        self.assertEqual(list(choices), ["", 81001])
+
+
+class ReportScreenTests(BaseReportTestCase):
+    def test_index_requires_login(self):
+        resp = self.client.get(reverse("reports:index"))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_index_lists_reports(self):
+        self.client.force_login(self.tfoms_user)
+        resp = self.client.get(reverse("reports:index"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Приложение №1")
+        self.assertContains(resp, "Приложение №9")
+
+    def test_detail_unknown_404(self):
+        self.client.force_login(self.tfoms_user)
+        resp = self.client.get(reverse("reports:detail", args=["nope"]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_detail_with_filters_renders_table(self):
+        self._make(irp_type=2)
+        self.client.force_login(self.tfoms_user)
+        resp = self.client.get(
+            reverse("reports:detail", args=["r4_complaints"]),
+            {"how": "1"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Качество услуг")
+
+    def test_export_xlsx(self):
+        self._make(irp_type=2)
+        self.client.force_login(self.tfoms_user)
+        resp = self.client.get(
+            reverse("reports:export", args=["r4_complaints", "xlsx"]), {"how": "1"}
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            resp["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertIn("pril4", resp["Content-Disposition"])
+
+    def test_export_pdf(self):
+        self._make(irp_type=2)
+        self.client.force_login(self.tfoms_user)
+        resp = self.client.get(
+            reverse("reports:export", args=["r4_complaints", "pdf"]), {"how": "1"}
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertTrue(resp.content.startswith(b"%PDF"))
+
+    def test_export_invalid_fmt_404(self):
+        self.client.force_login(self.tfoms_user)
+        resp = self.client.get(
+            reverse("reports:export", args=["r4_complaints", "doc"])
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_export_invalid_filters_400(self):
+        self.client.force_login(self.tfoms_user)
+        resp = self.client.get(
+            reverse("reports:export", args=["r4_complaints", "xlsx"]),
+            {"date_from": "2026-02-01", "date_to": "2026-01-01"},
+        )
+        self.assertEqual(resp.status_code, 400)
+
+
+class ExportBytesTests(BaseReportTestCase):
+    def test_write_xlsx_returns_zip(self):
+        spec = REPORT_INDEX["r4_complaints"]
+        rows = spec.build(self.tfoms_user.org, self._filters())
+        data = write_xlsx_bytes(spec, rows)
+        self.assertTrue(data.startswith(b"PK"))
+
+    def test_write_pdf_returns_pdf(self):
+        spec = REPORT_INDEX["r9_personal"]
+        self._make(irp_type=1)
+        rows = spec.build(self.tfoms_user.org, self._filters())
+        data = write_pdf(spec, rows)
+        self.assertTrue(data.startswith(b"%PDF"))

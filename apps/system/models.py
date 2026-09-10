@@ -4,7 +4,7 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -481,6 +481,65 @@ class TaskJob(models.Model):
             duration_ms=int((finished_at - started_at).total_seconds() * 1000),
         )
         return run
+
+    @classmethod
+    def recover_stale(cls, *, stale_after_seconds: int | None = None) -> int:
+        """Закрывает запуски, worker которых не завершился до таймаута."""
+        from apps.core.models import EventLog, log_event
+
+        timeout = (
+            settings.TASK_STALE_AFTER_SECONDS
+            if stale_after_seconds is None
+            else stale_after_seconds
+        )
+        cutoff = timezone.now() - timedelta(seconds=max(timeout, 1))
+        candidate_ids = cls.objects.filter(
+            status=cls.Status.RUNNING,
+            last_started_at__lt=cutoff,
+        ).values_list("pk", flat=True)
+        recovered = 0
+        for task_id in candidate_ids:
+            with transaction.atomic():
+                task = cls.objects.select_for_update().get(pk=task_id)
+                if task.status != cls.Status.RUNNING or not task.last_started_at:
+                    continue
+                if task.last_started_at >= cutoff:
+                    continue
+                finished_at = timezone.now()
+                message = "Worker не завершил запуск до установленного таймаута."
+                task.status = cls.Status.FAILED
+                task.last_finished_at = finished_at
+                task.last_result = EventLog.Result.FAILED
+                task.last_log = message
+                task.save(
+                    update_fields=[
+                        "status",
+                        "last_finished_at",
+                        "last_result",
+                        "last_log",
+                    ]
+                )
+                task.runs.filter(finished_at__isnull=True).update(
+                    finished_at=finished_at,
+                    result=EventLog.Result.FAILED,
+                    log=message,
+                )
+                event = EventLog.objects.filter(
+                    module="system",
+                    event_type=EventLog.EventType.TASK,
+                    target=f"task:{task.pk}:{task.command}",
+                    finished_at__isnull=True,
+                ).order_by("-started_at").first()
+                if event:
+                    log_event(
+                        module="system",
+                        event_type=EventLog.EventType.TASK,
+                        obj=event,
+                        result=EventLog.Result.FAILED,
+                        detail=message,
+                    )
+                recovered += 1
+        return recovered
 
 
 class TaskRun(models.Model):

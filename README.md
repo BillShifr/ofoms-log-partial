@@ -34,6 +34,11 @@ CREATE DATABASE ejournal OWNER ejournal;
 docker compose up --build
 ```
 
+Compose запускает отдельный сервис `scheduler`, который раз в минуту вызывает
+`manage.py run_tasks`. Зависшие дольше `TASK_STALE_AFTER_SECONDS` запуски перед
+каждым циклом автоматически закрываются с результатом «Ошибка»; для отдельной
+диагностики доступна команда `manage.py run_tasks --recover-only`.
+
 ## Конфигурация
 
 Настройки — `config/settings/{base,dev,prod}.py`. Переменные окружения

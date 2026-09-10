@@ -16,4 +16,4 @@
 | Сообщения | ТЗ 3.3 | все | system/messages | conversations/threads/replies/read markers | view + permission tests | Нет realtime; базовый поток и unread корректны | реализовано |
 | События с start/end и фильтрами | ТЗ 3.4 | Admin | system/events | EventLog/middleware + point/pending lifecycle | model/view tests | — | реализовано |
 | Пользователи, группы и права | ТЗ 3.5 | Admin | system/users | CRUD/groups | tests | Нет UI матрицы granular permissions | частично |
-| Автоматизированные задачи manual/schedule | ТЗ 3.6 | Admin | system/tasks | registry/runs/atomic claim | view/command tests | Нет остановки зависшего процесса и cron-конфигурации поставки | частично |
+| Автоматизированные задачи manual/schedule | ТЗ 3.6 | Admin | system/tasks + compose scheduler | registry/runs/atomic claim/stale recovery | view/command/compose checks | Отдельный scheduler поставляется; зависшие запуски закрываются по настраиваемому таймауту | реализовано |

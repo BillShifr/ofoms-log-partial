@@ -632,6 +632,53 @@ class TaskTests(BaseSystemTestCase):
         self.assertEqual(task.last_result, EventLog.Result.OK)
         self.assertIn("task", out.getvalue())
 
+    def test_recover_stale_run_closes_run_and_audit_event(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+        from django.utils import timezone
+
+        started_at = timezone.now() - datetime.timedelta(hours=2)
+        task = self._make_task(
+            status=TaskJob.Status.RUNNING,
+            last_started_at=started_at,
+        )
+        run = TaskRun.objects.create(
+            task=task,
+            triggered_by="auto",
+            started_at=started_at,
+        )
+        event = log_event(
+            module="system",
+            event_type=EventLog.EventType.TASK,
+            target=f"task:{task.pk}:{task.command}",
+            pending=True,
+        )
+        out = StringIO()
+        call_command("run_tasks", "--recover-only", "--stale-after=3600", stdout=out)
+
+        task.refresh_from_db()
+        run.refresh_from_db()
+        event.refresh_from_db()
+        self.assertEqual(task.status, TaskJob.Status.FAILED)
+        self.assertEqual(task.last_result, EventLog.Result.FAILED)
+        self.assertEqual(run.result, EventLog.Result.FAILED)
+        self.assertIsNotNone(run.finished_at)
+        self.assertEqual(event.result, EventLog.Result.FAILED)
+        self.assertIsNotNone(event.finished_at)
+        self.assertIn("Зависших запусков закрыто: 1", out.getvalue())
+
+    def test_recover_stale_leaves_fresh_run_untouched(self):
+        from django.utils import timezone
+
+        task = self._make_task(
+            status=TaskJob.Status.RUNNING,
+            last_started_at=timezone.now(),
+        )
+        self.assertEqual(TaskJob.recover_stale(stale_after_seconds=3600), 0)
+        task.refresh_from_db()
+        self.assertEqual(task.status, TaskJob.Status.RUNNING)
+
     def test_not_due_not_run(self):
         from io import StringIO
 

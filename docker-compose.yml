@@ -34,11 +34,24 @@ services:
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-True}
       SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-True}
       SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-31536000}
+      TASK_STALE_AFTER_SECONDS: ${TASK_STALE_AFTER_SECONDS:-3600}
     volumes:
       - media:/app/media
       - exchange:/app/exchange
     ports:
       - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  scheduler:
+    build: .
+    command: >
+      sh -c "while true; do .venv/bin/python manage.py run_tasks; sleep 60; done"
+    environment: *web_env
+    volumes:
+      - media:/app/media
+      - exchange:/app/exchange
     depends_on:
       db:
         condition: service_healthy

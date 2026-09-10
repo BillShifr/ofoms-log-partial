@@ -7,15 +7,27 @@
 """
 
 import datetime as _dt
+import uuid
 
 import jwt
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
 
+class EmployeeRepository:
+    """Адаптер единого репозитория учётных записей для token exchange."""
+
+    def get_by_guid(self, guid):
+        try:
+            normalized_guid = uuid.UUID(str(guid))
+        except (TypeError, ValueError, AttributeError):
+            return None
+        return get_user_model().objects.filter(guid=normalized_guid).first()
+
+
 def issue_token(user, *, ttl: int | None = None, audience: str = "ejournal") -> str:
     """Выпуск временного JWT для вошедшего пользователя."""
-    ttl = ttl or settings.JWT_TTL
+    ttl = settings.JWT_TTL if ttl is None else ttl
     now = _dt.datetime.now(tz=_dt.UTC)
     payload = {
         "sub": str(user.guid),
@@ -37,8 +49,13 @@ def decode_token(token: str, *, audience: str = "ejournal"):
     )
 
 
-def resolve_user(token: str, *, audience: str = "ejournal"):
+def resolve_user(
+    token: str,
+    *,
+    audience: str = "ejournal",
+    repository: EmployeeRepository | None = None,
+):
     """По токену возвращает Employee (или None)."""
-    UserModel = get_user_model()
     payload = decode_token(token, audience=audience)
-    return UserModel.objects.filter(guid=payload["sub"]).first()
+    repository = repository or EmployeeRepository()
+    return repository.get_by_guid(payload["sub"])

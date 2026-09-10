@@ -1,12 +1,16 @@
 """Тесты core: парольная политика, блокировка, токены, журнал событий."""
 
+import jwt
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
 
 from apps.core.models import EventLog, log_event
-from apps.core.tokens import decode_token, issue_token, resolve_user
+from apps.core.tokens import EmployeeRepository, decode_token, issue_token, resolve_user
 from apps.core.validators import ComplexityPasswordValidator
 
 User = get_user_model()
@@ -77,10 +81,98 @@ class TokenTests(TestCase):
         self.assertEqual(resolve_user(token).pk, self.user.pk)
 
     def test_expired_token_rejected(self):
-
-
         expired = issue_token(self.user, ttl=-10)
         self.assertIsNone(resolve_user_catching(expired))
+
+    def test_zero_ttl_is_not_replaced_by_default(self):
+        token = issue_token(self.user, ttl=0)
+        self.assertIsNone(resolve_user_catching(token))
+
+    def test_resolve_user_uses_repository_adapter(self):
+        class Repository(EmployeeRepository):
+            def get_by_guid(self, guid):
+                self.guid = guid
+                return self.user
+
+        repository = Repository()
+        repository.user = self.user
+        resolved = resolve_user(issue_token(self.user), repository=repository)
+        self.assertEqual(resolved, self.user)
+        self.assertEqual(repository.guid, str(self.user.guid))
+
+
+class TokenLoginTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="sso-user", password="GoodPass!1", org=81004
+        )
+        self.url = reverse("core:token_login")
+
+    def test_valid_form_token_creates_session(self):
+        response = self.client.post(self.url, {"token": issue_token(self.user)})
+        self.assertRedirects(response, reverse("journal:list"), fetch_redirect_response=False)
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.pk)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
+
+    def test_valid_bearer_token_creates_session(self):
+        response = self.client.post(
+            self.url,
+            HTTP_AUTHORIZATION=f"Bearer {issue_token(self.user)}",
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.pk)
+
+    def test_unsafe_next_is_ignored(self):
+        response = self.client.post(
+            self.url,
+            {"token": issue_token(self.user), "next": "https://attacker.invalid/steal"},
+        )
+        self.assertEqual(response.url, reverse("journal:list"))
+
+    def test_safe_next_is_used(self):
+        response = self.client.post(
+            self.url,
+            {"token": issue_token(self.user), "next": "/reports/"},
+        )
+        self.assertEqual(response.url, "/reports/")
+
+    def test_invalid_token_is_rejected_without_session(self):
+        response = self.client.post(self.url, {"token": "not-a-jwt"})
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertNotContains(response, "not-a-jwt", status_code=403)
+
+    def test_signed_token_with_invalid_subject_is_rejected(self):
+        token = jwt.encode(
+            {"sub": "not-a-guid", "aud": "ejournal"},
+            settings.JWT_SECRET,
+            algorithm=settings.JWT_ALGORITHM,
+        )
+        response = self.client.post(self.url, {"token": token})
+        self.assertEqual(response.status_code, 403)
+
+    def test_locked_and_inactive_users_are_rejected(self):
+        for field, value in (
+            ("is_active", False),
+            ("lock_until", timezone.now().replace(year=9999)),
+        ):
+            setattr(self.user, field, value)
+            self.user.save(update_fields=[field])
+            response = self.client.post(self.url, {"token": issue_token(self.user)})
+            self.assertEqual(response.status_code, 403)
+            self.client.logout()
+            setattr(self.user, field, True if field == "is_active" else None)
+            self.user.save(update_fields=[field])
+
+    def test_endpoint_is_post_only_and_rejects_malformed_authorization(self):
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+        response = self.client.post(
+            self.url,
+            {"token": issue_token(self.user)},
+            HTTP_AUTHORIZATION="Basic credentials",
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 def resolve_user_catching(token):

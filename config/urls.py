@@ -22,6 +22,7 @@ urlpatterns = [
     path("", RedirectView.as_view(pattern_name="journal:list", permanent=False), name="index"),
     path("healthz", healthz, name="healthz"),
     path("admin/", admin.site.urls),
+    path("accounts/", include("apps.core.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
     path("journal/", include("apps.journal.urls")),
     path("exchange/", include("apps.exchange.urls")),

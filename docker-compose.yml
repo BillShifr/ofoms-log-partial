@@ -43,6 +43,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - .venv/bin/python
+        - -c
+        - >-
+          import http.client,sys; c=http.client.HTTPConnection('127.0.0.1',8000,timeout=3);
+          c.request('GET','/healthz'); r=c.getresponse(); sys.exit(0 if r.status in (200,301,302) else 1)
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
   scheduler:
     build: .
@@ -53,7 +65,7 @@ services:
       - media:/app/media
       - exchange:/app/exchange
     depends_on:
-      db:
+      web:
         condition: service_healthy
 
 volumes:

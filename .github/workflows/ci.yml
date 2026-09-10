@@ -47,14 +47,31 @@ jobs:
           DB_PASSWORD: ejournal
           DB_HOST: 127.0.0.1
 
+      - name: Migration drift
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Production configuration
+        run: uv run python manage.py check --deploy
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          SECRET_KEY: ci-only-secret-key-with-more-than-fifty-characters-123456789
+          JWT_SECRET: ci-only-jwt-secret-with-more-than-fifty-characters-987654321
+          DB_HOST: 127.0.0.1
+
+      - name: Compose configuration
+        run: docker compose config --quiet
+        env:
+          SECRET_KEY: ci-only-secret-key-with-more-than-fifty-characters-123456789
+          JWT_SECRET: ci-only-jwt-secret-with-more-than-fifty-characters-987654321
+
   docker:
     runs-on: ubuntu-latest
     needs: lint-and-test
-    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
       - name: Docker Login
+        if: github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -63,5 +80,5 @@ jobs:
       - name: Build & push
         uses: docker/build-push-action@v6
         with:
-          push: true
+          push: ${{ github.ref == 'refs/heads/main' }}
           tags: frozendevs/tfoms-ejournal:latest

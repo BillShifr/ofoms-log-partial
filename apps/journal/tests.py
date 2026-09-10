@@ -126,11 +126,25 @@ class JournalScreenTests(TestCase):
         self.assertEqual(self.client.get(reverse("journal:list")).status_code, 403)
 
     def test_list_shows_irp(self):
-        self._make_irp()
+        irp = self._make_irp()
         self.client.force_login(self.tfoms_user)
         resp = self.client.get(reverse("journal:list"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Петров")
+        self.assertContains(resp, f'data-href="{reverse("journal:detail", args=[irp.pk])}"')
+        self.assertContains(resp, "table-row-link")
+
+    def test_sort_links_preserve_filters_and_expose_direction(self):
+        self.client.force_login(self.tfoms_user)
+        response = self.client.get(
+            reverse("journal:list"),
+            {"z_f": "Петров", "status": "open", "sort": "date_create", "page": 2},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'aria-sort="ascending"')
+        self.assertContains(response, "z_f=%D0%9F%D0%B5%D1%82%D1%80%D0%BE%D0%B2")
+        self.assertContains(response, "status=open")
+        self.assertNotContains(response, "page=2")
 
     def test_filter_finds_cyrillic_case_insensitive(self):
         # Локаль PG = C: __icontains не сворачивает кириллицу — ищем через fold

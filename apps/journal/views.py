@@ -106,7 +106,7 @@ def irp_list(request):
         request.user, JOURNAL_TABLE_KEY, [c["key"] for c in JOURNAL_COLUMNS]
     )
     visible_keys = pref.columns or [c["key"] for c in JOURNAL_COLUMNS]
-    cols = [c for c in JOURNAL_COLUMNS if c["key"] in visible_keys]
+    cols = [dict(c) for c in JOURNAL_COLUMNS if c["key"] in visible_keys]
 
     # Сортировка: явный параметр запроса > персональная настройка > по умолчанию
     sort = request.GET.get("sort")
@@ -116,6 +116,18 @@ def irp_list(request):
             sort = pref_sort["dir"] + pref_sort["field"]
     if sort not in ALLOWED_SORTS:
         sort = "-date_create"
+    for col in cols:
+        if not col["sortable"]:
+            col["aria_sort"] = None
+            continue
+        key = col["key"]
+        col["aria_sort"] = (
+            "descending" if sort == f"-{key}" else "ascending" if sort == key else "none"
+        )
+        params = request.GET.copy()
+        params.pop("page", None)
+        params["sort"] = f"-{key}" if sort == key else key
+        col["sort_url"] = f"?{params.urlencode()}"
     qs = qs.order_by(sort, "-id")
 
     page = _paginate_irp(request, qs)

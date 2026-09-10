@@ -234,6 +234,17 @@ table.data th {
 }
 table.data tbody tr:hover { background: var(--chip-green); }
 table.data tbody tr.clickable { cursor: pointer; }
+table.data tbody tr[data-href]:focus-within {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+.table-row-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
 table.data tr.row--overdue { background: var(--chip-red); }
 table.data tr.row--open { background: var(--chip-yellow); }
 

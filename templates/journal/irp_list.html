@@ -39,9 +39,9 @@
         </tr>
         <tr>
           {% for col in cols %}
-            <th>
+            <th{% if col.aria_sort %} aria-sort="{{ col.aria_sort }}"{% endif %}>
               {% if col.sortable %}
-                <a href="?sort={% if sort == col.key %}-{{ col.key }}{% else %}{{ col.key }}{% endif %}">{{ col.label }}</a>
+                <a href="{{ col.sort_url }}">{{ col.label }}</a>
               {% else %}
                 {{ col.label }}
               {% endif %}
@@ -52,10 +52,10 @@
       <tbody>
         {% for irp in page.object_list %}
         <tr class="clickable {% if not irp.is_closed and irp.is_overdue %}row--overdue{% elif not irp.is_closed and not irp.result %}row--open{% endif %}"
-            onclick="location.href='{% url 'journal:detail' irp.pk %}'">
+            data-href="{% url 'journal:detail' irp.pk %}">
           {% for col in cols %}
             <td>
-              {% if col.key == 'id' %}{{ irp.id }}
+              {% if col.key == 'id' %}<a class="table-row-link" href="{% url 'journal:detail' irp.pk %}" aria-label="Открыть обращение № {{ irp.n_irp }}">{{ irp.id }}</a>
               {% elif col.key == 'n_irp' %}<span class="mono">{{ irp.n_irp }}</span>
               {% elif col.key == 'date_create' %}<span data-value="{{ irp.date_create|date:'Y-m-d' }}">{{ irp.date_create|date:"d.m.Y" }}</span><br><span class="text-muted">{{ irp.time_create|time:"H:i"|default:"" }}</span>
               {% elif col.key == 'data_plan' %}<span data-value="{{ irp.data_plan|date:'Y-m-d' }}">{{ irp.data_plan|date:"d.m.Y" }}</span>

@@ -31,6 +31,8 @@ class EmployeeModelTests(TestCase):
             user.record_failed_login()
         user.refresh_from_db()
         self.assertTrue(user.is_locked)
+        user.record_failed_login()
+        self.assertEqual(user.failed_attempts, 10)
         self.assertIsNone(authenticate(username="locktest", password="Passw0rd!"))
 
     def test_unlock(self):
@@ -41,6 +43,19 @@ class EmployeeModelTests(TestCase):
         user.reset_failed_logins()
         self.assertFalse(user.is_locked)
         self.assertTrue(authenticate(username="unlocktest", password="Passw0rd!") is not None)
+
+    def test_stale_instances_do_not_lose_failed_attempts(self):
+        user = Employee.objects.create_user(
+            username="atomic_lock", password="Passw0rd!", org=81000
+        )
+        first = Employee.objects.get(pk=user.pk)
+        second = Employee.objects.get(pk=user.pk)
+
+        first.record_failed_login()
+        second.record_failed_login()
+
+        user.refresh_from_db()
+        self.assertEqual(user.failed_attempts, 2)
 
 
 class GroupProxyTests(TestCase):

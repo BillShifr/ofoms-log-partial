@@ -10,7 +10,7 @@
 | Ролевой deny-by-default доступ | ТЗ 2.4, 3.1 | Admin, ОП, СП, СМО | core/journal/exchange/reports | capability policy + org scope + terminal-state guards | permission/lifecycle tests | Детальные destination rules зависят от оргструктуры | реализовано |
 | 9 отчётных форм и фильтры | ТЗ 2.5 | ТФОМС, СМО | reports | registry/export | reports tests | Нет оригинальных Приложений 1–9 | неоднозначно |
 | Защищённая выдача вложений | ТЗ 3.1 | все | journal/system downloads | object-scoped FileResponse | regression tests | Web-сервер не должен публиковать media напрямую | реализовано |
-| Блокировка после 10 попыток и стойкие пароли | ТЗ 3.1 | все | core/auth | backend/signals/validator | core tests | Счётчик подвержен гонке; окно не используется | частично |
+| Блокировка после 10 попыток и стойкие пароли | ТЗ 3.1 | все | core/auth | backend/signals/atomic counter/validator | core + employee tests | Временное окно намеренно не применяется: разблокировка только администратором | реализовано |
 | Временные токены и единый репозиторий | ТЗ 3.1 | все | core/tokens | token helpers | unit tests | Нет интеграционного endpoint/repository adapter | отсутствует |
 | Персональные настройки таблиц | ТЗ 3.2 | все | system/prefs | UserTableViewPref | tests | Фиксация/группировка ограничены журналом | частично |
 | Сообщения | ТЗ 3.3 | все | system/messages | conversations/threads/replies/read markers | view + permission tests | Нет realtime; базовый поток и unread корректны | реализовано |

@@ -1,0 +1,16 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.log
+.env
+media
+staticfiles
+docs
+.tmp
+tests
+.github
+.idea
+.vscode

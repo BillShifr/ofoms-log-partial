@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Django
+*.log
+staticfiles/
+media/
+db.sqlite3
+
+# Помехи IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Окружение
+.env
+
+# Файлы обмена входа/выхода (этап 3)
+exchange/in/*
+exchange/out/*
+exchange/archive/*
+!exchange/in/.gitkeep
+!exchange/out/.gitkeep
+!exchange/archive/.gitkeep

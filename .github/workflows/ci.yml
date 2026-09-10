@@ -1,0 +1,67 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ejournal
+          POSTGRES_USER: ejournal
+          POSTGRES_PASSWORD: ejournal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ejournal -d ejournal"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Sync deps
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Tests (pytest)
+        run: uv run pytest
+        env:
+          DB_NAME: ejournal
+          DB_USER: ejournal
+          DB_PASSWORD: ejournal
+          DB_HOST: 127.0.0.1
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: frozendevs/tfoms-ejournal:latest

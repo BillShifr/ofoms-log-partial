@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ejournal}
+      POSTGRES_USER: ${DB_USER:-ejournal}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ejournal}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ejournal}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    command: >
+      sh -c "
+        .venv/bin/python manage.py migrate --noinput --settings config.settings.prod &&
+        .venv/bin/gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60
+      "
+    environment: &web_env
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      DB_NAME: ${DB_NAME:-ejournal}
+      DB_USER: ${DB_USER:-ejournal}
+      DB_PASSWORD: ${DB_PASSWORD:-ejournal}
+      DB_HOST: db
+      DB_PORT: "5432"
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DEBUG: "False"
+      SESSION_COOKIE_SECURE: "False"
+      SECURE_SSL_REDIRECT: "False"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

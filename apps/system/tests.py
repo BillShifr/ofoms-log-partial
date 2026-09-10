@@ -554,6 +554,28 @@ class NewsTests(BaseSystemTestCase):
         resp = self.client.get(reverse("system:news_detail", args=[item.pk]))
         self.assertEqual(resp.status_code, 404)
 
+    def test_rich_text_rejects_script_and_protocol_relative_links(self):
+        item = NewsItem.objects.create(
+            title="Безопасная разметка",
+            text=(
+                '<script>alert(1)</script><a href="javascript:alert(2)">bad</a>'
+                '<a href="//evil.example/path">external</a>'
+                '<a href="/system/news/">local</a>'
+            ),
+            author=self.admin,
+            is_active=True,
+        )
+        self.client.force_login(self.operator)
+
+        response = self.client.get(reverse("system:news_detail", args=[item.pk]))
+        body = response.content.decode()
+
+        self.assertNotIn("<script>alert(1)", body)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", body)
+        self.assertNotIn('href="javascript:', body)
+        self.assertNotIn('href="//evil.example', body)
+        self.assertIn('href="/system/news/"', body)
+
     def test_news_suggest(self):
         NewsItem.objects.create(title="Изменение регламента", author=self.admin)
         self.client.force_login(self.smo)

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Протокол обработки {{ log.filename }}{% endblock %}
+{% block content %}
+<h1>Протокол обработки</h1>
+
+<div class="flex mb-2">
+  <a class="btn btn--ghost" href="{% url 'exchange:logs' %}">← В журнал загрузок</a>
+  <a class="btn btn--ghost" href="{% url 'exchange:upload' %}">Загрузить ещё</a>
+</div>
+
+<div class="card">
+  <dl class="dl">
+    <dt>Файл</dt><dd class="mono">{{ log.filename }}</dd>
+    <dt>Организация</dt><dd>{{ log.get_org_display }}</dd>
+    <dt>Тип</dt><dd>{{ log.get_kind_display }}</dd>
+    <dt>Статус</dt><dd>{% if log.status == 'ok' %}<span class="badge badge--closed">Обработан без ошибок</span>
+      {% else %}<span class="badge badge--overdue" data-tip="Ошибка формата данных (нарушена структура XML-элемента). Подробнее — строки протокола с кодом 41.">Обработан с ошибками</span>{% endif %}</dd>
+    <dt>Записей обработано</dt><dd>{{ log.rows }}</dd>
+    <dt>Когда</dt><dd>{{ log.created_at|date:"d.m.Y H:i" }}</dd>
+  </dl>
+</div>
+
+<div class="card">
+  <h2 class="text-muted mt-1">Протокол FLCP</h2>
+  <div class="table-wrap">
+    <table class="data" data-client-sort>
+      <thead><tr><th>Код</th><th>Поле</th><th data-type="num">Обращение</th><th>Комментарий</th></tr></thead>
+      <tbody>
+        {% for pr in prs %}
+        <tr>
+          <td>{% if pr.OSHIB == '0' %}<span class="badge badge--closed" data-tip="Ошибок не обнаружено">0</span>{% else %}
+              <span class="badge badge--overdue" data-tip="Код 41: ошибка формата данных (нарушена структура XML-элемента)">41</span>{% endif %}</td>
+          <td>{{ pr.IM_POL|default:"—" }}</td>
+          <td class="mono" data-type="num">{{ pr.N_ZAP|default:"—" }}</td>
+          <td>{{ pr.COMMENT }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-muted">Протокол пуст.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

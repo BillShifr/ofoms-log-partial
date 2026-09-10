@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<a class="btn btn--ghost mb-2" href="{% url 'system:news' %}">← Все новости</a>
+<h1>{{ title }}</h1>
+<div class="card">
+  <form method="post" enctype="multipart/form-data" data-validate>
+    {% csrf_token %}
+    <div class="form-grid">
+      {% for field in form %}
+        {% if field.field.widget.input_type == "checkbox" %}
+        <div class="field field--narrow">
+          <label class="checkbox">{{ field }}{{ field.label }}</label>
+          {% for error in field.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        {% elif field.name == "text" or field.name == "summary" %}
+        <div class="field field--wide">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.name == "text" %}<span class="text-muted">Поддерживаются простые HTML-теги: &lt;b&gt;, &lt;i&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;a href&gt; и др.</span>{% endif %}
+          {% for error in field.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        {% else %}
+        <div class="field">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% for error in field.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Сохранить</button>
+      <a class="btn btn--ghost" href="{% url 'system:news' %}">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

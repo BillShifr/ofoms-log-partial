@@ -1,0 +1,28 @@
+<form method="get" class="filters" style="align-items:center;gap:8px;margin-bottom:10px">
+  <div class="field" style="flex:1">
+    <label for="conversation-q">Поиск</label>
+    <input id="conversation-q" type="text" name="q" value="{{ q }}" placeholder="Участник, тема или текст">
+  </div>
+  <div class="field field--narrow">
+    <button class="btn btn--primary btn--sm" type="submit">Найти</button>
+    {% if q %}<a class="btn btn--ghost btn--sm" href="{% url 'system:messages' %}">Сброс</a>{% endif %}
+  </div>
+</form>
+<div class="conversation-list">
+  {% for m in conversations %}
+  <a class="conversation-card {% if m.unread %}conversation-card--unread{% endif %}"
+     href="{% url 'system:conversation' m.conv.pk %}">
+    <div class="conversation-card__head">
+      <strong>{% if m.unread %}<span class="nav__badge">{{ m.unread }}</span> {% endif %}{{ m.conv.display_title }}</strong>
+      <span class="text-muted">{{ m.last.created_at|date:"d.m.Y H:i"|default:m.conv.created_at|date:"d.m.Y" }}</span>
+    </div>
+    {% if m.last %}
+    <p class="conversation-card__last">{{ m.last.author.full_name }}: {{ m.last.body|truncatechars:64 }}</p>
+    {% else %}
+    <p class="conversation-card__last text-muted">Сообщений пока нет</p>
+    {% endif %}
+  </a>
+  {% empty %}
+  <p class="text-muted">Диалогов пока нет.</p>
+  {% endfor %}
+</div>

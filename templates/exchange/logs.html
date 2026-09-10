@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Журнал загрузок обмена{% endblock %}
+{% block content %}
+<h1>Журнал загрузок файлов обмена</h1>
+
+<div class="flex mb-2">
+  <a class="btn btn--accent" href="{% url 'exchange:upload' %}">+ Загрузить файл</a>
+  <a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data" data-client-sort>
+      <thead>
+        <tr>
+          <th>Файл</th><th>Организация</th><th>Тип</th><th>Статус</th>
+          <th data-type="num">Записей</th><th>Когда</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr data-href="{% url 'exchange:protocol' log.pk %}"
+            {% if log.status == 'ok' %}title="Загрузка обработана без ошибок — протокол FLCP"{% else %}title="Загрузка обработана с ошибками — смотрите протокол FLCP, код 41"{% endif %}>
+          <td class="mono cell-long">{{ log.filename }}</td>
+          <td>{{ log.get_org_display }}</td>
+          <td>{{ log.get_kind_display }}</td>
+          <td>{% if log.status == 'ok' %}<span class="badge badge--closed">OK</span>
+              {% else %}<span class="badge badge--overdue">Ошибки</span>{% endif %}</td>
+          <td data-type="num">{{ log.rows }}</td>
+          <td>{{ log.created_at|date:"d.m.Y H:i" }}</td>
+          <td class="text-nowrap"><a class="btn btn--sm btn--ghost" href="{% url 'exchange:protocol' log.pk %}">Протокол</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-muted">Загрузок ещё не было.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load system_filters %}
+{% block title %}Документация{% endblock %}
+{% block content %}
+<h1>Документация</h1>
+<p class="text-muted mb-2">Действующая эксплуатационная документация, сгруппированная по разделам (ТЗ разд. 3.7, PRD v3 §2.8).</p>
+
+<div class="card mb-2">
+  <form method="get" class="filters" style="align-items:center">
+    <div class="field" style="flex:1">
+      <label for="search-docs">Поиск по документам</label>
+      <input id="search-docs" type="text" name="q" value="{{ request.GET.q }}" data-autocomplete="doc" data-autocomplete-url="{% url 'system:doc_suggest' %}" placeholder="Введите название (от 3 символов)">
+    </div>
+    <div class="field field--narrow">
+      <button class="btn btn--primary" type="submit">Найти</button>
+      {% if request.GET.q %}<a class="btn btn--ghost" href="{% url 'system:docs' %}">Сбросить</a>{% endif %}
+    </div>
+  </form>
+</div>
+
+{% if can_manage %}
+<div class="card mb-2">
+  <details class="collapsible" data-key="docs-upload">
+    <summary class="collapsible__toggle">Подключить документ</summary>
+    <form method="post" action="{% url 'system:doc_upload' %}" enctype="multipart/form-data" data-validate>
+      {% csrf_token %}
+      <div class="form-grid">
+        <div class="field"><label for="{{ form.title.id_for_label }}">Наименование</label>{{ form.title }}
+          <span class="text-muted">При пустом поле подставится имя файла без расширения</span>
+          {% for error in form.title.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field"><label for="{{ form.category.id_for_label }}">Категория</label>{{ form.category }}{% for error in form.category.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field"><label for="{{ form.version.id_for_label }}">Версия</label>{{ form.version }}{% for error in form.version.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field"><label for="{{ form.sort_order.id_for_label }}">Порядок</label>{{ form.sort_order }}{% for error in form.sort_order.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field field--wide"><label for="{{ form.description.id_for_label }}">Описание</label>{{ form.description }}{% for error in form.description.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field field--wide"><label for="{{ form.file.id_for_label }}">Файл</label>{{ form.file }}{% for error in form.file.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+      </div>
+      <div class="form-actions" style="justify-content:flex-start">
+        <button class="btn btn--primary" type="submit">Загрузить</button>
+      </div>
+    </form>
+  </details>
+</div>
+{% endif %}
+
+{% if request.GET.q %}
+<div class="card mb-2">
+  <h3 class="mt-1 mb-1">Результаты поиска по «{{ request.GET.q }}»</h3>
+  {% include "system/_docs_grid.html" %}
+</div>
+{% else %}
+<div class="grid-2">
+  {% for cat in categories %}
+  <a class="card report-card" data-href="{% url 'system:doc_category' cat.slug %}">
+    <div class="cat-icon" aria-hidden="true">{{ cat.icon|default:"DOC" }}</div>
+    <h3 class="mt-1 mb-1">{{ cat.name }}</h3>
+    {% if cat.description %}<p class="text-muted">{{ cat.description }}</p>{% endif %}
+    <span class="badge badge--role">Документов: {{ cat.docs_count }}</span>
+  </a>
+  {% empty %}
+  <p class="text-muted">Категорий пока нет.</p>
+  {% endfor %}
+</div>
+
+{% if category or docs %}
+<div class="card mt-2">
+  <div class="flex-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <h2 style="flex:1;font-size:1.2rem" class="mt-1 mb-1">
+      {% if category %}{{ category.name }}{% else %}Без категории{% endif %}
+    </h2>
+    {% if category %}<a class="btn btn--ghost btn--sm" href="{% url 'system:docs' %}">← Все разделы</a>{% endif %}
+  </div>
+  {% include "system/_docs_grid.html" %}
+</div>
+{% else %}
+<div class="card mt-2">
+  <p class="text-muted">Документация ещё не загружена.</p>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var fileInput = document.querySelector('#id_file');
+  var titleInput = document.querySelector('#id_title');
+  if (fileInput && titleInput) {
+    fileInput.addEventListener('change', function () {
+      if (!titleInput.value && fileInput.files.length) {
+        titleInput.value = (fileInput.files[0].name || '').replace(/\.[^.]+$/, '').slice(0, 200);
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

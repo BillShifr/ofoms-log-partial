@@ -1,0 +1,118 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Обращение № {{ irp.n_irp }} (печать)</title>
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}">
+  <style>
+    body{ background:#fff !important; padding:24px; }
+    .print-header{ display:flex; justify-content:space-between; align-items:flex-start;
+      border-bottom:2px solid var(--ink); padding-bottom:12px; margin-bottom:16px; }
+    .print-header h1{ margin:0; font-family:var(--font-display, 'Unbounded'); font-size:18px; }
+    @media print{
+      .no-print{ display:none !important; }
+      body{ padding:0; }
+      .print-header{ border-bottom:2px solid #000; }
+      .card{ box-shadow:none !important; border:1px solid #000; break-inside:avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print flex mb-2">
+    <a class="btn btn--ghost" href="{% url 'journal:detail' irp.pk %}">← Назад к карточке</a>
+    <button class="btn btn--primary" onclick="window.print()">Печать</button>
+  </div>
+
+  <div class="print-header">
+    <div>
+      <h1>Единый электронный журнал обращений граждан</h1>
+      <div class="text-muted">Карточка обращения (РКК) — печатная форма</div>
+    </div>
+    <div class="text-right">
+      <div class="mono">{{ irp.n_irp }}</div>
+      <div>зарегистрировано: {{ irp.date_create|date:"d.m.Y" }} {{ irp.time_create|time:"H:i"|default:"" }}</div>
+    </div>
+  </div>
+
+  {% if irp.is_closed %}<span class="badge badge--closed">Закрыто</span>
+  {% elif irp.is_overdue %}<span class="badge badge--overdue">Просрочено</span>
+  {% else %}<span class="badge badge--open">Открыто</span>{% endif %}
+  {% if irp.result %}<span class="badge badge--result">{{ irp.get_result_display }}</span>{% endif %}
+
+  <div class="card">
+    <h2>Основные сведения</h2>
+    <dl class="dl">
+      <dt>Вид обращения</dt><dd>{{ irp.get_irp_type_display }}</dd>
+      <dt>Дата / время поступления</dt><dd>{{ irp.date_create|date:"d.m.Y" }}{% if irp.time_create %} {{ irp.time_create|time:"H:i" }}{% endif %}</dd>
+      <dt>Источник</dt><dd>{{ irp.get_way_display }}{% if irp.way_n %} — {{ irp.way_n }}{% endif %}</dd>
+      <dt>Способ</dt><dd>{{ irp.get_how_display }}</dd>
+      <dt>Тема</dt><dd>{{ irp.theme.code_name }} — {{ irp.theme.title }}{% if irp.theme_comment %}<br><span class="text-muted">{{ irp.theme_comment }}</span>{% endif %}</dd>
+      <dt>Содержание</dt><dd>{{ irp.text|default:"—" }}</dd>
+      <dt>Сведения о жалобе</dt><dd>{{ irp.get_zh_d_display|default:"—" }}</dd>
+      <dt>Срок рассмотрения</dt><dd>{{ irp.data_plan|date:"d.m.Y" }}</dd>
+      <dt>Фактическое закрытие</dt><dd>{{ irp.date_close|date:"d.m.Y"|default:"—" }}</dd>
+      <dt>Исход</dt><dd>{{ irp.get_result_display|default:"—" }}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Обратившийся</h2>
+    <dl class="dl">
+      <dt>ФИО</dt><dd>{{ irp.z_f }} {{ irp.z_i|default:"" }} {{ irp.z_o|default:"" }}</dd>
+      <dt>Дата рождения</dt><dd>{{ irp.z_dr|date:"d.m.Y"|default:"—" }}</dd>
+      <dt>ЕНП</dt><dd>{{ irp.z_enp|default:"—" }}</dd>
+      <dt>Страховая принадлежность</dt><dd>{{ irp.get_z_smo_display|default:"—" }}</dd>
+      <dt>Документ</dt><dd>{{ irp.get_z_doctype_display|default:"—" }} {{ irp.z_docser|default:"" }} {{ irp.z_docnum|default:"" }}</dd>
+      <dt>Адрес</dt><dd>{{ irp.adr|default:"—" }}</dd>
+      <dt>Телефон</dt><dd>{{ irp.phone|default:"—" }}</dd>
+      <dt>E-mail</dt><dd>{{ irp.e_mail|default:"—" }}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Застрахованный</h2>
+    <dl class="dl">
+      <dt>ФИО</dt><dd>{{ irp.in_f|default:"—" }} {{ irp.in_i|default:"" }} {{ irp.in_o|default:"" }}</dd>
+      <dt>Дата рождения</dt><dd>{{ irp.in_dr|date:"d.m.Y"|default:"—" }}</dd>
+      <dt>ЕНП</dt><dd>{{ irp.in_enp|default:"—" }}</dd>
+      <dt>Страховая принадлежность</dt><dd>{{ irp.get_in_smo_display|default:"—" }}</dd>
+      <dt>Документ</dt><dd>{{ irp.get_in_doctype_display|default:"—" }} {{ irp.in_docser|default:"" }} {{ irp.in_docnum|default:"" }}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Исполнение</h2>
+    <dl class="dl">
+      <dt>Ответственная организация</dt><dd>{{ irp.get_otv_t_display }} / {{ irp.get_otv_kon_display }}</dd>
+      <dt>Принял (линия)</dt><dd>{{ irp.employee_one.full_name }}{% if irp.line_one %} ({{ irp.get_line_one_display }}){% endif %}</dd>
+      <dt>Ответственный (линия)</dt><dd>{{ irp.employee_it.full_name|default:"—" }}{% if irp.line_it %} ({{ irp.get_line_it_display }}){% endif %}</dd>
+      <dt>Переадресация</dt><dd>{{ irp.get_pr_out_display|default:"—" }}{% if irp.date_cross %}<br>{{ irp.date_cross|date:"d.m.Y" }} {{ irp.time_cross|time:"H:i"|default:"" }}{% endif %}</dd>
+    </dl>
+  </div>
+
+  {% if history %}
+  <div class="card">
+    <h2>История изменений</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Когда</th><th>Кем</th><th>Поле</th><th>Было</th><th>Стало</th></tr></thead>
+        <tbody>
+          {% for h in history %}
+          <tr>
+            <td>{{ h.changed_at|date:"d.m.Y H:i" }}</td>
+            <td>{{ h.user.full_name|default:"—" }}</td>
+            <td>{{ h.field_name }}</td>
+            <td>{{ h.old_value|default:"—" }}</td>
+            <td>{{ h.new_value|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <p class="text-muted">Печатная форма сформирована {% now "d.m.Y H:i" %} пользователем {{ user.full_name|default:user.username }}.</p>
+</body>
+</html>

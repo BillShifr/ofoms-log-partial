@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Журнал обращений{% endblock %}
+{% block content %}
+<h1>Единый электронный журнал обращений граждан</h1>
+
+<div class="card mb-2">
+  <form method="get" id="journal-filter-form">
+    <details class="collapsible" id="journal-filters" data-key="journal-filters">
+      <summary class="collapsible__toggle">Фильтры</summary>
+      <div class="filters">
+        <div class="field"><label for="id_id">ID</label>{{ form.id }}</div>
+        <div class="field"><label for="id_n_irp">Номер</label>{{ form.n_irp }}</div>
+        <div class="field"><label for="id_z_f">Фамилия заявителя</label>{{ form.z_f }}</div>
+        <div class="field"><label for="id_z_enp">ЕНП</label>{{ form.z_enp }}</div>
+        <div class="field"><label for="id_irp_type">Вид обращения</label>{{ form.irp_type }}</div>
+        <div class="field"><label for="id_how">Способ</label>{{ form.how }}</div>
+        <div class="field"><label for="id_status">Статус</label>{{ form.status }}</div>
+        <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}</div>
+        <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}</div>
+      </div>
+    </details>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Применить</button>
+      <a class="btn btn--ghost" href="{% url 'journal:list' %}">Сбросить</a>
+      <a class="btn btn--accent" href="{% url 'journal:create' %}">+ Зарегистрировать обращение</a>
+      <a class="btn btn--ghost btn--sm" href="{% url 'system:prefs' %}">Настройки таблицы</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data {% if fixed_first %}th-sticky{% endif %}">
+      <thead>
+        <tr class="group-row">
+          {% for g in table_groups %}
+            <th colspan="{{ g.colspan }}" class="{% if not g.label %}group-row__empty{% endif %}">{{ g.label }}</th>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for col in cols %}
+            <th>
+              {% if col.sortable %}
+                <a href="?sort={% if sort == col.key %}-{{ col.key }}{% else %}{{ col.key }}{% endif %}">{{ col.label }}</a>
+              {% else %}
+                {{ col.label }}
+              {% endif %}
+            </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for irp in page.object_list %}
+        <tr class="clickable {% if not irp.is_closed and irp.is_overdue %}row--overdue{% elif not irp.is_closed and not irp.result %}row--open{% endif %}"
+            onclick="location.href='{% url 'journal:detail' irp.pk %}'">
+          {% for col in cols %}
+            <td>
+              {% if col.key == 'id' %}{{ irp.id }}
+              {% elif col.key == 'n_irp' %}<span class="mono">{{ irp.n_irp }}</span>
+              {% elif col.key == 'date_create' %}<span data-value="{{ irp.date_create|date:'Y-m-d' }}">{{ irp.date_create|date:"d.m.Y" }}</span><br><span class="text-muted">{{ irp.time_create|time:"H:i"|default:"" }}</span>
+              {% elif col.key == 'data_plan' %}<span data-value="{{ irp.data_plan|date:'Y-m-d' }}">{{ irp.data_plan|date:"d.m.Y" }}</span>
+              {% elif col.key == 'date_close' %}{% if irp.date_close %}<span data-value="{{ irp.date_close|date:'Y-m-d' }}">{{ irp.date_close|date:"d.m.Y" }}</span>{% endif %}
+              {% elif col.key == 'irp_type' %}{{ irp.get_irp_type_display }}
+              {% elif col.key == 'theme' %}{{ irp.theme.code_name }} — {{ irp.theme.title }}
+              {% elif col.key == 'z_f' %}{{ irp.z_f }} {{ irp.z_i|default:"" }}
+              {% elif col.key == 'z_enp' %}{{ irp.z_enp|default:"" }}
+              {% elif col.key == 'employee_one' %}{{ irp.employee_one.full_name }}
+              {% elif col.key == 'status' %}
+                {% if irp.is_closed %}<span class="badge badge--closed">Закрыто</span>
+                {% elif irp.is_overdue %}<span class="badge badge--overdue">Просрочено</span>
+                {% else %}<span class="badge badge--open">Открыто</span>{% endif %}
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="{{ cols|length }}" class="text-muted">Обращений не найдено.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page.paginator.num_pages > 1 %}
+  <div class="pagination">
+    {% if page.has_previous %}
+      <a href="?page={{ page.previous_page_number }}&amp;{{ request.GET.urlencode }}">‹ Назад</a>
+    {% endif %}
+    <span class="current">Стр. {{ page.number }} из {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+      <a href="?page={{ page.next_page_number }}&amp;{{ request.GET.urlencode }}">Вперёд ›</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load system_filters %}
+{% block title %}{{ thread.title }}{% endblock %}
+{% block content %}
+<div class="messenger">
+  <aside class="messenger__side">
+    <div class="card" style="padding:14px">
+      {% include "system/_conversation_side.html" %}
+    </div>
+  </aside>
+
+  <section class="messenger__main">
+    <div class="flex-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <a class="btn btn--ghost" href="{% url 'system:conversation' conv.pk %}">← {{ conv.display_title }}</a>
+      <h1 style="flex:1;margin:0">{{ thread.title }}</h1>
+      {% if thread.is_closed %}<span class="badge badge--open">Закрыта</span>{% endif %}
+    </div>
+    <p class="text-muted">Тему создал: {{ thread.created_by.full_name }} · {{ thread.created_at|date:"d.m.Y H:i" }}</p>
+
+    <div class="card">
+      <div class="chat">
+        {% for r in replies %}
+        <div class="msg {% if r.author_id == user.id %}msg--mine{% endif %}" id="reply-{{ r.pk }}">
+          <div class="msg__head">
+            <span>
+              <strong>{{ r.author.full_name }}</strong>
+              <span class="text-muted"> · {{ r.created_at|date:"d.m.Y H:i" }}</span>
+            </span>
+            {% if r.parent %}<span class="text-muted">→ в ответ на: {{ r.parent.author.full_name }}</span>{% endif %}
+          </div>
+          <p class="msg__body">{{ r.body }}</p>
+          {% if r.attachments.all %}
+            <div class="flex" style="gap:6px;flex-wrap:wrap">
+              {% for a in r.attachments.all %}
+                <a class="attachment-chip" href="{{ a.file.url }}" target="_blank">Загрузить: {{ a.file.name|cut:"messages/" }}</a>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="reactions">
+            {% for emoji in emoji_set %}
+            {% with uids=r.reactions|get_item:emoji %}
+            <button type="submit" name="emoji" value="{{ emoji }}" form="react-form-{{ r.pk }}"
+                    class="reaction {% if user.id in uids %}reaction--active{% endif %}"
+                    title="Добавить/убрать реакцию">
+              {{ emoji }} {{ uids|length }}
+            </button>
+            {% endwith %}
+            {% endfor %}
+          </div>
+          <form id="react-form-{{ r.pk }}" method="post" action="{% url 'system:react' r.pk %}" class="inline-form">
+            {% csrf_token %}
+          </form>
+        </div>
+        {% empty %}
+        <p class="text-muted">В теме пока нет сообщений.</p>
+        {% endfor %}
+      </div>
+
+      {% if not thread.is_closed %}
+      <form method="post" action="{% url 'system:reply' thread.pk %}"
+            enctype="multipart/form-data" class="answer-form" data-validate>
+        {% csrf_token %}
+        <div class="field">
+          <label for="{{ reply_form.body.id_for_label }}">Сообщение</label>{{ reply_form.body }}
+          {% for error in reply_form.body.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="field">
+          <label for="id_attachment">Вложение (необязательно)</label>
+          <input type="file" id="id_attachment" name="attachment">
+          <span class="text-muted">PDF, DOC/XLS, до 20 МБ</span>
+        </div>
+        <button class="btn btn--primary" type="submit">Отправить</button>
+      </form>
+      {% else %}
+      <p class="text-muted">Тема закрыта — новые сообщения недоступны.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

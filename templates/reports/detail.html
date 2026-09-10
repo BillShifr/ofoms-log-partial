@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load report_filters %}
+{% block title %}{{ report.title }}{% endblock %}
+{% block content %}
+<a class="btn btn--ghost mb-2" href="{% url 'reports:index' %}">← Все отчёты</a>
+<h1>{{ report.title }}</h1>
+<p class="text-muted">{{ report.description }}</p>
+
+<div class="card">
+  <form method="get" class="filter-form" id="report-filter-form">
+    <details class="collapsible" id="report-filters" data-key="report-filters">
+      <summary class="collapsible__toggle">Параметры отчёта</summary>
+      <div class="filters">
+        {% for field in form %}
+        {% if field.field.widget.input_type == "checkbox" %}
+        <div class="field field--narrow">
+          <label class="checkbox">{{ field }}{{ field.label }}</label>
+        </div>
+        {% else %}
+        <div class="field">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </details>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Сформировать</button>
+      {% if rows %}
+      <a class="btn btn--accent" href="{% url 'reports:export' report.slug 'xlsx' %}?{{ request.GET.urlencode }}">Скачать Excel</a>
+      <a class="btn btn--accent" href="{% url 'reports:export' report.slug 'pdf' %}?{{ request.GET.urlencode }}">Скачать PDF</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{% if rows is not None %}
+<div class="card">
+  <div class="table-wrap">
+    <table class="data reports-table" data-client-sort>
+      <thead>
+        <tr>
+          {% for label in report.labels %}<th>{{ label }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr {% if row.period == "ИТОГО" or row.type == "ИТОГО" or row.month == "ИТОГО" or row.theme == "ИТОГО" %}class="row-total"{% endif %}>
+          {% for key in report.keys %}<td>{{ row|get_item:key }}</td>{% endfor %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="{{ report.columns|length }}" class="text-muted">По заданным параметрам обращений не найдено.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <p class="text-muted">Задайте параметры формы выше и нажмите «Сформировать».</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var form = document.getElementById('report-filter-form');
+  if (!form) return;
+  form.addEventListener('submit', function (e) {
+    var from = form.querySelector('[name="date_from"]');
+    var to = form.querySelector('[name="date_to"]');
+    if (from && to && !from.value && !to.value) {
+      e.preventDefault();
+      [from, to].forEach(function (el) { el.classList.add('is-invalid'); });
+      if (window.toast) toast.error('Укажите хотя бы дату начала или окончания периода');
+    }
+  });
+})();
+</script>
+{% endblock %}

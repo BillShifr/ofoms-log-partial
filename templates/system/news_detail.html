@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load system_filters %}
+{% block title %}{{ item.title }}{% endblock %}
+{% block content %}
+<a class="btn btn--ghost mb-2" href="{% url 'system:news' %}">← Все новости</a>
+
+{% if can_manage and not item.is_active %}
+<div class="alert alert--error mb-2">Новость скрыта — обычные пользователи её не видят.</div>
+{% endif %}
+
+<article class="card">
+  <div class="news-card__meta">
+    {% if item.category %}<span class="badge badge--result">{{ item.category.name }}</span>{% endif %}
+    <span class="text-muted">{{ item.created_at|date:"d.m.Y H:i" }}</span>
+    <span class="text-muted">{{ item.author.full_name|default:"система" }}</span>
+    <span class="text-muted">просмотров: {{ item.views_count }}</span>
+    {% if item.is_pinned %}<span class="badge badge--role">Закреплено</span>{% endif %}
+  </div>
+  <h1 class="mt-1 mb-1">{{ item.title }}</h1>
+  {% if item.cover_image %}<img class="news-detail__cover" src="{{ item.cover_image.url }}"
+      alt="{% if item.category %}{{ item.category.name }}{% endif %}">{% endif %}
+  <div class="rich-text">{{ item.text|sanitize_rich }}</div>
+
+  {% if can_manage %}
+  <div class="news-card__actions">
+    <a class="btn btn--sm btn--ghost" href="{% url 'system:news_update' item.pk %}">Изменить</a>
+    <form method="post" action="{% url 'system:news_toggle' item.pk %}" class="inline-form">{% csrf_token %}
+      <button class="btn btn--sm {% if item.is_active %}btn--ghost{% else %}btn--primary{% endif %}" type="submit">
+        {{ item.is_active|yesno:"Скрыть,Опубликовать" }}
+      </button>
+    </form>
+    <form method="post" action="{% url 'system:news_delete' item.pk %}" class="inline-form" data-confirm="Удалить новость «{{ item.title }}»?">{% csrf_token %}
+      <button class="btn btn--sm btn--ghost" type="submit">Удалить</button>
+    </form>
+  </div>
+  {% endif %}
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('form[data-confirm]').forEach(function (f) {
+    f.addEventListener('submit', function (e) {
+      var text = f.getAttribute('data-confirm') || 'Подтвердите действие';
+      if (!window.confirm(text)) e.preventDefault();
+    });
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load system_filters %}
+{% block title %}Задачи{% endblock %}
+{% block content %}
+<h1>Автоматизированные задания</h1>
+
+<div class="flex mb-2">
+  <a class="btn btn--accent" href="{% url 'system:task_create' %}">+ Новое задание</a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data" data-client-sort>
+      <thead>
+        <tr>
+          <th>Наименование</th>
+          <th>Команда</th>
+          <th>Статус</th>
+          <th>Исполнитель</th>
+          <th>Приоритет</th>
+          <th>Режим</th>
+          <th>Последний запуск</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tasks %}
+        <tr data-href="{% url 'system:task_update' t.pk %}">
+          <td>{{ t.name }}</td>
+          <td class="mono" data-tip="{{ command_tips|get_item:t.command|default:t.command }}">{{ t.command }}</td>
+          <td>
+            {% if t.status == 'completed' %}<span class="badge badge--closed">{{ t.get_status_display }}</span>
+            {% elif t.status == 'failed' %}<span class="badge badge--overdue">{{ t.get_status_display }}</span>
+            {% elif t.status == 'running' %}<span class="badge badge--running">{{ t.get_status_display }}</span>
+            {% elif t.status == 'cancelled' %}<span class="badge badge--cancelled">{{ t.get_status_display }}</span>
+            {% else %}<span class="badge badge--open">{{ t.get_status_display }}</span>{% endif %}
+          </td>
+          <td>{% if t.assigned_to %}{{ t.assigned_to.full_name }}{% else %}—{% endif %}</td>
+          <td>
+            {% if t.priority == 2 %}<span class="badge badge--overdue">Высокий</span>
+            {% elif t.priority == 1 %}<span class="badge badge--open">Средний</span>
+            {% else %}<span class="badge badge--cancelled">Низкий</span>{% endif %}
+          </td>
+          <td>{{ t.get_run_mode_display }}</td>
+          <td>{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
+          <td class="text-nowrap">
+            <a class="btn btn--sm btn--ghost" href="{% url 'system:task_update' t.pk %}">Карточка</a>
+            <form method="post" action="{% url 'system:task_run' t.pk %}" class="inline-form">{% csrf_token %}
+              <button class="btn btn--sm btn--primary" type="submit">Запустить</button>
+            </form>
+            <form method="post" action="{% url 'system:task_toggle' t.pk %}" class="inline-form">{% csrf_token %}
+              <button class="btn btn--sm btn--ghost" type="submit">{{ t.enabled|yesno:"Стоп,Вкл" }}</button>
+            </form>
+          </td>
+        </tr>
+        {% if t.last_log %}
+        <tr class="task-log-row" data-href="{% url 'system:task_update' t.pk %}">
+          <td colspan="8" class="text-muted mono">{{ t.last_log|slice:":500" }}</td>
+        </tr>
+        {% endif %}
+        {% empty %}
+        <tr><td colspan="8" class="text-muted">Заданий не создано.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

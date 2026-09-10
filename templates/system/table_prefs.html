@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Настройки таблицы{% endblock %}
+{% block content %}
+<h1>{{ meta.title }} — настройки таблицы</h1>
+<div class="card">
+  <form method="post" data-validate>
+    {% csrf_token %}
+    <h2 class="text-muted mt-1" style="font-size:1.05rem;">Колонки (порядок = число в поле «#»)</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr><th></th><th>#</th><th>Колонка</th><th>Группа</th></tr>
+        </thead>
+        <tbody>
+          {% for col in columns %}
+            <tr>
+              <td><label class="checkbox"><input type="checkbox" name="columns" value="{{ col.key }}" {% if col.key in current %}checked{% endif %}></label></td>
+              <td>
+                <input type="number" name="order_{{ col.key }}" value="{{ forloop.counter }}" min="0" max="99" style="width:4rem;">
+              </td>
+              <td>{{ col.label }}</td>
+              <td class="text-muted">{{ col.group|default:"—" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="filters mt-1">
+      <div class="field">
+        <label for="sort_field">Сортировка по умолчанию</label>
+        <select name="sort_field" id="sort_field">
+          <option value="">— по умолчанию —</option>
+          {% for col in columns %}
+            {% if col.sortable %}
+            <option value="{{ col.key }}" {% if sort_field == col.key %}selected{% endif %}>{{ col.label }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="sort_dir">Направление</label>
+        <select name="sort_dir" id="sort_dir">
+          <option value="-" {% if sort_dir == '-' %}selected{% endif %}>По убыванию</option>
+          <option value="" {% if sort_dir == '' %}selected{% endif %}>По возрастанию</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="checkbox"><input type="checkbox" name="fixed_first" {% if pref.fixed_first %}checked{% endif %}> Фиксировать первую колонку</label>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Сохранить</button>
+      <a class="btn btn--ghost" href="{% url 'journal:list' %}">К журналу</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

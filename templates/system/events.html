@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Журнал событий{% endblock %}
+{% block content %}
+<h1>Журнал событий</h1>
+
+<div class="card mb-2">
+  <form method="get" id="events-filter-form">
+    <details class="collapsible" id="events-filters" data-key="events-filters">
+      <summary class="collapsible__toggle">Фильтры</summary>
+      <div class="filters">
+        <div class="field"><label for="id_module">Модуль</label>{{ form.module }}</div>
+        <div class="field"><label for="id_event_type">Тип события</label>{{ form.event_type }}</div>
+        <div class="field"><label for="id_result">Результат</label>{{ form.result }}</div>
+        <div class="field">
+          <label for="id_user">Инициатор</label>
+          <input type="hidden" id="id_user" name="user" value="{{ form.user.value|default:'' }}">
+          <input type="text" class="js-event-user" autocomplete="off"
+                 placeholder="ФИО или логин (не менее 3 букв)"
+                 value="{{ initiator_label|default:'' }}">
+        </div>
+        <div class="field"><label for="id_target">Объект</label>{{ form.target }}</div>
+        <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}</div>
+        <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}</div>
+        {% for error in form.non_field_errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+      </div>
+    </details>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Применить</button>
+      <a class="btn btn--ghost" href="{% url 'system:events' %}">Сбросить</a>
+      <a class="btn btn--accent" href="{% url 'system:events_export' %}?{{ request.GET.urlencode }}">Скачать Excel</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data" data-client-sort>
+      <thead>
+        <tr>
+          <th data-type="num">ID</th>
+          <th>Начало</th>
+          <th>Завершение</th>
+          <th>Тип</th>
+          <th>Модуль</th>
+          <th>Результат</th>
+          <th>Инициатор</th>
+          <th>Объект</th>
+          <th>IP</th>
+          <th data-type="num">Длит., мс</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in page.object_list %}
+        <tr class="js-event-row" title="{% if e.detail %}{{ e.detail }}{% else %}Событие {{ e.get_event_type_display }} (модуль {{ e.module }}){% endif %}">
+          <td data-type="num">{{ e.id }}</td>
+          <td>{{ e.started_at|date:"d.m.Y H:i:s" }}</td>
+          <td>{% if e.finished_at %}<span data-value="{{ e.finished_at|date:'Y-m-d\TH:i:s' }}">{{ e.finished_at|date:"d.m.Y H:i:s" }}</span>{% endif %}</td>
+          <td>{{ e.get_event_type_display }}</td>
+          <td>{{ e.module }}</td>
+          <td>
+            {% if e.result == 'ok' %}<span class="badge badge--closed">{{ e.get_result_display }}</span>
+            {% elif e.result == 'failed' %}<span class="badge badge--overdue">{{ e.get_result_display }}</span>
+            {% else %}<span class="badge badge--open">{{ e.get_result_display }}</span>{% endif %}
+          </td>
+          <td>{{ e.user.full_name|default:"—" }}</td>
+          <td class="mono cell-long">{{ e.target }}</td>
+          <td class="mono">{{ e.ip|default:"—" }}</td>
+          <td data-type="num">{{ e.duration_ms|default:"—" }}</td>
+        </tr>
+        <tr class="row-detail js-event-detail" hidden>
+          <td colspan="10">{{ e.detail|default:"Описание события отсутствует." }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="10" class="text-muted">Событий не найдено.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page.paginator.num_pages > 1 %}
+  <div class="pagination">
+    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&amp;{{ request.GET.urlencode }}">‹ Назад</a>{% endif %}
+    <span class="current">Стр. {{ page.number }} из {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?page={{ page.next_page_number }}&amp;{{ request.GET.urlencode }}">Вперёд ›</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

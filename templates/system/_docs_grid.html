@@ -1,0 +1,34 @@
+{% load system_filters %}
+{% if docs %}
+<div class="grid-2">
+  {% for d in docs %}
+  <div class="card report-card">
+    <div class="flex" style="align-items:flex-start;gap:10px">
+      <div class="doc-type">{{ d.file_type|upper|default:"DOC" }}</div>
+      <div style="flex:1">
+        <h3 class="mt-1 mb-1">{{ d.title }}</h3>
+        {% if d.description %}<p class="text-muted">{{ d.description }}</p>{% endif %}
+        <div class="text-muted">
+          <span>Версия {{ d.version|default:"1.0" }}</span>
+          <span> · {{ d.size_display }}</span>
+          <span> · {{ d.uploaded_by.full_name|default:"—" }} · {{ d.created_at|date:"d.m.Y" }}</span>
+          <span> · Скачиваний: {{ d.downloads_count }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="flex mt-1 mb-1" style="gap:8px">
+      <a class="btn btn--sm btn--primary" href="{% url 'system:doc_download' d.pk %}"
+         title="Скачать файл (учёт загрузок)">Скачать</a>
+      {% if can_manage %}
+      <form method="post" action="{% url 'system:doc_delete' d.pk %}" class="inline-form">
+        {% csrf_token %}
+        <button class="btn btn--sm btn--danger" type="submit">Удалить</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">Ничего не найдено.</p>
+{% endif %}

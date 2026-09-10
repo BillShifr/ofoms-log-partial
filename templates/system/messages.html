@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Сообщения{% endblock %}
+{% block content %}
+<h1>Сообщения</h1>
+<p class="text-muted mb-2">Внутренний мессенджер: диалоги, темы и ответы (PRD v3 §2.6).</p>
+
+<div class="messenger">
+  <aside class="messenger__side">
+    <div class="card" style="padding:14px">
+      {% include "system/_conversation_side.html" %}
+    </div>
+  </aside>
+
+  <section class="messenger__main">
+    <div class="card">
+      <details class="collapsible" data-key="new-conversation">
+        <summary class="collapsible__toggle">Новый диалог</summary>
+        <form method="post" action="{% url 'system:conversation_create' %}" data-validate>
+          {% csrf_token %}
+          <div class="form-grid">
+            <div class="field field--wide">
+              <label for="{{ form.title.id_for_label }}">Тема</label>{{ form.title }}
+              {% for error in form.title.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+              <span class="text-muted">Необязательно — для личного диалога подставятся имена участников</span>
+            </div>
+            <div class="field field--wide">
+              <label for="participant-search">Участники</label>
+              <input id="participant-search" type="text"
+                     placeholder="Введите ФИО (от 3 символов) — совпадения отмечаются автоматически"
+                     autocomplete="off">
+              <div class="participant-pick">{{ form.participants }}</div>
+              {% for error in form.participants.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+            </div>
+          </div>
+          <div class="form-actions" style="justify-content:flex-start">
+            <button class="btn btn--primary" type="submit">Создать диалог</button>
+          </div>
+        </form>
+      </details>
+    </div>
+    <div class="card">
+      <p class="text-muted">Выберите диалог слева или создайте новый.</p>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var search = document.getElementById('participant-search');
+  if (!search) return;
+  var list = document.querySelector('.participant-pick');
+  if (!list) return;
+
+  // Ввод имени отмечает подходящий чекбокс участника (PRD v3 §2.0.6)
+  var labels = Array.prototype.map.call(list.querySelectorAll('label'), function (l) {
+    return l.textContent.trim();
+  });
+  var boxes = Array.prototype.slice.call(list.querySelectorAll('input'));
+
+  search.addEventListener('input', function () {
+    var q = search.value.trim();
+    if (q.length < 3) return;
+    fetch('/system/messages/users/suggest/?q=' + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        (data.suggestions || []).forEach(function (label) {
+          var idx = labels.indexOf(label);
+          if (idx === -1) return;
+          var box = boxes[idx];
+          if (box && !box.checked) {
+            box.checked = true;
+            search.value = '';
+          }
+        });
+      })
+      .catch(function () {});
+  });
+})();
+</script>
+{% endblock %}

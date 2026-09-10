@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Новости{% endblock %}
+{% block content %}
+<h1>Новости</h1>
+<p class="text-muted mb-2">Лента новостей и уведомлений ТФОМС (PRD v3 §2.7).</p>
+
+<div class="card mb-2">
+  <details class="collapsible" data-key="news-filters">
+    <summary class="collapsible__toggle">Поиск и фильтры</summary>
+    <form method="get" class="filters">
+      <div class="field">
+        <label for="news-q">Поиск</label>
+        <input id="news-q" type="text" name="q" value="{{ request.GET.q }}"
+               data-autocomplete="news" data-autocomplete-url="{% url 'system:news_suggest' %}"
+               placeholder="Заголовок или содержание (от 3 символов)">
+      </div>
+      <div class="field">
+        <label for="news-cat">Категория</label>
+        <select id="news-cat" name="category">
+          <option value="">Все</option>
+          {% for c in categories %}
+          <option value="{{ c.slug }}" {% if request.GET.category == c.slug %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field field--date">
+        <label for="news-from">С даты</label>
+        <input id="news-from" type="date" name="date_from" value="{{ request.GET.date_from }}">
+      </div>
+      <div class="field field--date">
+        <label for="news-to">По дату</label>
+        <input id="news-to" type="date" name="date_to" value="{{ request.GET.date_to }}">
+      </div>
+      {% if can_manage %}
+      <div class="field field--narrow">
+        <label for="news-status">Статус</label>
+        <select id="news-status" name="status">
+          <option value="">Все</option>
+          <option value="on" {% if request.GET.status == "on" %}selected{% endif %}>Опубликованные</option>
+          <option value="off" {% if request.GET.status == "off" %}selected{% endif %}>Скрытые</option>
+        </select>
+      </div>
+      {% endif %}
+      <div class="field field--narrow" style="align-self:flex-end">
+        <button class="btn btn--primary" type="submit">Применить</button>
+        {% if request.GET %}<a class="btn btn--ghost" href="{% url 'system:news' %}">Сброс</a>{% endif %}
+      </div>
+    </form>
+  </details>
+</div>
+
+{% if can_manage %}
+<div class="card mb-2">
+  <details class="collapsible" data-key="news-create">
+    <summary class="collapsible__toggle">Опубликовать новость</summary>
+    <form method="post" action="{% url 'system:news_create' %}" enctype="multipart/form-data" data-validate>
+      {% csrf_token %}
+      <div class="form-grid">
+        <div class="field field--wide">
+          <label for="{{ form.title.id_for_label }}">Заголовок</label>{{ form.title }}
+          {% for error in form.title.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="field">
+          <label for="{{ form.category.id_for_label }}">Категория</label>{{ form.category }}
+        </div>
+        <div class="field field--wide">
+          <label for="{{ form.summary.id_for_label }}">Краткое описание</label>{{ form.summary }}
+          {% for error in form.summary.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="field field--wide">
+          <label for="{{ form.text.id_for_label }}">Содержание</label>{{ form.text }}
+          <span class="text-muted">Поддерживаются простые HTML-теги: &lt;b&gt;, &lt;i&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;a href&gt; и др.</span>
+          {% for error in form.text.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="field">
+          <label for="{{ form.cover_image.id_for_label }}">Обложка</label>{{ form.cover_image }}
+          {% for error in form.cover_image.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="field field--narrow" style="display:flex;flex-direction:column;gap:8px">
+          <label class="checkbox">{{ form.is_active }}{{ form.is_active.label }}</label>
+          <label class="checkbox">{{ form.is_pinned }}{{ form.is_pinned.label }}</label>
+        </div>
+      </div>
+      <div class="form-actions" style="justify-content:flex-start">
+        <button class="btn btn--primary" type="submit">Опубликовать</button>
+      </div>
+    </form>
+  </details>
+</div>
+{% endif %}
+
+<div class="grid-2">
+  {% for n in page.object_list %}
+  <a class="card report-card news-card {% if n.is_pinned %}news-card--pinned{% endif %}"
+     data-href="{% url 'system:news_detail' n.pk %}">
+    {% if n.is_pinned %}<span class="badge badge--role news-card__pinned">Закреплено</span>{% endif %}
+    {% if n.cover_image %}<img class="news-card__cover" src="{{ n.cover_image.url }}"
+        alt="{% if n.category %}{{ n.category.name }}{% endif %}">{% endif %}
+    <span class="news-card__meta">
+      {% if n.category %}<span class="badge badge--result">{{ n.category.name }}</span>{% endif %}
+      <span class="text-muted">{{ n.created_at|date:"d.m.Y" }}</span>
+      <span class="text-muted">{{ n.author.full_name|default:"система" }}</span>
+      <span class="text-muted">просмотров: {{ n.views_count }}</span>
+    </span>
+    <h3 class="report-card__title">{{ n.title }}</h3>
+    <p class="report-card__desc">{{ n.summary|default:n.text|truncatechars:180 }}</p>
+    {% if can_manage %}
+    <div class="news-card__actions">
+      <a class="btn btn--sm btn--ghost" href="{% url 'system:news_update' n.pk %}">Изменить</a>
+      <form method="post" action="{% url 'system:news_toggle' n.pk %}" class="inline-form">{% csrf_token %}
+        <button class="btn btn--sm {% if n.is_active %}btn--ghost{% else %}btn--primary{% endif %}" type="submit">
+          {{ n.is_active|yesno:"Скрыть,Опубликовать" }}
+        </button>
+      </form>
+      <form method="post" action="{% url 'system:news_delete' n.pk %}" class="inline-form" data-confirm="Удалить новость «{{ n.title }}»?">{% csrf_token %}
+        <button class="btn btn--sm btn--ghost" type="submit">Удалить</button>
+      </form>
+    </div>
+    {% endif %}
+  </a>
+  {% empty %}
+  <p class="text-muted">Новостей пока нет.</p>
+  {% endfor %}
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+<div class="pagination">
+  {% if page.has_previous %}
+  <a href="?page={{ page.previous_page_number }}&amp;{% if request.GET.urlencode %}{{ request.GET.urlencode }}{% endif %}">‹ Назад</a>
+  {% endif %}
+  <span class="current">Стр. {{ page.number }} из {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}
+  <a href="?page={{ page.next_page_number }}&amp;{% if request.GET.urlencode %}{{ request.GET.urlencode }}{% endif %}">Вперёд ›</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('form[data-confirm]').forEach(function (f) {
+    f.addEventListener('submit', function (e) {
+      var text = f.getAttribute('data-confirm') || 'Подтвердите действие';
+      if (!window.confirm(text)) e.preventDefault();
+    });
+  });
+});
+</script>
+{% endblock %}

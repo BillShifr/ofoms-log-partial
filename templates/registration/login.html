@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Вход{% endblock %}
+{% block content %}
+<div class="card" style="max-width:440px; margin:40px auto;">
+  <h1 class="mt-1">Вход в систему</h1>
+  {% if form.non_field_errors %}
+    <div class="alert alert--error">{{ form.non_field_errors }}</div>
+    <p class="text-muted">Учётная запись блокируется после 10 неудачных попыток входа
+    (разблокировка — только администратором ТФОМС).</p>
+  {% endif %}
+  <form method="post" data-validate>
+    {% csrf_token %}
+    <div class="form-grid" style="grid-template-columns:1fr;">
+      <div class="field">
+        <label for="id_username">Логин</label>{{ form.username }}{{ form.username.errors }}
+      </div>
+      <div class="field">
+        <label for="id_password">Пароль</label>{{ form.password }}{{ form.password.errors }}
+      </div>
+    </div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Войти</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

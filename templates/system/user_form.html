@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<div class="card">
+  <form method="post" data-validate>
+    {% csrf_token %}
+    <details class="collapsible" data-key="user-section-auth">
+      <summary class="collapsible__toggle">Аутентификация</summary>
+      <div class="form-grid">
+        <div class="field">
+          <label for="{{ form.username.id_for_label }}">Логин</label>
+          {{ form.username }}
+          {% if form.username.help_text %}<span class="text-muted">{{ form.username.help_text }}</span>{% endif %}
+          {% for error in form.username.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        {% if form.password1 %}
+        <div class="field">
+          <label for="{{ form.password1.id_for_label }}">Пароль</label>
+          {{ form.password1 }}
+          <span class="text-muted">{{ form.password1.help_text }}</span>
+          {% for error in form.password1.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="field">
+          <label for="{{ form.password2.id_for_label }}">Пароль (повторно)</label>
+          {{ form.password2 }}
+          {% for error in form.password2.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="collapsible" data-key="user-section-personal" open>
+      <summary class="collapsible__toggle">Данные</summary>
+      <div class="form-grid">
+        <div class="field"><label for="{{ form.last_name.id_for_label }}">Фамилия</label>{{ form.last_name }}{% for error in form.last_name.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field"><label for="{{ form.first_name.id_for_label }}">Имя</label>{{ form.first_name }}{% for error in form.first_name.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field"><label for="{{ form.job_title.id_for_label }}">Должность</label>{{ form.job_title }}{% for error in form.job_title.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field"><label for="{{ form.org.id_for_label }}">Организация</label>{{ form.org }}{% for error in form.org.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        {% for field in form %}
+          {% if field.name == "is_staff" or field.name == "is_active" %}
+          <div class="field field--narrow"><label class="checkbox">{{ field }}{{ field.label }}</label></div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </details>
+
+    {% if form.roles %}
+    <details class="collapsible" data-key="user-section-roles" open>
+      <summary class="collapsible__toggle">Роли и доступы</summary>
+      <div class="field field--roles">
+        <label>Роли (группы)</label>
+        {{ form.roles }}
+      </div>
+    </details>
+    {% endif %}
+
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Сохранить</button>
+      <a class="btn btn--ghost" href="{% url 'system:users' %}">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

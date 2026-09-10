@@ -73,6 +73,8 @@ class EventLog(models.Model):
         indexes = [
             models.Index(fields=["module", "event_type"]),
             models.Index(fields=["user", "-id"]),
+            models.Index(fields=["started_at"], name="core_event_started_idx"),
+            models.Index(fields=["result", "-id"], name="core_event_result_id_idx"),
         ]
 
     def __str__(self):

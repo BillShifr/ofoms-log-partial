@@ -31,7 +31,7 @@ class Employee(AbstractUser):
         max_length=120, blank=True, null=True, verbose_name="Должность"
     )
     org = models.IntegerField(
-        choices=ORGS, verbose_name="Организация",
+        choices=ORGS, db_index=True, verbose_name="Организация",
     )
     guid = models.UUIDField(
         unique=True, editable=False, verbose_name="Идентификатор (GUID)",

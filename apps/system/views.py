@@ -12,7 +12,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Count
+from django.db.models import CharField, Count, OuterRef, Q, Subquery, Value
+from django.db.models.functions import Concat
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -415,19 +416,37 @@ def _conversations_meta(user, q=""):
     """Список диалогов пользователя с последним сообщением и счётчиком
     непрочитанных; при q — фильтр по теме, участникам и тексту."""
     unread_counts = _conversation_unread_counts(user)
-    conversations = Conversation.objects.filter(participants=user).prefetch_related("participants")
+    latest_reply = MessageReply.objects.filter(
+        thread__conversation=OuterRef("pk")
+    ).order_by("-created_at", "-pk")
+    conversations = Conversation.objects.filter(participants=user).annotate(
+        latest_reply_id=Subquery(latest_reply.values("pk")[:1])
+    )
+    if q:
+        conversations = (
+            conversations.annotate(
+                participant_name=Concat(
+                    "participants__first_name",
+                    Value(" "),
+                    "participants__last_name",
+                    output_field=CharField(),
+                )
+            )
+            .filter(
+                Q(title__icontains=q)
+                | Q(participant_name__icontains=q)
+                | Q(participants__username__icontains=q)
+                | Q(threads__replies__body__icontains=q)
+            )
+            .distinct()
+        )
+    conversations = list(conversations.prefetch_related("participants"))
+    latest_by_id = MessageReply.objects.select_related("author").in_bulk(
+        conv.latest_reply_id for conv in conversations if conv.latest_reply_id
+    )
     meta = []
     for conv in conversations:
-        if q:
-            titles = " ".join(
-                [conv.title or ""] + [p.full_name() for p in conv.participants.all()]
-            ).lower()
-            bodies = " ".join(
-                MessageReply.objects.filter(thread__conversation=conv).values_list("body", flat=True)
-            ).lower()
-            if q not in titles and q not in bodies:
-                continue
-        last = MessageReply.objects.filter(thread__conversation=conv).order_by("-created_at").first()
+        last = latest_by_id.get(conv.latest_reply_id)
         meta.append(
             {
                 "conv": conv,

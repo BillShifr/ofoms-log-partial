@@ -274,6 +274,9 @@ class MessageReply(models.Model):
         verbose_name = "Сообщение диалога"
         verbose_name_plural = "Сообщения диалогов"
         ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["thread", "-created_at"], name="system_reply_latest_idx")
+        ]
 
     def __str__(self):
         return f"{self.author_id}: {self.body[:50]}"
@@ -393,6 +396,12 @@ class TaskJob(models.Model):
         verbose_name = "Задание"
         verbose_name_plural = "Задачи"
         ordering = ["name"]
+        indexes = [
+            models.Index(
+                fields=["enabled", "run_mode", "status"],
+                name="system_task_schedule_idx",
+            )
+        ]
 
     def __str__(self):
         return self.name

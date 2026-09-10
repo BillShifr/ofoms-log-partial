@@ -290,6 +290,10 @@ class Irp(models.Model):
         verbose_name = "Обращение"
         verbose_name_plural = "Обращения"
         ordering = ["-date_create", "-id"]
+        indexes = [
+            models.Index(fields=["date_create", "id"], name="journal_date_id_idx"),
+            models.Index(fields=["date_close", "data_plan"], name="journal_close_plan_idx"),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=(

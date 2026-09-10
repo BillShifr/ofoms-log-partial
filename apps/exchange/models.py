@@ -35,6 +35,9 @@ class ImportLog(models.Model):
         verbose_name = "Загрузка файла"
         verbose_name_plural = "Обмен данными (загрузки)"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["org", "-created_at"], name="exchange_org_created_idx")
+        ]
 
     def __str__(self) -> str:
         return f"{self.filename} ({self.get_status_display()})"

@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
@@ -226,6 +227,43 @@ class MessageTests(BaseSystemTestCase):
         self.assertTrue(
             EventLog.objects.filter(event_type=EventLog.EventType.CREATE).exists()
         )
+
+    def test_conversation_list_query_count_does_not_grow_per_conversation(self):
+        from django.test.utils import CaptureQueriesContext
+
+        from apps.system.views import _conversations_meta
+
+        for number in range(5):
+            conv = Conversation.objects.create(title=f"Диалог {number}")
+            conv.participants.set([self.operator, self.admin])
+            thread = MessageThread.objects.create(
+                conversation=conv, created_by=self.admin, title="Тема"
+            )
+            MessageReply.objects.create(
+                thread=thread, author=self.admin, body=f"Сообщение {number}"
+            )
+
+        with CaptureQueriesContext(connection) as queries:
+            meta = _conversations_meta(self.operator)
+            list(meta)
+
+        self.assertEqual(len(meta), 5)
+        self.assertLessEqual(len(queries), 4)
+
+    def test_conversation_search_matches_message_without_per_conversation_queries(self):
+        conv = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=conv, created_by=self.admin, title="Тема"
+        )
+        MessageReply.objects.create(
+            thread=thread, author=self.admin, body="Уникальный текст обращения"
+        )
+
+        from apps.system.views import _conversations_meta
+
+        meta = _conversations_meta(self.operator, "уникальный")
+
+        self.assertEqual([item["conv"].pk for item in meta], [conv.pk])
 
     def test_conversation_without_participants_rejected(self):
         self.client.force_login(self.operator)

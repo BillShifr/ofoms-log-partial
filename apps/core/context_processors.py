@@ -18,18 +18,14 @@ def system_meta(request):
     if user is not None and user.is_authenticated:
         from apps.system.models import MessageReply
 
-        replies = (
+        unread = (
             MessageReply.objects.filter(thread__conversation__participants=user)
             .exclude(author=user)
-            .select_related("thread__conversation")
+            .exclude(read_by=user)
+            .values("thread__conversation_id")
+            .distinct()
+            .count()
         )
-        seen = set()
-        for r in replies:
-            if not r.read_by.filter(pk=user.pk).exists():
-                conv_id = r.thread.conversation_id
-                if conv_id not in seen:
-                    seen.add(conv_id)
-        unread = len(seen)
 
     return {
         "SYSTEM_META": settings.SYSTEM_META,

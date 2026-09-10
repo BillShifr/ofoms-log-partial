@@ -8,7 +8,7 @@ from django.db import models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
-from apps.system.validators import validate_document_file
+from apps.system.validators import validate_document_file, validate_image_file
 
 logger = logging.getLogger("apps.system")
 
@@ -52,7 +52,11 @@ class NewsItem(models.Model):
         verbose_name="Категория",
     )
     cover_image = models.ImageField(
-        upload_to=news_cover_upload_to, null=True, blank=True, verbose_name="Обложка"
+        upload_to=news_cover_upload_to,
+        null=True,
+        blank=True,
+        validators=[validate_image_file],
+        verbose_name="Обложка",
     )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,

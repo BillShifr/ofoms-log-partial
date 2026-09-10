@@ -30,7 +30,11 @@ from apps.system.models import (
     TaskRun,
     UserTableViewPref,
 )
-from apps.system.validators import DOC_MAX_SIZE_BYTES, validate_document_file
+from apps.system.validators import (
+    DOC_MAX_SIZE_BYTES,
+    IMAGE_MAX_SIZE_BYTES,
+    validate_document_file,
+)
 
 SYS_MEDIA_ROOT = tempfile.mkdtemp(prefix="ejournal_system_media_")
 PASSWORD = "GoodPass!1"
@@ -489,6 +493,22 @@ class NewsTests(BaseSystemTestCase):
         resp = self.client.get(reverse("system:news"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Обновление системы")
+
+    def test_oversized_cover_is_rejected(self):
+        self.client.force_login(self.admin)
+        oversized = SimpleUploadedFile(
+            "cover.png",
+            b"x" * (IMAGE_MAX_SIZE_BYTES + 1),
+            content_type="image/png",
+        )
+
+        response = self.client.post(
+            reverse("system:news_create"),
+            {"title": "Большая обложка", "text": "Текст", "cover_image": oversized},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(NewsItem.objects.filter(title="Большая обложка").exists())
 
     def test_hidden_news_not_for_regular_user(self):
         NewsItem.objects.create(title="Черновик", text="x", author=self.admin, is_active=False)

@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import CharField, Count, OuterRef, Q, Subquery, Value
+from django.db.models import CharField, Count, F, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Concat
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -987,7 +987,7 @@ def doc_upload(request):
 def doc_download(request, pk):
     """Скачивание документа с учётом счётчика загрузок (PRD v3 §2.8)."""
     doc = get_object_or_404(SystemDocument, pk=pk)
-    SystemDocument.objects.filter(pk=pk).update(downloads_count=doc.downloads_count + 1)
+    SystemDocument.objects.filter(pk=pk).update(downloads_count=F("downloads_count") + 1)
     log_event(
         module="system",
         event_type=EventLog.EventType.EXPORT,
@@ -1146,7 +1146,7 @@ def news_detail(request, pk):
     )
     if not item.is_active and not _is_admin(request.user):
         raise Http404
-    NewsItem.objects.filter(pk=pk).update(views_count=item.views_count + 1)
+    NewsItem.objects.filter(pk=pk).update(views_count=F("views_count") + 1)
     item.views_count += 1
     return render(
         request,

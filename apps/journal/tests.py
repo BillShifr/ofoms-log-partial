@@ -133,6 +133,39 @@ class JournalScreenTests(TestCase):
         self.assertContains(resp, "Петров")
         self.assertContains(resp, f'data-href="{reverse("journal:detail", args=[irp.pk])}"')
         self.assertContains(resp, "table-row-link")
+        self.assertContains(resp, reverse("journal:list_print"))
+
+    def test_print_list_preserves_filters_and_org_scope(self):
+        own = self._make_irp(owner=self.smo_user)
+        own.z_f = "Нужная"
+        own.save(update_fields=["z_f"])
+        hidden_by_filter = self._make_irp(owner=self.smo_user)
+        hidden_by_filter.z_f = "Другая"
+        hidden_by_filter.save(update_fields=["z_f"])
+        foreign = self._make_irp(owner=self.tfoms_user)
+        foreign.z_f = "Нужная"
+        foreign.save(update_fields=["z_f"])
+
+        self.client.force_login(self.smo_user)
+        response = self.client.get(
+            reverse("journal:list_print"), {"z_f": "Нужная"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "journal/irp_list_print.html")
+        self.assertContains(response, own.n_irp)
+        self.assertNotContains(response, hidden_by_filter.n_irp)
+        self.assertNotContains(response, foreign.n_irp)
+        self.assertContains(response, "лимит 500")
+
+    def test_print_list_requires_journal_role(self):
+        user = Employee.objects.create_user(
+            username="print_no_role", password="GoodPass!1", org=81000
+        )
+        self.client.force_login(user)
+        self.assertEqual(
+            self.client.get(reverse("journal:list_print")).status_code,
+            403,
+        )
 
     def test_sort_links_preserve_filters_and_expose_direction(self):
         self.client.force_login(self.tfoms_user)

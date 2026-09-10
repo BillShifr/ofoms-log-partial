@@ -24,6 +24,7 @@
       <a class="btn btn--ghost" href="{% url 'journal:list' %}">Сбросить</a>
       <a class="btn btn--accent" href="{% url 'journal:create' %}">+ Зарегистрировать обращение</a>
       <a class="btn btn--ghost btn--sm" href="{% url 'system:prefs' %}">Настройки таблицы</a>
+      <a class="btn btn--ghost btn--sm" href="{{ print_url }}" target="_blank">Печать списка</a>
     </div>
   </form>
 </div>

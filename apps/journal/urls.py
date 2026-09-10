@@ -19,6 +19,7 @@ app_name = "journal"
 
 urlpatterns = [
     path("", views.irp_list, name="list"),
+    path("print/", views.irp_list_print, name="list_print"),
     path("suggest/", views.irp_suggest, name="suggest"),
     path("new/", views.irp_create, name="create"),
     path("<int:pk>/", views.irp_detail, name="detail"),

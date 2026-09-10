@@ -1,0 +1,57 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Реестр обращений — печать</title>
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}">
+  <style>
+    body { background:#fff !important; padding:20px; }
+    .print-meta { margin-bottom:16px; }
+    @media print {
+      .no-print { display:none !important; }
+      body { padding:0; }
+      table.data { font-size:9pt; }
+      table.data th, table.data td { padding:5px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print flex mb-2">
+    <a class="btn btn--ghost" href="{% url 'journal:list' %}">← К реестру</a>
+    <button class="btn btn--primary" type="button" onclick="window.print()">Печать</button>
+  </div>
+  <h1>Единый электронный журнал обращений граждан</h1>
+  <p class="print-meta">Выбрано записей: {{ page.paginator.count }}. В печатную форму выводятся первые {{ page.object_list|length }} (лимит 500).</p>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr>{% for col in cols %}<th>{{ col.label }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for irp in page.object_list %}
+        <tr>
+        {% for col in cols %}
+          <td>
+            {% if col.key == 'id' %}{{ irp.id }}
+            {% elif col.key == 'n_irp' %}{{ irp.n_irp }}
+            {% elif col.key == 'date_create' %}{{ irp.date_create|date:"d.m.Y" }}
+            {% elif col.key == 'data_plan' %}{{ irp.data_plan|date:"d.m.Y" }}
+            {% elif col.key == 'date_close' %}{{ irp.date_close|date:"d.m.Y"|default:"—" }}
+            {% elif col.key == 'irp_type' %}{{ irp.get_irp_type_display }}
+            {% elif col.key == 'theme' %}{{ irp.theme.code_name }} — {{ irp.theme.title }}
+            {% elif col.key == 'z_f' %}{{ irp.z_f }} {{ irp.z_i|default:"" }}
+            {% elif col.key == 'z_enp' %}{{ irp.z_enp|default:"—" }}
+            {% elif col.key == 'employee_one' %}{{ irp.employee_one.full_name }}
+            {% elif col.key == 'status' %}{{ irp.get_status_display }}
+            {% endif %}
+          </td>
+        {% endfor %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="{{ cols|length }}">Обращений не найдено.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p>Сформировано {% now "d.m.Y H:i" %}; пользователь: {{ user.full_name|default:user.username }}.</p>
+</body>
+</html>

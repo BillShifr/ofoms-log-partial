@@ -238,13 +238,23 @@ def irp_edit(request, pk):
     """Редактирование карточки обращения с фиксацией изменений в истории."""
     irp = _get_irp_for_user(request, pk)
     _require_capability(request, JOURNAL_CHANGE)
+    _require_mutable(irp)
     if request.method == "POST":
         form = IrpForm(request.POST, instance=irp, user=request.user)
         # ModelForm мутирует instance при валидации — снимок до is_valid()
         before = {f: getattr(irp, f) for f in form.fields}
         if form.is_valid():
             old = {f: before[f] for f in form.changed_data}
-            irp = form.save()
+            irp = form.save(commit=False)
+            target = (
+                Irp.Status.CLOSED
+                if irp.date_close and irp.result
+                else Irp.Status.IN_PROGRESS
+                if irp.status == Irp.Status.REGISTERED
+                else irp.status
+            )
+            _transition(irp, target)
+            irp.save()
             _write_history(irp, request.user, old)
             log_event(
                 module="journal",
@@ -271,12 +281,22 @@ def irp_answer_create(request, pk):
     """Добавление ответа на обращение (ТЗ п. 215: предварительный ответ)."""
     irp = _get_irp_for_user(request, pk)
     _require_capability(request, JOURNAL_CHANGE)
+    _require_mutable(irp)
     form = IrpAnswerForm(request.POST)
     if form.is_valid():
         answer = form.save(commit=False)
         answer.irp = irp
         answer.user = request.user
         answer.save()
+        target = (
+            Irp.Status.PRELIMINARY
+            if answer.is_preliminary
+            else Irp.Status.IN_PROGRESS
+            if irp.status == Irp.Status.REGISTERED
+            else irp.status
+        )
+        _transition(irp, target)
+        irp.save(update_fields=["status"])
         IrpHistory.objects.create(
             irp=irp, user=request.user, field_name="answer",
             old_value="—",
@@ -297,6 +317,7 @@ def irp_file_upload(request, pk):
     """Прикрепление файла к обращению или к ответу (ТЗ п. 200)."""
     irp = _get_irp_for_user(request, pk)
     _require_capability(request, JOURNAL_CHANGE)
+    _require_mutable(irp)
     uploaded = request.FILES.get("file")
     if uploaded:
         from apps.system.validators import validate_document_file
@@ -350,12 +371,15 @@ def irp_redirect(request, pk):
     """Переадресация обращения (ТЗ п. 212) + запись в историю."""
     irp = _get_irp_for_user(request, pk)
     _require_capability(request, JOURNAL_REDIRECT)
+    _require_mutable(irp)
     if request.method == "POST":
         form = IrpRedirectForm(request.POST, instance=irp, user=request.user)
         before = {f: getattr(irp, f) for f in form.fields}
         if form.is_valid():
             old = {f: before[f] for f in form.changed_data}
-            irp = form.save()
+            irp = form.save(commit=False)
+            _transition(irp, Irp.Status.REDIRECTED)
+            irp.save()
             _write_history(irp, request.user, old)
             if old:
                 log_event(
@@ -396,6 +420,17 @@ def _get_irp_for_user(request, pk):
 def _require_capability(request, capability):
     if not user_has_capability(request.user, capability):
         raise PermissionDenied
+
+
+def _require_mutable(irp):
+    if irp.is_closed:
+        raise PermissionDenied("Закрытое обращение нельзя изменять.")
+
+
+def _transition(irp, target):
+    if not irp.can_transition_to(target):
+        raise PermissionDenied("Недопустимый переход статуса обращения.")
+    irp.status = target
 
 
 def _write_history(irp, user, old=None, created=False):

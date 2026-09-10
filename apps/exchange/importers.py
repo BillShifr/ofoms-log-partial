@@ -343,6 +343,7 @@ class IrpXMLFile(XsdExchangeFile):
         irp.employee_it = employee_it
         irp.theme = theme
         try:
+            irp.synchronize_imported_status()
             irp.full_clean()
             irp.save()
         except ValidationError as e:
@@ -579,6 +580,7 @@ class ExcelIrpFile:
         irp.employee_it = employee_it
         irp.theme = theme
         try:
+            irp.synchronize_imported_status()
             irp.full_clean()
             irp.save()
         except ValidationError as e:

@@ -4,16 +4,18 @@
 <div class="flex mb-2">
   <h1>Обращение № {{ irp.n_irp }}</h1>
   <div class="flex">
-    {% if irp.is_closed %}<span class="badge badge--closed">Закрыто</span>
+    {% if irp.is_closed %}<span class="badge badge--closed">{{ irp.get_status_display }}</span>
     {% elif irp.is_overdue %}<span class="badge badge--overdue">Просрочено</span>
-    {% else %}<span class="badge badge--open">Открыто</span>{% endif %}
+    {% else %}<span class="badge badge--open">{{ irp.get_status_display }}</span>{% endif %}
     {% if irp.result %}<span class="badge badge--result">{{ irp.get_result_display }}</span>{% endif %}
   </div>
 </div>
 
 <div class="flex mb-2">
-  <a class="btn btn--accent" href="{% url 'journal:edit' irp.pk %}">Редактировать</a>
-  <a class="btn btn--accent" href="{% url 'journal:redirect' irp.pk %}">Переадресация</a>
+  {% if not irp.is_closed %}
+    <a class="btn btn--accent" href="{% url 'journal:edit' irp.pk %}">Редактировать</a>
+    <a class="btn btn--accent" href="{% url 'journal:redirect' irp.pk %}">Переадресация</a>
+  {% endif %}
   <a class="btn btn--ghost" href="{% url 'journal:print' irp.pk %}" target="_blank">Печать</a>
   <a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a>
 </div>
@@ -99,6 +101,7 @@
   <p class="text-muted">Ответов пока нет.</p>
   {% endfor %}
 
+  {% if not irp.is_closed %}
   <form method="post" action="{% url 'journal:answer' irp.pk %}" class="answer-form" data-validate>
     {% csrf_token %}
     <div class="field"><label for="{{ answer_form.text.id_for_label }}">Новый ответ</label>{{ answer_form.text }}</div>
@@ -119,6 +122,7 @@
     </div>
     <button class="btn btn--ghost" type="submit">Загрузить файл</button>
   </form>
+  {% endif %}
 </div>
 
 <div class="card">

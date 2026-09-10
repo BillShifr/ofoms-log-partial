@@ -43,6 +43,8 @@ class BaseReportTestCase(TestCase):
     def _make(self, owner=None, irp_type=1, how=1, way=1, zh_d=None,
               date_close=None, result=None, text="Текст", line_one=None, pr_out=None):
         owner = owner or self.tfoms_user
+        if date_close and result is None:
+            result = 2
         return Irp.objects.create(
             n_irp=str(uuid.uuid4()),
             irp_type=irp_type,
@@ -59,6 +61,7 @@ class BaseReportTestCase(TestCase):
             zh_d=zh_d,
             date_close=date_close,
             result=result,
+            status=Irp.Status.CLOSED if date_close else Irp.Status.REGISTERED,
             line_one=line_one,
             pr_out=pr_out,
         )

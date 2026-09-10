@@ -74,6 +74,21 @@ class IrpForm(forms.ModelForm):
         value = self.cleaned_data.get("otv_t")
         return value
 
+    def clean(self):
+        cleaned = super().clean()
+        date_close = cleaned.get("date_close")
+        result = cleaned.get("result")
+        if bool(date_close) != bool(result):
+            raise forms.ValidationError(
+                "Для закрытия обращения одновременно укажите дату и исход."
+            )
+        date_create = cleaned.get("date_create")
+        if date_close and date_create and date_close < date_create:
+            self.add_error(
+                "date_close", "Дата закрытия не может быть раньше даты поступления."
+            )
+        return cleaned
+
 
 class IrpFilterForm(forms.Form):
     """Панель фильтров реестра обращений."""

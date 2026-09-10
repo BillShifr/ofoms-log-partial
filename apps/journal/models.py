@@ -162,6 +162,13 @@ class IrpTheme(models.Model):
 
 
 class Irp(models.Model):
+    class Status(models.TextChoices):
+        REGISTERED = "registered", "Зарегистрировано"
+        IN_PROGRESS = "in_progress", "В работе"
+        REDIRECTED = "redirected", "Переадресовано"
+        PRELIMINARY = "preliminary", "Предварительный ответ"
+        CLOSED = "closed", "Закрыто"
+
     """Обращение гражданина (запись журнала)."""
 
     input_file = models.ForeignKey(
@@ -227,6 +234,13 @@ class Irp(models.Model):
     result = models.SmallIntegerField(
         blank=True, null=True, choices=RESULTS, verbose_name="Исход обращения"
     )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.REGISTERED,
+        db_index=True,
+        verbose_name="Статус",
+    )
 
     # ---- Заявитель (z_*) ----
     z_f = models.CharField(max_length=40, blank=True, null=True, verbose_name="Фамилия")
@@ -276,6 +290,22 @@ class Irp(models.Model):
         verbose_name = "Обращение"
         verbose_name_plural = "Обращения"
         ordering = ["-date_create", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status="closed",
+                        date_close__isnull=False,
+                        result__isnull=False,
+                    )
+                    | (
+                        ~models.Q(status="closed")
+                        & models.Q(date_close__isnull=True, result__isnull=True)
+                    )
+                ),
+                name="irp_closed_status_has_date_and_result",
+            )
+        ]
 
     def __str__(self) -> str:
         return self.n_irp
@@ -284,10 +314,63 @@ class Irp(models.Model):
         super().clean()
         if self.way == 5 and not self.way_n:
             raise ValidationError({"way_n": "Укажите организацию"})
+        if bool(self.date_close) != bool(self.result):
+            raise ValidationError(
+                "Для закрытия обращения одновременно укажите дату и исход."
+            )
+        if self.date_close and self.date_create and self.date_close < self.date_create:
+            raise ValidationError(
+                {"date_close": "Дата закрытия не может быть раньше даты поступления."}
+            )
+        if self.status == self.Status.CLOSED and not self.date_close:
+            raise ValidationError(
+                {"date_close": "Для статуса «Закрыто» укажите дату и исход."}
+            )
 
     @property
     def is_closed(self) -> bool:
-        return bool(self.date_close)
+        return self.status == self.Status.CLOSED
+
+    def can_transition_to(self, target: str) -> bool:
+        allowed = {
+            self.Status.REGISTERED: {
+                self.Status.IN_PROGRESS,
+                self.Status.REDIRECTED,
+                self.Status.PRELIMINARY,
+                self.Status.CLOSED,
+            },
+            self.Status.IN_PROGRESS: {
+                self.Status.REDIRECTED,
+                self.Status.PRELIMINARY,
+                self.Status.CLOSED,
+            },
+            self.Status.REDIRECTED: {
+                self.Status.PRELIMINARY,
+                self.Status.CLOSED,
+            },
+            self.Status.PRELIMINARY: {
+                self.Status.PRELIMINARY,
+                self.Status.CLOSED,
+            },
+            self.Status.CLOSED: set(),
+        }
+        return target == self.status or target in allowed[self.status]
+
+    def synchronize_imported_status(self) -> None:
+        """Восстанавливает lifecycle для импорта, не открывая закрытые записи."""
+        if self.date_close and self.result:
+            target = self.Status.CLOSED
+        elif self.pk and self.answers.filter(is_preliminary=True).exists():
+            target = self.Status.PRELIMINARY
+        elif self.date_cross or self.pr_out:
+            target = self.Status.REDIRECTED
+        else:
+            target = self.Status.REGISTERED
+        if self.pk and self.status == self.Status.CLOSED and target != self.Status.CLOSED:
+            raise ValidationError(
+                {"status": "Пакетный импорт не может повторно открыть обращение."}
+            )
+        self.status = target
 
     @property
     def is_overdue(self) -> bool:

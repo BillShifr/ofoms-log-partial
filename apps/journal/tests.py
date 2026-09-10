@@ -55,6 +55,8 @@ class IrpModelTests(TestCase):
             data_plan=data_plan or datetime.date.today() + datetime.timedelta(days=30),
             z_f="Заявитель",
             date_close=date_close,
+            result=2 if date_close else None,
+            status=Irp.Status.CLOSED if date_close else Irp.Status.REGISTERED,
         )
 
     def test_is_closed(self):
@@ -216,11 +218,13 @@ class JournalScreenTests(TestCase):
                 "data_plan": irp.data_plan.isoformat(),
                 "z_f": "Иванов",  # изменено
                 "date_close": datetime.date.today().isoformat(),
+                "result": 2,
             },
         )
         self.assertEqual(resp.status_code, 302)
         irp.refresh_from_db()
         self.assertEqual(irp.z_f, "Иванов")
+        self.assertEqual(irp.status, Irp.Status.CLOSED)
         entry = IrpHistory.objects.filter(irp=irp, field_name="z_f").latest("id")
         self.assertEqual(entry.old_value, "Петров")
         self.assertEqual(entry.new_value, "Иванов")
@@ -316,6 +320,8 @@ class RoutingTests(TestCase):
         answer = irp.answers.get()
         self.assertTrue(answer.is_preliminary)
         self.assertEqual(answer.user, self.tfoms_user)
+        irp.refresh_from_db()
+        self.assertEqual(irp.status, Irp.Status.PRELIMINARY)
         self.assertTrue(IrpHistory.objects.filter(irp=irp, field_name="answer").exists())
 
     def test_final_answer_flag(self):
@@ -429,7 +435,57 @@ class RoutingTests(TestCase):
         irp.refresh_from_db()
         self.assertEqual(irp.otv_kon, 81007)
         self.assertEqual(irp.pr_out, 1)
+        self.assertEqual(irp.status, Irp.Status.REDIRECTED)
         self.assertTrue(IrpHistory.objects.filter(irp=irp, field_name="pr_out").exists())
+
+    def test_closed_irp_is_terminal_for_mutations(self):
+        irp = self._make_irp()
+        irp.status = Irp.Status.CLOSED
+        irp.date_close = datetime.date.today()
+        irp.result = 2
+        irp.save()
+        self.client.force_login(self.tfoms_user)
+
+        self.assertEqual(
+            self.client.get(reverse("journal:edit", args=[irp.pk])).status_code, 403
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("journal:answer", args=[irp.pk]), {"text": "Поздний ответ"}
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.get(reverse("journal:redirect", args=[irp.pk])).status_code,
+            403,
+        )
+
+    def test_close_requires_date_and_result_together(self):
+        irp = self._make_irp()
+        self.client.force_login(self.tfoms_user)
+        response = self.client.post(
+            reverse("journal:edit", args=[irp.pk]),
+            {
+                "n_irp": irp.n_irp,
+                "irp_type": 1,
+                "date_create": irp.date_create.isoformat(),
+                "way": 1,
+                "how": 1,
+                "theme": self.theme.pk,
+                "otv_t": 1,
+                "otv_kon": 81000,
+                "employee_one": self.tfoms_user.pk,
+                "data_plan": irp.data_plan.isoformat(),
+                "date_close": datetime.date.today().isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Для закрытия обращения одновременно укажите дату и исход.",
+        )
+        irp.refresh_from_db()
+        self.assertEqual(irp.status, Irp.Status.REGISTERED)
 
     def test_redirect_requires_login(self):
         irp = self._make_irp()

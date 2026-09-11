@@ -10,6 +10,7 @@ media
 staticfiles
 docs
 .tmp
+.artifacts
 tests
 .github
 .idea

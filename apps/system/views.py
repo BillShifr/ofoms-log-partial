@@ -159,7 +159,7 @@ def user_create(request):
 def user_update(request, pk):
     user = get_object_or_404(Employee, pk=pk)
     if request.method == "POST":
-        form = EmployeeUpdateForm(request.POST, instance=user)
+        form = EmployeeUpdateForm(request.POST, instance=user, actor=request.user)
         if form.is_valid():
             changed = list(form.changed_data)
             form.save()
@@ -173,7 +173,7 @@ def user_update(request, pk):
             messages.success(request, "Учётная запись обновлена.")
             return redirect("system:users")
     else:
-        form = EmployeeUpdateForm(instance=user)
+        form = EmployeeUpdateForm(instance=user, actor=request.user)
     return render(
         request,
         "system/user_form.html",

@@ -6,7 +6,7 @@ from django.contrib.auth.models import Group
 from django.db.models import Q
 
 from apps.core.models import EventLog
-from apps.core.roles import GROUP_ROLE_MAP, ROLE_GROUP_MAP, SMO_ROLES, TFOMS_ROLES
+from apps.core.roles import GROUP_ROLE_MAP, ROLE_GROUP_MAP, SMO_ROLES, TFOMS_ROLES, Roles
 from apps.employee.models import ORGS, TFOMS, Employee
 from apps.system.models import (
     Conversation,
@@ -109,11 +109,36 @@ class EmployeeUpdateForm(RoleAssignmentMixin, forms.ModelForm):
         model = Employee
         fields = ("last_name", "first_name", "job_title", "org", "is_active", "is_staff")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, actor=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.actor = actor
         self._configure_roles()
         if self.instance.pk:
             self.fields["roles"].initial = self.instance.groups.all()
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self.actor or self.instance.pk != self.actor.pk:
+            return cleaned
+
+        if not cleaned.get("is_active"):
+            self.add_error(
+                "is_active",
+                "Нельзя отключить собственную учётную запись.",
+            )
+
+        roles = cleaned.get("roles")
+        admin_group = ROLE_GROUP_MAP[Roles.ADMIN]
+        if (
+            not self.actor.is_superuser
+            and roles is not None
+            and not roles.filter(name=admin_group).exists()
+        ):
+            self.add_error(
+                "roles",
+                "Нельзя снять собственную роль администратора.",
+            )
+        return cleaned
 
     def save(self, commit=True):
         user = super().save(commit=commit)

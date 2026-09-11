@@ -207,6 +207,43 @@ class UserManagementTests(BaseSystemTestCase):
         self.admin.refresh_from_db()
         self.assertTrue(self.admin.is_active)
 
+    def test_cannot_deactivate_self_through_update_form(self):
+        self.client.force_login(self.admin)
+        admin_group = Group.objects.get(name="Администратор")
+        response = self.client.post(
+            reverse("system:user_update", args=[self.admin.pk]),
+            {
+                "last_name": self.admin.last_name,
+                "org": str(self.admin.org),
+                "roles": [admin_group.pk],
+                "is_staff": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Нельзя отключить собственную учётную запись")
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+
+    def test_cannot_remove_own_administrator_role_through_update_form(self):
+        self.client.force_login(self.admin)
+        operator_group = Group.objects.get(name="ОП1")
+        response = self.client.post(
+            reverse("system:user_update", args=[self.admin.pk]),
+            {
+                "last_name": self.admin.last_name,
+                "org": str(self.admin.org),
+                "roles": [operator_group.pk],
+                "is_active": "on",
+                "is_staff": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Нельзя снять собственную роль администратора")
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.groups.filter(name="Администратор").exists())
+
     def test_filter_by_org(self):
         self.client.force_login(self.admin)
         resp = self.client.get(reverse("system:users"), {"org": "81001"})

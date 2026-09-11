@@ -1,13 +1,16 @@
-"""Сквозные (E2E) сценарии через реальный HTTP-стек (Этап 7).
+"""Сквозные (E2E) сценарии через реальный HTTP-стек (этап 4 плана готовности).
 
-Покрывают полный пользовательский путь с настоящими cookie/CSRF:
-вход -> типовые экраны -> выход. Без JS (серверный рендеринг), stdlib urllib.
+Покрывают пользовательские пути с настоящими cookie/CSRF и multipart-загрузками:
+вход -> создание -> изменение/результат -> выход. Без JS, stdlib urllib.
 Запуск: pytest (LiveServerTestCase самостоятельно поднимает dev-сервер).
 """
 
 import datetime
 import re
+import tempfile
+import uuid
 from http.cookiejar import CookieJar
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import HTTPCookieProcessor, Request, build_opener
@@ -15,21 +18,32 @@ from urllib.request import HTTPCookieProcessor, Request, build_opener
 from apps.core.models import EventLog
 from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
+from apps.exchange.models import ImportLog
 from apps.journal.models import Irp, IrpTheme
 from apps.system.models import (
     Conversation,
     MessageReply,
     MessageThread,
     NewsItem,
+    SystemDocument,
     TaskJob,
     TaskNote,
     TaskReport,
 )
 from django.contrib.auth.models import Group
-from django.test import LiveServerTestCase
+from django.test import LiveServerTestCase, override_settings
 
 TOKEN_RE = re.compile(r'name="csrfmiddlewaretoken" value="([^"]+)"')
 PASSWORD = "GoodPass!1"
+SAMPLE_USERS_XML = """<?xml version="1.0" encoding="windows-1251"?>
+<USER_COLLECTION>
+  <USERS>
+    <USER_FULLNAME>Файлов Файл Файлович</USER_FULLNAME>
+    <USER_UUID>00000000-0000-0000-0000-00000000e2e1</USER_UUID>
+    <USER_EMAIL>file-e2e@example.ru</USER_EMAIL>
+  </USERS>
+</USER_COLLECTION>
+""".encode("windows-1251")
 
 
 class _LiveHttp:
@@ -68,9 +82,61 @@ class _LiveHttp:
             html = exc.read().decode("utf-8", errors="replace")
         return code, html
 
+    def post_multipart(self, path, data, files, token_page):
+        _, html = self.get(token_page)
+        match = TOKEN_RE.search(html)
+        if match is None:
+            raise AssertionError(f"CSRF-токен не найден на {token_page}")
+        boundary = f"----ofoms-e2e-{uuid.uuid4().hex}"
+        chunks = []
+        for name, value in {**data, "csrfmiddlewaretoken": match.group(1)}.items():
+            chunks.extend(
+                [
+                    f"--{boundary}\r\n".encode(),
+                    f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode(),
+                    str(value).encode(),
+                    b"\r\n",
+                ]
+            )
+        for name, (filename, payload, content_type) in files.items():
+            chunks.extend(
+                [
+                    f"--{boundary}\r\n".encode(),
+                    (
+                        f'Content-Disposition: form-data; name="{name}"; '
+                        f'filename="{filename}"\r\n'
+                    ).encode(),
+                    f"Content-Type: {content_type}\r\n\r\n".encode(),
+                    payload,
+                    b"\r\n",
+                ]
+            )
+        chunks.append(f"--{boundary}--\r\n".encode())
+        request = Request(
+            self.base + path,
+            data=b"".join(chunks),
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        )
+        try:
+            with self._opener.open(request, timeout=20) as response:
+                return response.status, response.read().decode("utf-8", errors="replace")
+        except HTTPError as exc:
+            return exc.code, exc.read().decode("utf-8", errors="replace")
+
 
 class LiveFlowsTests(LiveServerTestCase):
     def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory(prefix="ofoms-e2e-")
+        root = Path(self.temp_dir.name)
+        self.settings_override = override_settings(
+            MEDIA_ROOT=root / "media",
+            EXCHANGE_IN=root / "exchange" / "in",
+            EXCHANGE_OUT=root / "exchange" / "out",
+            EXCHANGE_ARCHIVE=root / "exchange" / "archive",
+        )
+        self.settings_override.enable()
+        self.addCleanup(self.settings_override.disable)
+        self.addCleanup(self.temp_dir.cleanup)
         ensure_role_groups()
         self.operator = Employee.objects.create_user(
             username="e2e_op", password=PASSWORD, org=81000
@@ -322,3 +388,45 @@ class LiveFlowsTests(LiveServerTestCase):
         self.assertIn("e2e_created_user", html)
         created = Employee.objects.get(username="e2e_created_user")
         self.assertTrue(created.groups.filter(pk=sp1_group.pk).exists())
+
+    def test_document_and_exchange_upload_flow_via_http(self):
+        http = self._client()
+        status, _ = http.post_form(
+            "/accounts/login/?next=/system/docs/",
+            {"username": self.admin.username, "password": PASSWORD},
+            token_page="/accounts/login/",
+        )
+        self.assertEqual(status, 200)
+
+        status, html = http.post_multipart(
+            "/system/docs/upload/",
+            {
+                "title": "Документ сквозной проверки",
+                "version": "1.0",
+                "sort_order": 0,
+            },
+            {"file": ("e2e-manual.pdf", b"%PDF-1.4\n%%EOF\n", "application/pdf")},
+            token_page="/system/docs/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Документ сквозной проверки", html)
+        document = SystemDocument.objects.get(title="Документ сквозной проверки")
+        self.assertTrue(Path(document.file.path).exists())
+
+        status, html = http.post_multipart(
+            "/exchange/upload/",
+            {"org": self.admin.org},
+            {
+                "file": (
+                    "users260911001.xml",
+                    SAMPLE_USERS_XML,
+                    "application/xml",
+                )
+            },
+            token_page="/exchange/upload/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Протокол", html)
+        exchange_log = ImportLog.objects.get(filename="users260911001.xml")
+        self.assertEqual(exchange_log.status, ImportLog.Status.OK)
+        self.assertTrue(Employee.objects.filter(email="file-e2e@example.ru").exists())

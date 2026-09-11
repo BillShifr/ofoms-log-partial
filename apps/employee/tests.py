@@ -1,6 +1,7 @@
 """Тесты employee: модель Employee и GroupProxy."""
 
 from apps.employee.models import Employee, GroupProxy
+from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
 from django.db import IntegrityError, transaction
 from django.test import TestCase
@@ -65,6 +66,11 @@ class EmployeeModelTests(TestCase):
 
         with self.assertRaises(IntegrityError), transaction.atomic():
             Employee.objects.filter(pk=user.pk).update(org=99999)
+
+    def test_employee_admin_disables_physical_deletion(self):
+        model_admin = admin.site._registry[Employee]
+
+        self.assertFalse(model_admin.has_delete_permission(request=None))
 
 
 class GroupProxyTests(TestCase):

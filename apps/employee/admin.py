@@ -60,6 +60,10 @@ class EmployeeAdmin(UserAdmin):
     )
     readonly_fields = ("guid", "failed_attempts", "lock_until")
 
+    def has_delete_permission(self, request, obj=None):
+        """Учётные записи деактивируются, но не удаляются из audit trail."""
+        return False
+
     def is_locked(self, obj):
         return obj.is_locked
 

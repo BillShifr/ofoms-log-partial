@@ -14,6 +14,7 @@ from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, connection, transaction
+from django.db.models.deletion import ProtectedError
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -658,6 +659,20 @@ class EventLogTests(TestCase):
         entry = log_event(module="test", event_type=EventLog.EventType.CREATE)
         self.assertEqual(entry.finished_at, entry.started_at)
         self.assertEqual(entry.duration_ms, 0)
+
+    def test_event_actor_cannot_be_deleted(self):
+        actor = User.objects.create_user(
+            username="retained-audit-actor", password="GoodPass!1", org=81000
+        )
+        entry = log_event(
+            module="test", event_type=EventLog.EventType.VIEW, user=actor
+        )
+
+        with self.assertRaises(ProtectedError):
+            actor.delete()
+
+        entry.refresh_from_db()
+        self.assertEqual(entry.user, actor)
 
     def test_pending_event_is_completed_without_explicit_duration(self):
         entry = log_event(

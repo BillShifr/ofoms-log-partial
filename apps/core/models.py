@@ -62,7 +62,7 @@ class EventLog(models.Model):
         settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         related_name="events",
         verbose_name="Инициатор",
     )

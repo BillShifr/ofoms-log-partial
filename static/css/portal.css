@@ -661,14 +661,15 @@ tbody tr.js-event-row { cursor: pointer; }
 .filter-form .field { flex: 1; min-width: 190px; }
 
 /* ---------- Автозаполнение (2.0.6) ---------- */
-.autocomplete { position: fixed; z-index: 2200; max-height: 240px; overflow-y: auto;
+.autocomplete-host { position: relative; }
+.autocomplete { z-index: 2200; max-height: 240px; overflow-y: auto;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg); }
 .autocomplete__item { display: block; width: 100%; padding: 8px 12px; border: none;
   background: none; text-align: left; font: inherit; cursor: pointer; }
 .autocomplete__item:hover { background: var(--chip-green); }
 #assignee-wrap { position: relative; }
-.autocomplete--anchored { position: absolute; inset-inline: 0; top: 100%; }
+.autocomplete--anchored { position: absolute; inset-inline: 0; top: calc(100% + 4px); }
 
 /* ---------- Клиентская валидация (2.0.4) ---------- */
 .validation-tip { display: block; margin-top: 4px; color: var(--danger, #b3261e); font-size: .82rem; }
@@ -791,20 +792,6 @@ th.data-sort.sort-asc::after { content: " ▲"; opacity: 1; }
 th.data-sort.sort-desc::after { content: " ▼"; opacity: 1; }
 th.data-sort:hover { background: var(--chip-green); }
 td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dt-tip {
-  position: fixed;
-  z-index: 2000;
-  max-width: 320px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: var(--ink);
-  color: #fff;
-  font-size: .82rem;
-  line-height: 1.45;
-  pointer-events: none;
-  box-shadow: var(--shadow-lg);
-}
-
 /* ---------- Мессенджер (PRD v3 §2.6) ---------- */
 .messenger { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
 .messenger__side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }

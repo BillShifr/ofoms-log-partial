@@ -79,23 +79,10 @@
   }
 
   function initTooltips() {
-    var tipEl = null;
-    function hide() { if (tipEl) { tipEl.remove(); tipEl = null; } }
-    document.addEventListener('mouseover', function (e) {
-      var cell = e.target.closest('[data-tip]');
-      if (!cell) { hide(); return; }
-      hide();
-      tipEl = document.createElement('div');
-      tipEl.className = 'dt-tip';
-      tipEl.textContent = cell.getAttribute('data-tip');
-      document.body.appendChild(tipEl);
-      var rect = cell.getBoundingClientRect();
-      var top = rect.top - tipEl.offsetHeight - 8;
-      tipEl.style.left = Math.min(rect.left, window.innerWidth - tipEl.offsetWidth - 12) + 'px';
-      tipEl.style.top = (top < 0 ? rect.bottom + 8 : top) + 'px';
-    });
-    document.addEventListener('mouseout', function (e) {
-      if (e.target.closest && e.target.closest('[data-tip]')) hide();
+    document.querySelectorAll('[data-tip]').forEach(function (element) {
+      if (!element.hasAttribute('title')) {
+        element.setAttribute('title', element.getAttribute('data-tip'));
+      }
     });
   }
 

@@ -480,3 +480,12 @@ class TemplateHygieneTests(TestCase):
             if inline_script.search(text):
                 violations.append(str(template.relative_to(templates_root)))
         self.assertEqual(violations, [])
+
+    def test_scripts_do_not_write_inline_styles(self):
+        scripts_root = Path(settings.BASE_DIR) / "static" / "js"
+        violations = []
+        inline_style = re.compile(r"\.style\b|setAttribute\(\s*['\"]style['\"]")
+        for script in scripts_root.rglob("*.js"):
+            if inline_style.search(script.read_text(encoding="utf-8-sig")):
+                violations.append(str(script.relative_to(scripts_root)))
+        self.assertEqual(violations, [])

@@ -73,6 +73,7 @@ let socket;
 let messageId = 0;
 const pending = new Map();
 const eventWaiters = new Map();
+const browserErrors = [];
 function command(method, params = {}) {
   const id = ++messageId;
   socket.send(JSON.stringify({ id, method, params }));
@@ -111,10 +112,25 @@ try {
     if (message.id && pending.has(message.id)) {
       const waiter = pending.get(message.id); pending.delete(message.id);
       if (message.error) waiter.reject(new Error(message.error.message)); else waiter.resolve(message.result);
-    } else if (eventWaiters.has(message.method)) eventWaiters.get(message.method)(message.params);
+    } else if (eventWaiters.has(message.method)) {
+      eventWaiters.get(message.method)(message.params);
+    } else if (
+      message.method === "Log.entryAdded" &&
+      message.params.entry.level === "error" &&
+      ["javascript", "security"].includes(message.params.entry.source)
+    ) {
+      browserErrors.push(message.params.entry.text);
+    } else if (message.method === "Runtime.exceptionThrown") {
+      browserErrors.push(
+        message.params.exceptionDetails.exception?.description ||
+        message.params.exceptionDetails.text ||
+        "Uncaught JavaScript exception",
+      );
+    }
   };
   await command("Page.enable");
   await command("Runtime.enable");
+  await command("Log.enable");
 
   await navigate(`${baseUrl}/accounts/login/`);
   const loginFormReady = await evaluate(`Boolean(
@@ -131,11 +147,15 @@ try {
   await evaluate("document.querySelector('form').requestSubmit()");
   await loginLoaded;
   if ((await evaluate("location.pathname")).includes("login")) throw new Error("QA login failed");
+  if (browserErrors.length) {
+    throw new Error(`Browser error during login: ${browserErrors.join(" | ")}`);
+  }
 
   const results = [];
   for (const [width, height] of viewports) {
     await command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
     for (const [name, path] of routes) {
+      const errorStart = browserErrors.length;
       await navigate(`${baseUrl}${path}`);
       await evaluate(`document.documentElement.dataset.theme='light'; document.documentElement.dataset.font='base'; document.documentElement.dataset.contrast='default'`);
       const metrics = await evaluate(`(() => ({
@@ -147,6 +167,7 @@ try {
         width: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth
       }))()`);
+      metrics.browserErrors = browserErrors.slice(errorStart);
       const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
       const filename = `${name}-${width}x${height}-light.png`;
       await writeFile(join(outputDir, filename), Buffer.from(shot.data, "base64"));
@@ -158,6 +179,7 @@ try {
     for (const [width, height] of [[694, 869], [1024, 768], [1920, 1080]]) {
       await command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
       for (const [name, path] of routes) {
+        const errorStart = browserErrors.length;
         await navigate(`${baseUrl}${path}`);
         await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}; document.documentElement.dataset.font=${JSON.stringify(font)}; document.documentElement.dataset.contrast=${JSON.stringify(contrast)}`);
       const metrics = await evaluate(`(() => ({
@@ -169,6 +191,7 @@ try {
           width: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth
         }))()`);
+        metrics.browserErrors = browserErrors.slice(errorStart);
         const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
         const filename = `${name}-${width}x${height}-${theme}-${font}-${contrast}.png`;
         await writeFile(join(outputDir, filename), Buffer.from(shot.data, "base64"));
@@ -187,7 +210,7 @@ try {
     cases: results.length,
     expectedForbidden: [...expectedForbidden],
     failures: checkedResults.filter((item) =>
-      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") || item.forbidden !== item.expectedForbidden
+      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") || item.forbidden !== item.expectedForbidden || item.browserErrors.length
     ),
     results: checkedResults,
   };

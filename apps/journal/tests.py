@@ -294,6 +294,48 @@ class JournalScreenTests(TestCase):
         self.assertEqual(entry.old_value, "Петров")
         self.assertEqual(entry.new_value, "Иванов")
 
+    def test_edit_clears_inapplicable_conditional_fields(self):
+        irp = self._make_irp()
+        irp.zh_d = "1"
+        irp.pr_out = 1
+        irp.date_cross = datetime.date.today()
+        irp.time_cross = datetime.time(12, 0)
+        irp.save()
+        self.client.force_login(self.tfoms_user)
+
+        response = self.client.post(
+            reverse("journal:edit", args=[irp.pk]),
+            {
+                "n_irp": irp.n_irp,
+                "irp_type": 1,
+                "date_create": irp.date_create.isoformat(),
+                "way": 1,
+                "how": 1,
+                "theme": self.theme.pk,
+                "zh_d": "1",
+                "otv_t": 1,
+                "otv_kon": 81000,
+                "employee_one": self.tfoms_user.pk,
+                "data_plan": irp.data_plan.isoformat(),
+                "date_cross": datetime.date.today().isoformat(),
+                "time_cross": "12:00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        irp.refresh_from_db()
+        self.assertIsNone(irp.zh_d)
+        self.assertIsNone(irp.pr_out)
+        self.assertIsNone(irp.date_cross)
+        self.assertIsNone(irp.time_cross)
+
+    def test_form_marks_conditional_fields_for_progressive_disclosure(self):
+        self.client.force_login(self.tfoms_user)
+        response = self.client.get(reverse("journal:create"))
+        self.assertContains(response, 'data-conditional-controller="id_irp_type"')
+        self.assertContains(response, 'data-conditional-controller="id_pr_out"', count=2)
+        self.assertContains(response, "js/conditional-fields.js")
+
     def test_print_requires_login(self):
         irp = self._make_irp()
         resp = self.client.get(reverse("journal:print", args=[irp.pk]))

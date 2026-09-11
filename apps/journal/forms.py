@@ -76,6 +76,11 @@ class IrpForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        if cleaned.get("irp_type") != 2:
+            cleaned["zh_d"] = None
+        if not cleaned.get("pr_out"):
+            cleaned["date_cross"] = None
+            cleaned["time_cross"] = None
         date_close = cleaned.get("date_close")
         result = cleaned.get("result")
         if bool(date_close) != bool(result):

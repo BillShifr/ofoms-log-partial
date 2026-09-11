@@ -1569,6 +1569,25 @@ class TaskTests(BaseSystemTestCase):
 
         self.assertFalse(task.notes.exists())
 
+    def test_task_note_create_audit_contains_note_identity(self):
+        task = self._make_task()
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:task_update", args=[task.pk]),
+            {"action": "note", "text": "Идентифицируемая заметка"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        note = task.notes.get()
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.UPDATE,
+                user=self.admin,
+                target=f"task:{task.pk}:note:{note.pk}",
+            ).exists()
+        )
+
     def test_task_note_delete_rolls_back_when_audit_fails(self):
         task = self._make_task()
         note = TaskNote.objects.create(
@@ -2081,6 +2100,28 @@ class PrefTests(BaseSystemTestCase):
         self.assertEqual(pref.sorting, {"field": "date_create", "dir": "-"})
         self.assertTrue(pref.fixed_first)
 
+    def test_table_prefs_save_rolls_back_when_audit_fails(self):
+        original = UserTableViewPref.objects.create(
+            user=self.operator,
+            table_key=JOURNAL_TABLE_KEY,
+            columns=["id", "status"],
+            sorting={"field": "id", "dir": ""},
+        )
+        self.client.force_login(self.operator)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:table_prefs", args=[JOURNAL_TABLE_KEY]),
+                {"columns": ["z_f"], "sort_field": "z_f", "sort_dir": "-"},
+            )
+
+        original.refresh_from_db()
+        self.assertEqual(original.columns, ["id", "status"])
+        self.assertEqual(original.sorting, {"field": "id", "dir": ""})
+
     def test_journal_uses_columns_pref(self):
         self._make_irp()
         UserTableViewPref.objects.create(
@@ -2148,6 +2189,9 @@ class PrefTests(BaseSystemTestCase):
         self.assertContains(resp, ">Поступило</a>")
         self.assertContains(resp, ">Срок рассм.</a>")
         self.assertContains(resp, ">Закрыто</a>")
+        self.assertFalse(
+            UserTableViewPref.objects.filter(user=self.operator).exists()
+        )
 
 
 class RequestScreensTests(BaseSystemTestCase):

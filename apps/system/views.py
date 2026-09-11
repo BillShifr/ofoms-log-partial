@@ -905,7 +905,7 @@ def _task_update(request, pk, *, for_update=False):
             note.author = request.user
             note.save()
             log_event(module="system", event_type=EventLog.EventType.UPDATE,
-                      user=request.user, target=f"task:{task.pk}:note",
+                      user=request.user, target=f"task:{task.pk}:note:{note.pk}",
                       ip=request.META.get("REMOTE_ADDR"))
             messages.success(request, "Заметка добавлена.")
         return redirect("system:task_update", pk=task.pk)
@@ -1474,9 +1474,7 @@ def table_prefs(request, table_key):
     meta = _tables_meta().get(table_key)
     if meta is None:
         raise Http404
-    pref = UserTableViewPref.for_table(
-        request.user, table_key, [c["key"] for c in meta["columns"]]
-    )
+    default_columns = [c["key"] for c in meta["columns"]]
     if request.method == "POST":
         selected = request.POST.getlist("columns")
         default_order = [c["key"] for c in meta["columns"]]
@@ -1496,20 +1494,31 @@ def table_prefs(request, table_key):
             sort_field = ""
         if sort_dir not in ("", "-"):
             sort_dir = "-"
-        pref.columns = selected_sorted
-        pref.sorting = {"field": sort_field, "dir": sort_dir} if sort_field else {}
-        pref.fixed_first = request.POST.get("fixed_first") == "on"
-        pref.save()
-        log_event(
-            module="system",
-            event_type=EventLog.EventType.OTHER,
-            user=request.user,
-            target=f"table_prefs:{table_key}",
-            ip=request.META.get("REMOTE_ADDR"),
-        )
+        with transaction.atomic():
+            UserTableViewPref.objects.update_or_create(
+                user=request.user,
+                table_key=table_key,
+                defaults={
+                    "columns": selected_sorted,
+                    "sorting": (
+                        {"field": sort_field, "dir": sort_dir}
+                        if sort_field
+                        else {}
+                    ),
+                    "fixed_first": request.POST.get("fixed_first") == "on",
+                },
+            )
+            log_event(
+                module="system",
+                event_type=EventLog.EventType.OTHER,
+                user=request.user,
+                target=f"table_prefs:{table_key}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
         messages.success(request, "Настройки таблицы сохранены.")
         return redirect("journal:list")
 
+    pref = UserTableViewPref.for_table(request.user, table_key, default_columns)
     current = set(pref.columns or [])
     sorting = pref.sorting or {}
     saved_order = pref.columns or [c["key"] for c in meta["columns"]]

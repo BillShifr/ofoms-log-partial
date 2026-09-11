@@ -766,7 +766,8 @@ class UserTableViewPref(models.Model):
 
     @classmethod
     def for_table(cls, user, table_key: str, default_columns: list[str]) -> "UserTableViewPref":
-        pref, _ = cls.objects.get_or_create(
-            user=user, table_key=table_key, defaults={"columns": default_columns}
+        return cls.objects.filter(user=user, table_key=table_key).first() or cls(
+            user=user,
+            table_key=table_key,
+            columns=list(default_columns),
         )
-        return pref

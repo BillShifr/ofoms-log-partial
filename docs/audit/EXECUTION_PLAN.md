@@ -5,7 +5,7 @@
 
 | Этап | Область | Критерий завершения | Статус | Доказательства |
 |---|---|---|---|---|
-| 0 | Публикация накопленных изменений | Merge актуального `main`, все CI-gates, Docker image build, push | заблокировано внешне | Python/Compose gates зелёные; PyPI TLS EOF блокирует image build; ветка ahead 5 |
+| 0 | Публикация накопленных изменений | Merge актуального `main`, все CI-gates, Docker image build, push | заблокировано внешне | Python/Compose gates зелёные; DNS не разрешает github.com, registry-1.docker.io и ghcr.io; ветка ahead 7 |
 | 1 | Доступность и ошибки форм | Label/input association, `aria-invalid`, `aria-describedby`, понятная inline-ошибка и фокус во всех формах | готово | DOM enhancement; `node --check`; browser AX: 26 полей формы обращения имеют accessible names |
 | 2 | Полная визуальная матрица | Ключевые страницы проверены при 1024, 1280, 1366, 1440, 1920 и mobile; light/dark/font-lg | готово | 132 browser-cases, 11 маршрутов, 6 viewport; redirect/overflow failures: 0; выборочная ручная проверка PNG |
 | 3 | Состояния и роли | Empty/populated/error/forbidden/overdue/closed для Admin, ОП, СП и СМО | готово | Admin/ОП1/СП1: 396 role-cases + 156 state-cases; mismatch/overflow: 0; оформлены 403/404/500 |
@@ -46,3 +46,10 @@
 - Обнаружена необработанная системная страница Django; вместо неё добавлены согласованные с порталом адаптивные страницы 403, 404 и 500 с понятным следующим действием.
 - Отдельный прогон из 156 сценариев подтвердил пустые и заполненные разделы, а также зарегистрированное, просроченное и закрытое обращения во всех размерах, тёмной теме и с увеличенным шрифтом.
 - Этап закрыт без document overflow и расхождений ожидаемой матрицы доступа. Следующий этап: сквозные операции создания, изменения и получения результата.
+
+### 2026-09-11 — контроль публикации после этапа 3
+
+- Полностью прошли `uv sync --frozen`, Ruff, pytest, проверка миграционного drift, базовый и production Django system check, а также `docker compose config --quiet`.
+- Обязательный fetch `origin/main` не выполнен: локальный DNS не разрешает `github.com`.
+- Docker build остановился до чтения Dockerfile-слоёв: Docker Desktop не смог разрешить `registry-1.docker.io` и `ghcr.io`.
+- Push намеренно не выполнен без предварительного merge базы и production image gate.

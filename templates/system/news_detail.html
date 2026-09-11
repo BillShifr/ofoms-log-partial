@@ -36,16 +36,3 @@
   {% endif %}
 </article>
 {% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('form[data-confirm]').forEach(function (f) {
-    f.addEventListener('submit', function (e) {
-      var text = f.getAttribute('data-confirm') || 'Подтвердите действие';
-      if (!window.confirm(text)) e.preventDefault();
-    });
-  });
-});
-</script>
-{% endblock %}

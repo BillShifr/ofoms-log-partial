@@ -102,7 +102,7 @@
         <form method="post" class="inline-form">{% csrf_token %}
           <input type="hidden" name="action" value="note_delete">
           <input type="hidden" name="note_id" value="{{ n.pk }}">
-          <button class="btn btn--sm btn--ghost" type="submit">Удалить</button>
+          <button class="btn btn--sm btn--ghost" type="submit" data-confirm="Удалить эту заметку?">Удалить</button>
         </form>
       </div>
       <p>{{ n.text }}</p>

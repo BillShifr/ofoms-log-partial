@@ -386,6 +386,7 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .error-page__title { margin: 0 0 12px; font-size: clamp(26px, 4vw, 38px); line-height: 1.15; }
 .error-page__text { max-width: 520px; margin: 0 auto 28px; color: var(--muted); font-size: 17px; line-height: 1.55; }
 .error-page__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.btn:disabled, .btn[aria-busy="true"] { cursor: wait; opacity: .65; box-shadow: none; }
 .form-card { padding: 0; overflow: hidden; }
 .form-card > form { padding: 0 26px; }
 .form-section-heading { display: flex; gap: 14px; align-items: flex-start; margin: 0 -26px 20px; padding: 19px 26px 14px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--chip-blue) 52%, var(--card)); }

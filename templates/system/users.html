@@ -52,7 +52,7 @@
             <a class="btn btn--sm btn--ghost" href="{% url 'system:user_update' u.pk %}">Изменить</a>
             {% if u.pk != request.user.pk %}
               {% if u.is_active and not u.is_locked %}
-                <form method="post" action="{% url 'system:user_block' u.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--sm btn--danger" type="submit">Блок</button></form>
+                <form method="post" action="{% url 'system:user_block' u.pk %}" class="inline-form" data-confirm="Заблокировать пользователя {{ u.username }}?">{% csrf_token %}<button class="btn btn--sm btn--danger" type="submit">Блок</button></form>
               {% else %}
                 <form method="post" action="{% url 'system:user_unblock' u.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--sm btn--primary" type="submit">Разблок.</button></form>
               {% endif %}

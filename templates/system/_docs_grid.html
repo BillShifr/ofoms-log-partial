@@ -20,7 +20,7 @@
       <a class="btn btn--sm btn--primary" href="{% url 'system:doc_download' d.pk %}"
          title="Скачать файл (учёт загрузок)">Скачать</a>
       {% if can_manage %}
-      <form method="post" action="{% url 'system:doc_delete' d.pk %}" class="inline-form">
+      <form method="post" action="{% url 'system:doc_delete' d.pk %}" class="inline-form" data-confirm="Удалить документ «{{ d.title }}»?">
         {% csrf_token %}
         <button class="btn btn--sm btn--danger" type="submit">Удалить</button>
       </form>

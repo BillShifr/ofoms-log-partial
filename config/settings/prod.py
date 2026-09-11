@@ -141,6 +141,12 @@ SECRET_KEY = _required_secret("SECRET_KEY")
 JWT_SECRET = _required_secret("JWT_SECRET")
 JWT_AUDIENCE = _jwt_audience()
 JWT_TTL = _bounded_int("JWT_TTL", 300, minimum=30, maximum=900)
+SECURITY_MAX_FAILED_LOGIN_ATTEMPTS = _bounded_int(
+    "MAX_FAILED_LOGIN_ATTEMPTS", 10, minimum=1, maximum=10
+)
+TASK_STALE_AFTER_SECONDS = _bounded_int(
+    "TASK_STALE_AFTER_SECONDS", 3600, minimum=300, maximum=86400
+)
 DB_PASSWORD = _required_secret(
     "DB_PASSWORD",
     min_length=16,

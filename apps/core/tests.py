@@ -48,6 +48,9 @@ class ProductionSettingsTests(TestCase):
         environment.pop("LOG_LEVEL", None)
         environment.pop("JWT_AUDIENCE", None)
         environment.pop("JWT_TTL", None)
+        environment.pop("MAX_FAILED_LOGIN_ATTEMPTS", None)
+        environment.pop("SESSION_COOKIE_AGE", None)
+        environment.pop("TASK_STALE_AFTER_SECONDS", None)
         environment.update(
             {
                 "DJANGO_SETTINGS_MODULE": "config.settings.prod",
@@ -195,6 +198,39 @@ class ProductionSettingsTests(TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("1800 True True", result.stdout)
+
+    def test_production_bounds_login_and_stale_recovery_limits(self):
+        invalid_environments = (
+            {"MAX_FAILED_LOGIN_ATTEMPTS": "0"},
+            {"MAX_FAILED_LOGIN_ATTEMPTS": "11"},
+            {"MAX_FAILED_LOGIN_ATTEMPTS": "not-a-number"},
+            {"TASK_STALE_AFTER_SECONDS": "299"},
+            {"TASK_STALE_AFTER_SECONDS": "86401"},
+            {"TASK_STALE_AFTER_SECONDS": "not-a-number"},
+        )
+        for environment in invalid_environments:
+            with self.subTest(environment=environment):
+                result = self._import_settings(
+                    "database-secret-4827-strong",
+                    extra_environment=environment,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(next(iter(environment)), result.stderr)
+
+        accepted = self._import_settings(
+            "database-secret-4827-strong",
+            code=(
+                "from config.settings.prod import "
+                "SECURITY_MAX_FAILED_LOGIN_ATTEMPTS, TASK_STALE_AFTER_SECONDS; "
+                "print(SECURITY_MAX_FAILED_LOGIN_ATTEMPTS, TASK_STALE_AFTER_SECONDS)"
+            ),
+            extra_environment={
+                "MAX_FAILED_LOGIN_ATTEMPTS": "7",
+                "TASK_STALE_AFTER_SECONDS": "7200",
+            },
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertEqual(accepted.stdout.strip(), "7 7200")
 
     def test_production_validates_token_login_trusted_origins(self):
         for origins in (
@@ -352,6 +388,9 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("c.request('GET','/readyz',headers={'X-Forwarded-Proto':'https'})", compose)
         self.assertIn("r.status == 200", compose)
         self.assertIn("SESSION_COOKIE_SECURE=True", example)
+        self.assertIn("MAX_FAILED_LOGIN_ATTEMPTS: ${MAX_FAILED_LOGIN_ATTEMPTS:-10}", compose)
+        self.assertIn("SESSION_COOKIE_AGE: ${SESSION_COOKIE_AGE:-28800}", compose)
+        self.assertIn("TASK_STALE_AFTER_SECONDS: ${TASK_STALE_AFTER_SECONDS:-3600}", compose)
         self.assertIn("SECURE_SSL_REDIRECT=True", example)
         self.assertIn("LOG_LEVEL: ${LOG_LEVEL:-INFO}", compose)
         self.assertIn("JWT_TTL: ${JWT_TTL:-300}", compose)

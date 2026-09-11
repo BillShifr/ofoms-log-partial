@@ -34,7 +34,7 @@
         <div class="field"><label for="{{ form.version.id_for_label }}">Версия</label>{{ form.version }}{% for error in form.version.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field"><label for="{{ form.sort_order.id_for_label }}">Порядок</label>{{ form.sort_order }}{% for error in form.sort_order.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field field--wide"><label for="{{ form.description.id_for_label }}">Описание</label>{{ form.description }}{% for error in form.description.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
-        <div class="field field--wide"><label for="{{ form.file.id_for_label }}">Файл</label>{{ form.file }}{% for error in form.file.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field field--wide"><label for="{{ form.file.id_for_label }}">Файл</label>{{ form.file }}<span class="text-muted">Документы и архивы — до 20 МБ; видео MP4, WebM или OGV — до 200 МБ.</span>{% for error in form.file.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
       </div>
       <div class="form-actions form-actions--start">
         <button class="btn btn--primary" type="submit">Загрузить</button>

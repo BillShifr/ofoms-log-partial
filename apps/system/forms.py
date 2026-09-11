@@ -19,7 +19,7 @@ from apps.system.models import (
     TaskReport,
 )
 from apps.system.tasks import TASK_COMMAND_CHOICES
-from apps.system.validators import DOC_EXTENSIONS, validate_document_file
+from apps.system.validators import ALLOWED_DOCUMENT_EXTENSIONS, validate_document_file
 
 # Модули, фиксируемые в журнале событий (для фильтра)
 EVENT_MODULE_CHOICES = (
@@ -244,7 +244,9 @@ class DocForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         file_field = self.fields["file"]
         file_field.validators.append(validate_document_file)
-        file_field.widget.attrs["accept"] = ",".join(sorted(DOC_EXTENSIONS))
+        file_field.widget.attrs["accept"] = ",".join(
+            sorted(ALLOWED_DOCUMENT_EXTENSIONS)
+        )
         self.fields["category"].required = False
         self.fields["category"].empty_label = "— Без категории —"
         self.fields["version"].required = False

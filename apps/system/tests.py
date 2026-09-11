@@ -33,6 +33,7 @@ from apps.system.models import (
 from apps.system.validators import (
     DOC_MAX_SIZE_BYTES,
     IMAGE_MAX_SIZE_BYTES,
+    VIDEO_MAX_SIZE_BYTES,
     validate_document_file,
 )
 
@@ -952,11 +953,32 @@ class DocUploadSecurityTests(BaseSystemTestCase):
     @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
     def test_validator_accepts_allowed_extension(self):
         validate_document_file(_FakeUpload("manual.pdf", 1024))
+        validate_document_file(_FakeUpload("training.mp4", DOC_MAX_SIZE_BYTES + 1))
 
     @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
     def test_validator_rejects_oversize(self):
         with self.assertRaises(ValidationError):
             validate_document_file(_FakeUpload("big.pdf", DOC_MAX_SIZE_BYTES + 1))
+        with self.assertRaises(ValidationError):
+            validate_document_file(_FakeUpload("big.webm", VIDEO_MAX_SIZE_BYTES + 1))
+
+    @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
+    def test_upload_video_is_available_in_documentation(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("system:doc_upload"),
+            {
+                "title": "Обучающий видеоролик",
+                "sort_order": "1",
+                "file": SimpleUploadedFile(
+                    "training.mp4", b"video-placeholder", content_type="video/mp4"
+                ),
+            },
+            follow=True,
+        )
+        self.assertContains(response, "Обучающий видеоролик")
+        document = SystemDocument.objects.get(title="Обучающий видеоролик")
+        self.assertEqual(document.file_type, "mp4")
 
     @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
     def test_upload_unsafe_extension_rejected_by_view(self):

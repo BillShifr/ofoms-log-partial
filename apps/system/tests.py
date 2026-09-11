@@ -1575,6 +1575,11 @@ class SecurityHeaderTests(BaseSystemTestCase):
         self.assertEqual(resp.headers["X-Frame-Options"], "DENY")
         self.assertEqual(resp.headers["X-Content-Type-Options"], "nosniff")
         self.assertEqual(resp.headers.get("Referrer-Policy"), "same-origin")
+        self.assertEqual(
+            resp.headers["Permissions-Policy"],
+            "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+        )
+        self.assertEqual(resp.headers["Cross-Origin-Opener-Policy"], "same-origin")
         policy = resp.headers.get("Content-Security-Policy", "")
         self.assertIn("script-src 'self'", policy)
         self.assertIn("style-src 'self'", policy)
@@ -1590,6 +1595,7 @@ class SecurityHeaderTests(BaseSystemTestCase):
         resp = self.client.get(reverse("system:users"))
         self.assertRedirects(resp, "/accounts/login/?next=/system/users/")
         self.assertIn("no-store", resp.headers["Cache-Control"])
+        self.assertIn("camera=()", resp.headers["Permissions-Policy"])
 
     def test_error_response_is_not_cacheable(self):
         resp = self.client.get("/missing-sensitive-page/")
@@ -1597,6 +1603,7 @@ class SecurityHeaderTests(BaseSystemTestCase):
         self.assertEqual(resp.status_code, 404)
         self.assertIn("no-store", resp.headers["Cache-Control"])
         self.assertEqual(resp.headers["Pragma"], "no-cache")
+        self.assertIn("camera=()", resp.headers["Permissions-Policy"])
 
     def test_non_admin_forbidden_on_admin_screens(self):
         self.client.force_login(self.operator)

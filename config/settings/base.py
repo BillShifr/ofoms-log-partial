@@ -92,6 +92,9 @@ CONTENT_SECURITY_POLICY = (
     "form-action 'self'; "
     "frame-ancestors 'none'"
 )
+PERMISSIONS_POLICY = (
+    "camera=(), geolocation=(), microphone=(), payment=(), usb=()"
+)
 
 ROOT_URLCONF = "config.urls"
 

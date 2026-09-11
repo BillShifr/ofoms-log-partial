@@ -56,6 +56,7 @@ class ContentSecurityPolicyMiddleware:
 
     def __call__(self, request):
         response = self.get_response(request)
+        response.headers.setdefault("Permissions-Policy", settings.PERMISSIONS_POLICY)
         if not request.path.startswith("/admin/"):
             response.headers.setdefault(
                 "Content-Security-Policy", settings.CONTENT_SECURITY_POLICY

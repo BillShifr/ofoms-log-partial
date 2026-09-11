@@ -13,9 +13,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     UV_HTTP_TIMEOUT=60 UV_HTTP_RETRIES=10 uv sync --frozen --no-dev --no-install-project
 
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/uv \
-    UV_HTTP_TIMEOUT=60 UV_HTTP_RETRIES=10 uv sync --frozen --no-dev && \
-    chmod +x .venv/bin/gunicorn && \
+RUN chmod +x .venv/bin/gunicorn && \
     .venv/bin/python manage.py collectstatic --noinput --settings config.settings.base && \
     mkdir -p /app/media /app/exchange/in /app/exchange/out /app/exchange/archive
 

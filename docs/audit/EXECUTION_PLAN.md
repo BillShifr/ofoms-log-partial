@@ -5,7 +5,7 @@
 
 | Этап | Область | Критерий завершения | Статус | Доказательства |
 |---|---|---|---|---|
-| 0 | Публикация накопленных изменений | Merge актуального `main`, все CI-gates, Docker image build, push | заблокировано внешне | Python/Compose gates зелёные; DNS не разрешает github.com, registry-1.docker.io и ghcr.io; ветка ahead 7 |
+| 0 | Публикация накопленных изменений | Merge актуального `main`, все CI-gates, Docker image build, push | в работе | `origin/main` merged; Python/Compose/Docker gates зелёные; готовится push |
 | 1 | Доступность и ошибки форм | Label/input association, `aria-invalid`, `aria-describedby`, понятная inline-ошибка и фокус во всех формах | готово | DOM enhancement; `node --check`; browser AX: 26 полей формы обращения имеют accessible names |
 | 2 | Полная визуальная матрица | Ключевые страницы проверены при 1024, 1280, 1366, 1440, 1920 и mobile; light/dark/font-lg | готово | 132 browser-cases, 11 маршрутов, 6 viewport; redirect/overflow failures: 0; выборочная ручная проверка PNG |
 | 3 | Состояния и роли | Empty/populated/error/forbidden/overdue/closed для Admin, ОП, СП и СМО | готово | Admin/ОП1/СП1: 396 role-cases + 156 state-cases; mismatch/overflow: 0; оформлены 403/404/500 |
@@ -77,3 +77,10 @@
 - Добавлена регрессия, запрещающая возврат inline-стилей и событийных атрибутов в шаблоны.
 - Повторная визуальная матрица: 132 сценария, ошибок переполнения и авторизации нет; вручную проверены документация, задачи и сообщения.
 - Этап закрыт. Доступная локально работа переходит в финальный release audit; этап внешней сверки остаётся заблокирован отсутствующими материалами.
+
+### 2026-09-11 — Docker image gate
+
+- После восстановления сети зависимости production-образа были получены успешно.
+- Сборка выявила лишний второй `uv sync`: после `COPY . .` он пытался собрать локальный Django-проект как wheel и повторно получить build-backend `hatchling` из PyPI.
+- Проект запускается непосредственно из `/app`; зависимости уже устанавливаются frozen-слоем до копирования исходников. Повторная установка проекта удалена без изменения runtime-команды.
+- `docker build -t ofoms-log-partial:local-gate .` завершился успешно, включая `collectstatic` (142 файла, 426 post-process операций).

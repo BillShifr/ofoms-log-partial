@@ -697,6 +697,30 @@ class RoutingTests(TestCase):
             ).exists()
         )
 
+    def test_unavailable_attachment_returns_not_found_without_export_event(self):
+        irp = self._make_irp(owner=self.tfoms_user)
+        attachment = IrpFile.objects.create(
+            irp=irp,
+            file=SimpleUploadedFile("missing.txt", b"missing"),
+            uploader=self.tfoms_user,
+        )
+        self.client.force_login(self.tfoms_user)
+
+        with patch.object(
+            attachment.file.storage, "open", side_effect=OSError("offline")
+        ):
+            response = self.client.get(
+                reverse("journal:file_download", args=[attachment.pk])
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.EXPORT,
+                target=f"irp:{irp.pk}:file:{attachment.pk}",
+            ).exists()
+        )
+
     @override_settings(MEDIA_ROOT=ROUTING_MEDIA_ROOT)
     def test_deleting_irp_removes_cascaded_attachment_file(self):
         irp = self._make_irp(owner=self.tfoms_user)

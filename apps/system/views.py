@@ -25,6 +25,7 @@ from apps.core.fold import contains_folded, filter_contains_any
 from apps.core.models import EventLog, log_event
 from apps.core.policy import role_codes_for_user
 from apps.core.roles import Roles
+from apps.core.storage import open_field_file_or_404
 from apps.employee.models import Employee
 from apps.journal.table import JOURNAL_COLUMNS, JOURNAL_TABLE_KEY, SORTABLE_FIELDS
 from apps.system.forms import (
@@ -647,7 +648,7 @@ def message_attachment_download(request, pk):
         pk=pk,
     )
     _participant_or_404(request.user, attachment.reply.thread.conversation)
-    file_handle = attachment.file.open("rb")
+    file_handle = open_field_file_or_404(attachment.file)
     log_event(
         module="system",
         event_type=EventLog.EventType.EXPORT,
@@ -940,7 +941,7 @@ def task_toggle(request, pk):
 def task_file_download(request, pk):
     """Выдаёт служебное вложение задачи только администратору."""
     attachment = get_object_or_404(TaskFile, pk=pk)
-    file_handle = attachment.file.open("rb")
+    file_handle = open_field_file_or_404(attachment.file)
     log_event(
         module="system",
         event_type=EventLog.EventType.EXPORT,
@@ -1047,7 +1048,7 @@ def doc_upload(request):
 def doc_download(request, pk):
     """Скачивание документа с учётом счётчика загрузок (PRD v3 §2.8)."""
     doc = get_object_or_404(SystemDocument, pk=pk)
-    file_handle = doc.file.open("rb")
+    file_handle = open_field_file_or_404(doc.file)
     SystemDocument.objects.filter(pk=pk).update(downloads_count=F("downloads_count") + 1)
     log_event(
         module="system",
@@ -1070,7 +1071,7 @@ def doc_view(request, pk):
 
     filename = doc.file.name.rsplit("/", 1)[-1]
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    file_handle = doc.file.open("rb")
+    file_handle = open_field_file_or_404(doc.file)
     log_event(
         module="system",
         event_type=EventLog.EventType.VIEW,
@@ -1259,10 +1260,7 @@ def news_cover(request, pk):
 
     filename = item.cover_image.name.rsplit("/", 1)[-1]
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    try:
-        file_handle = item.cover_image.open("rb")
-    except (FileNotFoundError, OSError):
-        raise Http404 from None
+    file_handle = open_field_file_or_404(item.cover_image)
     return FileResponse(
         file_handle,
         as_attachment=False,

@@ -681,11 +681,10 @@ class DocTests(BaseSystemTestCase):
         )
         self.client.force_login(self.operator)
 
-        with patch.object(
-            doc.file.storage, "open", side_effect=OSError("offline")
-        ), self.assertRaises(OSError):
-            self.client.get(reverse("system:doc_download", args=[doc.pk]))
+        with patch.object(doc.file.storage, "open", side_effect=OSError("offline")):
+            response = self.client.get(reverse("system:doc_download", args=[doc.pk]))
 
+        self.assertEqual(response.status_code, 404)
         doc.refresh_from_db()
         self.assertEqual(doc.downloads_count, 0)
         self.assertFalse(

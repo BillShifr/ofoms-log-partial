@@ -29,6 +29,7 @@ from apps.core.policy import (
     JOURNAL_REDIRECT,
     user_has_capability,
 )
+from apps.core.storage import open_field_file_or_404
 from apps.employee.models import TFOMS
 from apps.journal.forms import IrpAnswerForm, IrpFilterForm, IrpForm, IrpRedirectForm
 from apps.journal.models import RESULTS, Irp, IrpAnswer, IrpFile, IrpHistory
@@ -396,7 +397,7 @@ def irp_file_download(request, pk):
         IrpFile.objects.select_related("irp__employee_one"), pk=pk
     )
     irp = _get_irp_for_user(request, attachment.irp_id)
-    file_handle = attachment.file.open("rb")
+    file_handle = open_field_file_or_404(attachment.file)
     _log_irp_access(
         request, irp, EventLog.EventType.EXPORT, f"file:{attachment.pk}"
     )

@@ -6,7 +6,9 @@
   управление Новостями/Документацией (ТЗ разд. 3, п. «доступ при наличии прав»).
 """
 
+import mimetypes
 from functools import wraps
+from pathlib import PurePosixPath
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -55,6 +57,7 @@ from apps.system.models import (
     TaskNote,
     UserTableViewPref,
 )
+from apps.system.validators import VIDEO_EXTENSIONS
 
 PAGE_SIZE = 25
 
@@ -996,6 +999,25 @@ def doc_download(request, pk):
         ip=request.META.get("REMOTE_ADDR"),
     )
     return FileResponse(doc.file.open("rb"), filename=doc.file.name.split("/")[-1], as_attachment=True)
+
+
+@login_required
+@require_http_methods(["GET"])
+def doc_view(request, pk):
+    """Отдаёт видео авторизованному пользователю без публикации MEDIA_ROOT."""
+    doc = get_object_or_404(SystemDocument, pk=pk)
+    extension = PurePosixPath(doc.file.name).suffix.lower()
+    if extension not in VIDEO_EXTENSIONS:
+        raise Http404
+
+    filename = doc.file.name.rsplit("/", 1)[-1]
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return FileResponse(
+        doc.file.open("rb"),
+        as_attachment=False,
+        filename=filename,
+        content_type=content_type,
+    )
 
 
 @login_required

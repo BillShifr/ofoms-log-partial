@@ -39,6 +39,7 @@ urlpatterns = [
     path("docs/", views.doc_list, name="docs"),
     path("docs/suggest/", views.doc_suggest, name="doc_suggest"),
     path("docs/upload/", views.doc_upload, name="doc_upload"),
+    path("docs/<int:pk>/view/", views.doc_view, name="doc_view"),
     path("docs/<int:pk>/download/", views.doc_download, name="doc_download"),
     path("docs/<int:pk>/delete/", views.doc_delete, name="doc_delete"),
     path("docs/category/<slug:slug>/", views.doc_category, name="doc_category"),

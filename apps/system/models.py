@@ -2,6 +2,7 @@
 
 import logging
 from datetime import timedelta
+from pathlib import PurePosixPath
 
 from django.conf import settings
 from django.db import models, transaction
@@ -181,6 +182,10 @@ class SystemDocument(models.Model):
         if size >= 1024:
             return f"{size / 1024:.0f} КБ"
         return f"{size} Б"
+
+    @property
+    def is_video(self) -> bool:
+        return PurePosixPath(self.file.name).suffix.lower() in {".mp4", ".ogv", ".webm"}
 
 
 class Conversation(models.Model):

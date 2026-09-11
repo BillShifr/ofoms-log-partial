@@ -474,6 +474,55 @@ class DocTests(BaseSystemTestCase):
         doc.refresh_from_db()
         self.assertEqual(doc.downloads_count, 1)
 
+    def test_video_can_be_viewed_inline_by_authenticated_user(self):
+        doc = SystemDocument.objects.create(
+            title="Обучение",
+            file=SimpleUploadedFile("training.mp4", b"video", content_type="video/mp4"),
+            file_type="mp4",
+            uploaded_by=self.admin,
+        )
+        self.client.force_login(self.operator)
+        resp = self.client.get(reverse("system:doc_view", args=[doc.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "video/mp4")
+        self.assertTrue(resp["Content-Disposition"].startswith("inline;"))
+
+    def test_video_view_requires_authentication(self):
+        doc = SystemDocument.objects.create(
+            title="Обучение",
+            file=SimpleUploadedFile("private.mp4", b"video", content_type="video/mp4"),
+            file_type="mp4",
+            uploaded_by=self.admin,
+        )
+        resp = self.client.get(reverse("system:doc_view", args=[doc.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/login/", resp.url)
+
+    def test_non_video_cannot_be_opened_in_video_view(self):
+        doc = SystemDocument.objects.create(
+            title="Инструкция",
+            file=SimpleUploadedFile(
+                "view-denied.pdf", b"%PDF-1.4", content_type="application/pdf"
+            ),
+            file_type="pdf",
+            uploaded_by=self.admin,
+        )
+        self.client.force_login(self.operator)
+        resp = self.client.get(reverse("system:doc_view", args=[doc.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_video_card_has_separate_view_action(self):
+        SystemDocument.objects.create(
+            title="Обучение",
+            file=SimpleUploadedFile("card.mp4", b"video", content_type="video/mp4"),
+            file_type="mp4",
+            uploaded_by=self.admin,
+        )
+        self.client.force_login(self.operator)
+        resp = self.client.get(reverse("system:docs"))
+        self.assertContains(resp, "Смотреть")
+        self.assertContains(resp, reverse("system:doc_view", args=[SystemDocument.objects.get().pk]))
+
     def test_doc_suggest(self):
         SystemDocument.objects.create(
             title="Инструкция оператора",

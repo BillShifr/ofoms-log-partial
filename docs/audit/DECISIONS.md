@@ -239,3 +239,9 @@
 - Pool включён только в production; development и тесты сохраняют простой persistent connection для предсказуемости транзакционных тестов.
 - При pool `CONN_MAX_AGE` обязан быть нулём: Django закрывает request connection, фактически возвращая физическое соединение psycopg в pool. Health check выполняется самим pool перед выдачей.
 - Максимум 4 соединения на процесс даёт верхнюю границу 16 для штатных трёх Gunicorn workers и scheduler; изменение лимита требует сверки с PostgreSQL `max_connections`.
+
+## 2026-09-11 Fail-safe parsing production environment
+
+- Security-sensitive booleans не используют правило «всё неизвестное равно false»: неоднозначность конфигурации является startup error.
+- Wildcard `ALLOWED_HOSTS=*` запрещён даже для закрытого корпоративного ресурса; закрытый контур не заменяет проверку Host header. Leading-dot host pattern остаётся допустимым для явно выбранного доменного суффикса.
+- Нулевой HSTS допускается для контролируемого первичного внедрения, но отрицательное, нечисловое или чрезмерное значение запрещено.

@@ -46,6 +46,7 @@ class ProductionSettingsTests(TestCase):
                 "SECRET_KEY": "test-secret-key-with-more-than-fifty-characters-123456789",
                 "JWT_SECRET": "test-jwt-secret-with-more-than-fifty-characters-987654321",
                 "DB_PASSWORD": database_password,
+                "ALLOWED_HOSTS": "localhost,127.0.0.1",
             }
         )
         environment.update(extra_environment or {})
@@ -68,6 +69,44 @@ class ProductionSettingsTests(TestCase):
     def test_production_accepts_strong_database_password(self):
         result = self._import_settings("database-secret-4827-strong")
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_production_rejects_wildcard_or_malformed_allowed_hosts(self):
+        for hosts in ("", "*", "https://journal.example", "valid.example/bad", "two hosts"):
+            with self.subTest(hosts=hosts):
+                result = self._import_settings(
+                    "database-secret-4827-strong",
+                    extra_environment={"ALLOWED_HOSTS": hosts},
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("ALLOWED_HOSTS", result.stderr)
+
+    def test_production_accepts_explicit_host_names(self):
+        result = self._import_settings(
+            "database-secret-4827-strong",
+            "from config.settings.prod import ALLOWED_HOSTS; print(ALLOWED_HOSTS)",
+            {"ALLOWED_HOSTS": "journal.example,.internal.example,127.0.0.1"},
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("journal.example", result.stdout)
+        self.assertIn(".internal.example", result.stdout)
+
+    def test_production_rejects_ambiguous_security_values(self):
+        invalid_environments = (
+            {"SESSION_COOKIE_SECURE": "treu"},
+            {"SECURE_SSL_REDIRECT": "enabled"},
+            {"TRUST_PROXY_SSL_HEADER": "sometimes"},
+            {"SECURE_HSTS_SECONDS": "-1"},
+            {"SECURE_HSTS_SECONDS": "not-a-number"},
+        )
+        for environment in invalid_environments:
+            with self.subTest(environment=environment):
+                result = self._import_settings(
+                    "database-secret-4827-strong",
+                    extra_environment=environment,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(next(iter(environment)), result.stderr)
 
     def test_production_uses_bounded_health_checked_database_pool(self):
         result = self._import_settings(

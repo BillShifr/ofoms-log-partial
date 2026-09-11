@@ -42,6 +42,35 @@ def _bounded_int(name, default, *, minimum, maximum):
     return value
 
 
+def _boolean_env(name, default):
+    raw_value = os.getenv(name, "true" if default else "false").strip().lower()
+    if raw_value in ("1", "true", "yes"):
+        return True
+    if raw_value in ("0", "false", "no"):
+        return False
+    raise ImproperlyConfigured(
+        f"{name} must be one of: true, false, 1, 0, yes, no."
+    )
+
+
+def _production_hosts():
+    hosts = [item.strip() for item in os.getenv("ALLOWED_HOSTS", "").split(",")]
+    hosts = [item for item in hosts if item]
+    invalid = [
+        host
+        for host in hosts
+        if host == "*"
+        or any(marker in host for marker in ("://", "/", "?", "#"))
+        or any(character.isspace() for character in host)
+    ]
+    if not hosts or invalid:
+        raise ImproperlyConfigured(
+            "ALLOWED_HOSTS must contain explicit host names without schemes, paths, "
+            "whitespace, or the '*' wildcard."
+        )
+    return hosts
+
+
 SECRET_KEY = _required_secret("SECRET_KEY")
 JWT_SECRET = _required_secret("JWT_SECRET")
 DB_PASSWORD = _required_secret(
@@ -56,25 +85,20 @@ DB_CONNECT_TIMEOUT = _bounded_int("DB_CONNECT_TIMEOUT", 3, minimum=1, maximum=60
 if DB_POOL_MIN_SIZE > DB_POOL_MAX_SIZE:
     raise ImproperlyConfigured("DB_POOL_MIN_SIZE must not exceed DB_POOL_MAX_SIZE.")
 
-SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "True").lower() in (
-    "1",
-    "true",
-    "yes",
-)
+ALLOWED_HOSTS = _production_hosts()
+SECURE_SSL_REDIRECT = _boolean_env("SECURE_SSL_REDIRECT", True)
+SESSION_COOKIE_SECURE = _boolean_env("SESSION_COOKIE_SECURE", True)
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
-SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+SECURE_HSTS_SECONDS = _bounded_int(
+    "SECURE_HSTS_SECONDS", 31536000, minimum=0, maximum=63072000
+)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = bool(SECURE_HSTS_SECONDS)
 SECURE_HSTS_PRELOAD = bool(SECURE_HSTS_SECONDS)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # Production topology terminates TLS at a trusted reverse proxy. The proxy must
 # overwrite (not append) this header; the Compose port is loopback-bound by default.
-if os.getenv("TRUST_PROXY_SSL_HEADER", "True").lower() in ("1", "true", "yes"):
+if _boolean_env("TRUST_PROXY_SSL_HEADER", True):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Пути ОС внутри контейнера

@@ -239,6 +239,15 @@ class ProductionSettingsTests(TestCase):
         )
         self.assertNotIn("while true", compose)
 
+    def test_compose_rotates_all_service_logs(self):
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+
+        self.assertIn("x-logging: &default-logging", compose)
+        self.assertIn('max-size: "10m"', compose)
+        self.assertIn('max-file: "5"', compose)
+        self.assertIn('compress: "true"', compose)
+        self.assertEqual(compose.count("logging: *default-logging"), 4)
+
     def test_uv_sync_treats_application_as_virtual_project(self):
         project = (settings.BASE_DIR / "pyproject.toml").read_text()
         lockfile = (settings.BASE_DIR / "uv.lock").read_text()

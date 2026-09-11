@@ -105,6 +105,15 @@ class ProductionSettingsTests(TestCase):
             [],
         )
 
+    def test_uv_sync_treats_application_as_virtual_project(self):
+        project = (settings.BASE_DIR / "pyproject.toml").read_text()
+        lockfile = (settings.BASE_DIR / "uv.lock").read_text()
+
+        self.assertIn("[tool.uv]", project)
+        self.assertIn("package = false", project)
+        self.assertIn('name = "ejournal-portal-tfoms"', lockfile)
+        self.assertIn('source = { virtual = "." }', lockfile)
+
 
 class ComplexityPasswordValidatorTests(TestCase):
     def setUp(self):

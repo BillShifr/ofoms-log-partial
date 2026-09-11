@@ -290,3 +290,15 @@
 - `python:3.13-slim` и образ uv закреплены проверенными multi-arch digest’ами; `uv:latest` удалён из production Dockerfile.
 - Checkout, Python/uv setup, Docker login и build/push Actions закреплены полными commit SHA соответствующих major-релизов.
 - Регрессия проверяет отсутствие плавающих executable references, а production Docker build подтверждает работоспособность закреплённых образов.
+
+### 2026-09-11 — непрерывный dependency audit
+
+- В lint-and-test job после `uv sync --frozen` добавлен обязательный PyPA pip-audit по `.venv` с OSV backend и без allow-failure/ignore списка.
+- Action закреплён полным SHA; существующий workflow-ratchet автоматически контролирует и эту ссылку.
+- Текущий набор production/dev пакетов отдельно проверен через OSV querybatch: известных записей уязвимостей не найдено.
+
+### 2026-09-11 — согласованный frozen sync
+
+- Проект объявлен virtual application через `tool.uv.package = false`: CI и локальная среда больше не собирают ненужный editable wheel.
+- Runtime остаётся неизменным — Django импортирует код непосредственно из checkout/image, как уже делал production Dockerfile.
+- Frozen sync перестал зависеть от загрузки build backend Hatchling и согласован с контейнерным `--no-install-project`.

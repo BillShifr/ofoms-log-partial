@@ -20,19 +20,36 @@ _LOGIN_PATHS = ("/accounts/login/", "/accounts/token-login/")
 
 
 class TrustedProxyClientIPMiddleware:
-    """Восстанавливает REMOTE_ADDR только из проверенного proxy-контракта."""
+    """Принимает forwarded headers только от настроенного proxy peer."""
 
     def __init__(self, get_response):
         self.get_response = get_response
+        self.trusted_networks = tuple(
+            ipaddress.ip_network(network)
+            for network in settings.TRUSTED_PROXY_IPS
+        )
+
+    def _peer_is_trusted(self, request):
+        try:
+            peer = ipaddress.ip_address(request.META.get("REMOTE_ADDR", ""))
+        except ValueError:
+            return False
+        return any(peer in network for network in self.trusted_networks)
 
     def __call__(self, request):
-        if settings.TRUST_PROXY_CLIENT_IP_HEADER:
-            forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "").strip()
+        peer_is_trusted = self._peer_is_trusted(request)
+        if not settings.TRUST_PROXY_SSL_HEADER or not peer_is_trusted:
+            request.META.pop("HTTP_X_FORWARDED_PROTO", None)
+
+        if settings.TRUST_PROXY_CLIENT_IP_HEADER and peer_is_trusted:
+            forwarded_for = request.META.pop("HTTP_X_FORWARDED_FOR", "").strip()
             if forwarded_for and "," not in forwarded_for:
                 with contextlib.suppress(ValueError):
                     request.META["REMOTE_ADDR"] = str(
                         ipaddress.ip_address(forwarded_for)
                     )
+        else:
+            request.META.pop("HTTP_X_FORWARDED_FOR", None)
         return self.get_response(request)
 
 

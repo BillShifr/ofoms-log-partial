@@ -5,6 +5,7 @@
 """
 
 import os
+from ipaddress import ip_network
 from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
@@ -106,6 +107,25 @@ def _trusted_token_origins():
     return tuple(dict.fromkeys(origins))
 
 
+def _trusted_proxy_networks(*, required):
+    networks = []
+    for raw_network in os.getenv(
+        "TRUSTED_PROXY_IPS", "127.0.0.1/32,::1/128"
+    ).split(","):
+        network = raw_network.strip()
+        if not network:
+            continue
+        try:
+            networks.append(str(ip_network(network, strict=False)))
+        except ValueError as error:
+            raise ImproperlyConfigured(
+                "TRUSTED_PROXY_IPS must contain valid IPv4/IPv6 addresses or CIDRs."
+            ) from error
+    if not networks and required:
+        raise ImproperlyConfigured("TRUSTED_PROXY_IPS must not be empty.")
+    return tuple(dict.fromkeys(networks))
+
+
 SECRET_KEY = _required_secret("SECRET_KEY")
 JWT_SECRET = _required_secret("JWT_SECRET")
 DB_PASSWORD = _required_secret(
@@ -143,9 +163,13 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # Production topology terminates TLS at a trusted reverse proxy. The proxy must
 # overwrite (not append) this header; the Compose port is loopback-bound by default.
-if _boolean_env("TRUST_PROXY_SSL_HEADER", True):
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+TRUST_PROXY_SSL_HEADER = _boolean_env("TRUST_PROXY_SSL_HEADER", True)
 TRUST_PROXY_CLIENT_IP_HEADER = _boolean_env("TRUST_PROXY_CLIENT_IP_HEADER", True)
+TRUSTED_PROXY_IPS = _trusted_proxy_networks(
+    required=TRUST_PROXY_SSL_HEADER or TRUST_PROXY_CLIENT_IP_HEADER
+)
+if TRUST_PROXY_SSL_HEADER:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Пути ОС внутри контейнера
 STATIC_ROOT = os.getenv("STATIC_ROOT", "/app/staticfiles")

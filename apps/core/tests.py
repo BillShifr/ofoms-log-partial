@@ -43,6 +43,7 @@ class ProductionSettingsTests(TestCase):
     ):
         environment = os.environ.copy()
         environment.pop("TRUST_PROXY_SSL_HEADER", None)
+        environment.pop("TRUSTED_PROXY_IPS", None)
         environment.pop("LOG_LEVEL", None)
         environment.update(
             {
@@ -219,6 +220,41 @@ class ProductionSettingsTests(TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("HTTP_X_FORWARDED_PROTO", result.stdout)
 
+    def test_production_validates_and_normalizes_trusted_proxy_networks(self):
+        for networks in ("", "not-an-ip", "127.0.0.1/99"):
+            with self.subTest(networks=networks):
+                result = self._import_settings(
+                    "database-secret-4827-strong",
+                    extra_environment={"TRUSTED_PROXY_IPS": networks},
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("TRUSTED_PROXY_IPS", result.stderr)
+
+        accepted = self._import_settings(
+            "database-secret-4827-strong",
+            "from config.settings.prod import TRUSTED_PROXY_IPS; "
+            "print(TRUSTED_PROXY_IPS)",
+            {"TRUSTED_PROXY_IPS": "192.0.2.7,2001:db8::1/64"},
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertEqual(
+            accepted.stdout.strip(),
+            "('192.0.2.7/32', '2001:db8::/64')",
+        )
+
+        disabled = self._import_settings(
+            "database-secret-4827-strong",
+            "from config.settings.prod import TRUSTED_PROXY_IPS; "
+            "print(TRUSTED_PROXY_IPS)",
+            {
+                "TRUST_PROXY_SSL_HEADER": "false",
+                "TRUST_PROXY_CLIENT_IP_HEADER": "false",
+                "TRUSTED_PROXY_IPS": "",
+            },
+        )
+        self.assertEqual(disabled.returncode, 0, disabled.stderr)
+        self.assertEqual(disabled.stdout.strip(), "()")
+
     def test_proxied_https_health_request_does_not_redirect(self):
         result = self._import_settings(
             "database-secret-4827-strong",
@@ -229,6 +265,18 @@ class ProductionSettingsTests(TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "200")
+
+    def test_untrusted_peer_cannot_spoof_proxied_https(self):
+        result = self._import_settings(
+            "database-secret-4827-strong",
+            "import django; django.setup(); "
+            "from django.test import Client; "
+            "response=Client().get('/healthz', HTTP_HOST='localhost', "
+            "REMOTE_ADDR='198.51.100.9', HTTP_X_FORWARDED_PROTO='https'); "
+            "print(response.status_code, response.headers.get('Location'))",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("301 https://localhost/healthz", result.stdout)
 
     def test_liveness_and_readiness_are_uncached_and_readiness_queries_database(self):
         with self.assertNumQueries(0):
@@ -257,12 +305,23 @@ class ProductionSettingsTests(TestCase):
 
         self.assertIn("${WEB_BIND_ADDRESS:-127.0.0.1}:8000:8000", compose)
         self.assertIn("TRUST_PROXY_SSL_HEADER: ${TRUST_PROXY_SSL_HEADER:-True}", compose)
+        self.assertIn("TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-127.0.0.1/32,::1/128}", compose)
+        self.assertLess(
+            compose.index("TRUSTED_PROXY_IPS:"),
+            compose.index("ports:"),
+        )
         self.assertIn("c.request('GET','/readyz',headers={'X-Forwarded-Proto':'https'})", compose)
         self.assertIn("r.status == 200", compose)
         self.assertIn("SESSION_COOKIE_SECURE=True", example)
         self.assertIn("SECURE_SSL_REDIRECT=True", example)
         self.assertIn("LOG_LEVEL: ${LOG_LEVEL:-INFO}", compose)
         self.assertIn("LOG_LEVEL=INFO", example)
+        self.assertLess(
+            settings.MIDDLEWARE.index(
+                "apps.core.middleware.TrustedProxyClientIPMiddleware"
+            ),
+            settings.MIDDLEWARE.index("django.middleware.security.SecurityMiddleware"),
+        )
 
     def test_build_executables_are_pinned_to_immutable_revisions(self):
         dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()
@@ -841,6 +900,18 @@ class AuthenticationAuditTests(TestCase):
 
         event = EventLog.objects.get(target="POST /accounts/login/")
         self.assertEqual(event.ip, "192.0.2.41")
+
+    @override_settings(TRUST_PROXY_CLIENT_IP_HEADER=True)
+    def test_untrusted_peer_cannot_spoof_client_ip(self):
+        self.client.post(
+            reverse("login"),
+            {"username": self.user.username, "password": "wrong-password"},
+            REMOTE_ADDR="198.51.100.9",
+            HTTP_X_FORWARDED_FOR="192.0.2.41",
+        )
+
+        event = EventLog.objects.get(target="POST /accounts/login/")
+        self.assertEqual(event.ip, "198.51.100.9")
 
     @override_settings(TRUST_PROXY_CLIENT_IP_HEADER=True)
     def test_forwarded_chain_does_not_override_remote_address(self):

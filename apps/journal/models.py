@@ -311,7 +311,24 @@ class Irp(models.Model):
                     )
                 ),
                 name="irp_closed_status_has_date_and_result",
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=("registered", "in_progress", "redirected", "preliminary", "closed")
+                ),
+                name="irp_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(data_plan__gte=models.F("date_create")),
+                name="irp_plan_not_before_created",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(date_close__isnull=True)
+                    | models.Q(date_close__gte=models.F("date_create"))
+                ),
+                name="irp_close_not_before_created",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -324,6 +341,10 @@ class Irp(models.Model):
         if bool(self.date_close) != bool(self.result):
             raise ValidationError(
                 "Для закрытия обращения одновременно укажите дату и исход."
+            )
+        if self.data_plan and self.date_create and self.data_plan < self.date_create:
+            raise ValidationError(
+                {"data_plan": "Плановый срок не может быть раньше даты поступления."}
             )
         if self.date_close and self.date_create and self.date_close < self.date_create:
             raise ValidationError(

@@ -10,8 +10,9 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -46,18 +47,19 @@ class IrpModelTests(TestCase):
             username="emp_irp", password="GoodPass!1", org=81000
         )
 
-    def _create_irp(self, date_close=None, data_plan=None):
+    def _create_irp(self, date_close=None, data_plan=None, date_create=None):
+        date_create = date_create or datetime.date.today()
         return Irp.objects.create(
             n_irp="00000000-0000-0000-0000-000000000001",
             irp_type=1,
-            date_create=datetime.date.today(),
+            date_create=date_create,
             way=1,
             how=1,
             theme=self.theme,
             otv_t=1,
             otv_kon=81000,
             employee_one=self.employee,
-            data_plan=data_plan or datetime.date.today() + datetime.timedelta(days=30),
+            data_plan=data_plan or date_create + datetime.timedelta(days=30),
             z_f="Заявитель",
             date_close=date_close,
             result=2 if date_close else None,
@@ -70,17 +72,49 @@ class IrpModelTests(TestCase):
 
     def test_is_overdue(self):
         yesterday = datetime.date.today() - datetime.timedelta(days=1)
-        irp = self._create_irp(data_plan=yesterday)
+        irp = self._create_irp(
+            date_create=yesterday - datetime.timedelta(days=1), data_plan=yesterday
+        )
         self.assertTrue(irp.is_overdue)
 
     def test_not_overdue_when_closed(self):
         yesterday = datetime.date.today() - datetime.timedelta(days=1)
-        irp = self._create_irp(data_plan=yesterday, date_close=datetime.date.today())
+        irp = self._create_irp(
+            date_create=yesterday - datetime.timedelta(days=1),
+            data_plan=yesterday,
+            date_close=datetime.date.today(),
+        )
         self.assertFalse(irp.is_overdue)
 
     def test_document_type_is_not_invented_when_omitted(self):
         irp = self._create_irp()
         self.assertIsNone(irp.z_doctype)
+
+    def test_model_validation_rejects_plan_before_creation(self):
+        irp = self._create_irp()
+        irp.data_plan = irp.date_create - datetime.timedelta(days=1)
+
+        with self.assertRaisesMessage(
+            ValidationError, "Плановый срок не может быть раньше даты поступления"
+        ):
+            irp.full_clean()
+
+    def test_database_rejects_invalid_status_and_dates(self):
+        irp = self._create_irp()
+        invalid_updates = (
+            {"status": "unknown"},
+            {"data_plan": irp.date_create - datetime.timedelta(days=1)},
+        )
+        for values in invalid_updates:
+            with self.subTest(values=values), self.assertRaises(IntegrityError), transaction.atomic():
+                Irp.objects.filter(pk=irp.pk).update(**values)
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Irp.objects.filter(pk=irp.pk).update(
+                status=Irp.Status.CLOSED,
+                result=2,
+                date_close=irp.date_create - datetime.timedelta(days=1),
+            )
 
 
 class JournalScreenTests(TestCase):

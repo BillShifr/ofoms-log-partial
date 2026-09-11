@@ -736,8 +736,6 @@ table.data.th-sticky td:first-child { position: sticky; left: 0; background: var
 table.data.th-sticky th:first-child { position: sticky; left: 0; z-index: 4; box-shadow: 1px 0 var(--line); }
 .task-log-row td { font-size: .78rem; background: color-mix(in srgb, var(--bg) 45%, var(--card)); }
 
-/* ---------- Тема-переключатель (заглушка, подключится на Этапе 6) ---------- */
-
 /* ---------- Тосты (Этап v3, 2.0.2) ---------- */
 .toast-container {
   position: fixed;

@@ -9,7 +9,8 @@ import datetime
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from django.db.models import Q
+from django.db.models import Avg, Count, DateField, DurationField, ExpressionWrapper, F, Q
+from django.db.models.functions import TruncMonth
 
 from apps.employee.models import ORGS, TFOMS
 from apps.journal.models import (
@@ -19,7 +20,6 @@ from apps.journal.models import (
     LINES,
     RESULTS,
     Irp,
-    IrpTheme,
 )
 
 
@@ -120,12 +120,6 @@ def _monthly(filters: ReportFilters) -> bool:
     return True
 
 
-def _bucket(date: datetime.date, monthly: bool) -> datetime.date:
-    if monthly:
-        return datetime.date(date.year, date.month, 1)
-    return date
-
-
 def _bucket_label(date: datetime.date, monthly: bool) -> str:
     return date.strftime("%m.%Y" if monthly else "%d.%m.%Y")
 
@@ -136,15 +130,16 @@ def _percent(part: float, whole: int) -> str:
     return f"{part / whole * 100:.1f}".replace(".", ",")
 
 
-def _avg_days(rows: list[dict]) -> str:
-    days = [
-        (r["date_close"] - r["date_create"]).days
-        for r in rows
-        if r.get("date_close") and r.get("date_create")
-    ]
-    if not days:
+def _avg_duration_label(value) -> str:
+    if value is None:
         return "—"
-    return f"{sum(days) / len(days):.1f}".replace(".", ",")
+    return f"{value.total_seconds() / 86400:.1f}".replace(".", ",")
+
+
+def _period_expression(monthly: bool):
+    if monthly:
+        return TruncMonth("date_create", output_field=DateField())
+    return F("date_create")
 
 
 def _base(user_org: int, filters: ReportFilters):
@@ -157,21 +152,21 @@ def _base(user_org: int, filters: ReportFilters):
 
 def r1_by_volume(user_org: int, filters: ReportFilters):
     monthly = _monthly(filters)
-    data = list(_base(user_org, filters).values("date_create", "irp_type", "date_close"))
-    buckets: dict[datetime.date, dict] = {}
-    for row in data:
-        key = _bucket(row["date_create"], monthly)
-        bucket = buckets.setdefault(key, {})
-        bucket["total"] = bucket.get("total", 0) + 1
-        bucket[f"t{row['irp_type']}"] = bucket.get(f"t{row['irp_type']}", 0) + 1
-        if row["date_close"]:
-            bucket["closed"] = bucket.get("closed", 0) + 1
-    rows = []
-    for key in sorted(buckets):
-        row = {"period": _bucket_label(key, monthly), **buckets[key]}
-        for report_key in ("total", "closed", "t1", "t2", "t3", "t4", "t5"):
-            row.setdefault(report_key, 0)
-        rows.append(row)
+    grouped = _base(user_org, filters).values(
+        period_value=_period_expression(monthly)
+    ).annotate(
+        total=Count("pk"),
+        closed=Count("pk", filter=Q(date_close__isnull=False)),
+        t1=Count("pk", filter=Q(irp_type=1)),
+        t2=Count("pk", filter=Q(irp_type=2)),
+        t3=Count("pk", filter=Q(irp_type=3)),
+        t4=Count("pk", filter=Q(irp_type=4)),
+        t5=Count("pk", filter=Q(irp_type=5)),
+    ).order_by("period_value")
+    rows = [
+        {"period": _bucket_label(row.pop("period_value"), monthly), **row}
+        for row in grouped
+    ]
     total = {
         "period": "ИТОГО",
         "total": sum(r.get("total", 0) for r in rows),
@@ -188,30 +183,41 @@ def r1_by_volume(user_org: int, filters: ReportFilters):
 # ---------------------------------------------------------------------------
 
 def r2_by_type(user_org: int, filters: ReportFilters):
-    data = list(
-        _base(user_org, filters).values("irp_type", "date_create", "date_close")
+    duration = ExpressionWrapper(
+        F("date_close") - F("date_create"), output_field=DurationField()
     )
-    by_type: dict[int, list] = {}
-    for row in data:
-        by_type.setdefault(row["irp_type"], []).append(row)
-    rows = []
-    for irp_type, items in sorted(by_type.items()):
-        rows.append(
-            {
-                "type": _irp_type_label(irp_type),
-                "total": len(items),
-                "percent": _percent(len(items), len(data)),
-                "closed": sum(1 for r in items if r["date_close"]),
-                "avg_days": _avg_days(items),
-            }
-        )
+    grouped = list(
+        _base(user_org, filters).values("irp_type").annotate(
+            total=Count("pk"),
+            closed=Count("pk", filter=Q(date_close__isnull=False)),
+            avg_duration=Avg(duration, filter=Q(date_close__isnull=False)),
+        ).order_by("irp_type")
+    )
+    total_count = sum(row["total"] for row in grouped)
+    rows = [
+        {
+            "type": _irp_type_label(row["irp_type"]),
+            "total": row["total"],
+            "percent": _percent(row["total"], total_count),
+            "closed": row["closed"],
+            "avg_days": _avg_duration_label(row["avg_duration"]),
+        }
+        for row in grouped
+    ]
     rows.append(
         {
             "type": "ИТОГО",
-            "total": len(data),
+            "total": total_count,
             "percent": "100,0",
-            "closed": sum(1 for r in data if r["date_close"]),
-            "avg_days": _avg_days(data),
+            "closed": sum(row["closed"] for row in grouped),
+            "avg_days": _avg_duration_label(
+                sum(
+                    (row["avg_duration"] * row["closed"] for row in grouped if row["avg_duration"]),
+                    datetime.timedelta(),
+                ) / sum(row["closed"] for row in grouped)
+                if sum(row["closed"] for row in grouped)
+                else None
+            ),
         }
     )
     return rows
@@ -222,30 +228,26 @@ def r2_by_type(user_org: int, filters: ReportFilters):
 # ---------------------------------------------------------------------------
 
 def r3_protection(user_org: int, filters: ReportFilters):
-    qs = _base(user_org, filters).filter(Q(irp_type=2) | Q(zh_d__isnull=False))
-    data = list(qs.select_related("theme").values("theme", "zh_d"))
-    themes = {}
-    for row in data:
-        theme_id = row["theme"]
-        item = themes.setdefault(theme_id, {"theme": theme_id, "well": 0, "pre": 0, "court": 0, "bad": 0, "total": 0})
-        item["total"] += 1
-        zh = row["zh_d"]
-        if zh and (zh.startswith("1") or zh == "1"):
-            item["well"] += 1
-            if zh == "1.1":
-                item["pre"] += 1
-            if zh == "1.2":
-                item["court"] += 1
-        elif zh == "2":
-            item["bad"] += 1
-    theme_names = {
-        t.id: _theme_label(t)
-        for t in IrpTheme.objects.filter(id__in=themes).only("code_name", "title")
-    }
-    rows = []
-    for item in themes.values():
-        item["theme"] = theme_names.get(item["theme"], "—")
-        rows.append(item)
+    grouped = _base(user_org, filters).filter(
+        Q(irp_type=2) | Q(zh_d__isnull=False)
+    ).values("theme__code_name", "theme__title").annotate(
+        well=Count("pk", filter=Q(zh_d__startswith="1")),
+        pre=Count("pk", filter=Q(zh_d="1.1")),
+        court=Count("pk", filter=Q(zh_d="1.2")),
+        bad=Count("pk", filter=Q(zh_d="2")),
+        total=Count("pk"),
+    )
+    rows = [
+        {
+            "theme": f"{row['theme__code_name']} — {row['theme__title']}",
+            "well": row["well"],
+            "pre": row["pre"],
+            "court": row["court"],
+            "bad": row["bad"],
+            "total": row["total"],
+        }
+        for row in grouped
+    ]
     rows.sort(key=lambda r: (-r["total"], r["theme"]))
     rows.append(
         {
@@ -265,33 +267,24 @@ def r3_protection(user_org: int, filters: ReportFilters):
 # ---------------------------------------------------------------------------
 
 def r4_complaints(user_org: int, filters: ReportFilters):
-    data = list(
-        _base(user_org, filters)
-        .filter(irp_type=2)
-        .select_related("theme")
-        .values("theme", "date_close")
-    )
-    themes = {}
-    for row in data:
-        item = themes.setdefault(row["theme"], {"theme": row["theme"], "total": 0, "closed": 0})
-        item["total"] += 1
-        if row["date_close"]:
-            item["closed"] += 1
-    theme_names = {
-        t.id: _theme_label(t)
-        for t in IrpTheme.objects.filter(id__in=themes).only("code_name", "title")
-    }
-    total_all = sum(r["total"] for r in themes.values())
-    rows = []
-    for item in themes.values():
-        rows.append(
-            {
-                "theme": theme_names.get(item["theme"], "—"),
-                "total": item["total"],
-                "closed": item["closed"],
-                "percent": _percent(item["total"], total_all),
-            }
+    grouped = list(
+        _base(user_org, filters).filter(irp_type=2)
+        .values("theme__code_name", "theme__title")
+        .annotate(
+            total=Count("pk"),
+            closed=Count("pk", filter=Q(date_close__isnull=False)),
         )
+    )
+    total_all = sum(row["total"] for row in grouped)
+    rows = [
+        {
+            "theme": f"{row['theme__code_name']} — {row['theme__title']}",
+            "total": row["total"],
+            "closed": row["closed"],
+            "percent": _percent(row["total"], total_all),
+        }
+        for row in grouped
+    ]
     rows.sort(key=lambda r: (-r["total"], r["theme"]))
     rows.append(
         {
@@ -310,21 +303,18 @@ def r4_complaints(user_org: int, filters: ReportFilters):
 
 def r5_applications(user_org: int, filters: ReportFilters):
     monthly = _monthly(filters)
-    data = list(
-        _base(user_org, filters)
-        .filter(irp_type=4)
-        .values("date_create", "date_close", "result")
-    )
-    buckets: dict[datetime.date, dict] = {}
-    for row in data:
-        key = _bucket(row["date_create"], monthly)
-        bucket = buckets.setdefault(key, {})
-        bucket["month"] = _bucket_label(key, monthly)
-        bucket["total"] = bucket.get("total", 0) + 1
-        bucket["satisfied"] = bucket.get("satisfied", 0) + (1 if row["result"] == 3 else 0)
-        bucket["rejected"] = bucket.get("rejected", 0) + (1 if row["result"] == 4 else 0)
-        bucket["pending"] = bucket.get("pending", 0) + (1 if not row["date_close"] else 0)
-    rows = [buckets[key] for key in sorted(buckets)]
+    grouped = _base(user_org, filters).filter(irp_type=4).values(
+        period_value=_period_expression(monthly)
+    ).annotate(
+        total=Count("pk"),
+        satisfied=Count("pk", filter=Q(result=3)),
+        rejected=Count("pk", filter=Q(result=4)),
+        pending=Count("pk", filter=Q(date_close__isnull=True)),
+    ).order_by("period_value")
+    rows = [
+        {"month": _bucket_label(row.pop("period_value"), monthly), **row}
+        for row in grouped
+    ]
     rows.append(
         {
             "month": "ИТОГО",
@@ -342,29 +332,24 @@ def r5_applications(user_org: int, filters: ReportFilters):
 # ---------------------------------------------------------------------------
 
 def r6_clarification(user_org: int, filters: ReportFilters):
-    data = list(
-        _base(user_org, filters)
-        .filter(irp_type=1)
-        .select_related("theme")
-        .values("theme", "how", "result", "date_close")
+    grouped = _base(user_org, filters).filter(irp_type=1).values(
+        "theme__code_name", "theme__title"
+    ).annotate(
+        total=Count("pk"),
+        hotline=Count("pk", filter=Q(how=1)),
+        consulted=Count("pk", filter=Q(result=1)),
+        closed=Count("pk", filter=Q(date_close__isnull=False)),
     )
-    themes = {}
-    for row in data:
-        item = themes.setdefault(
-            row["theme"], {"theme": row["theme"], "total": 0, "hotline": 0, "consulted": 0, "closed": 0}
-        )
-        item["total"] += 1
-        item["hotline"] += 1 if row["how"] == 1 else 0
-        item["consulted"] += 1 if row["result"] == 1 else 0
-        item["closed"] += 1 if row["date_close"] else 0
-    theme_names = {
-        t.id: _theme_label(t)
-        for t in IrpTheme.objects.filter(id__in=themes).only("code_name", "title")
-    }
-    rows = []
-    for item in themes.values():
-        item["theme"] = theme_names.get(item["theme"], "—")
-        rows.append(item)
+    rows = [
+        {
+            "theme": f"{row['theme__code_name']} — {row['theme__title']}",
+            "total": row["total"],
+            "hotline": row["hotline"],
+            "consulted": row["consulted"],
+            "closed": row["closed"],
+        }
+        for row in grouped
+    ]
     rows.sort(key=lambda r: (-r["total"], r["theme"]))
     rows.append(
         {
@@ -384,23 +369,20 @@ def r6_clarification(user_org: int, filters: ReportFilters):
 
 def _hotline(irp_type: int, user_org: int, filters: ReportFilters):
     monthly = _monthly(filters)
-    data = list(
-        _base(user_org, filters)
-        .filter(how=1, irp_type=irp_type)
-        .values("date_create", "line_one", "pr_out", "date_close")
-    )
-    buckets: dict[datetime.date, dict] = {}
-    for row in data:
-        key = _bucket(row["date_create"], monthly)
-        bucket = buckets.setdefault(key, {})
-        bucket["month"] = _bucket_label(key, monthly)
-        bucket["total"] = bucket.get("total", 0) + 1
-        bucket["op1"] = bucket.get("op1", 0) + (1 if row["line_one"] == 1 else 0)
-        bucket["op2"] = bucket.get("op2", 0) + (1 if row["line_one"] == 2 else 0)
-        bucket["sp1"] = bucket.get("sp1", 0) + (1 if row["line_one"] == 3 else 0)
-        bucket["redirected"] = bucket.get("redirected", 0) + (1 if row["pr_out"] else 0)
-        bucket["closed"] = bucket.get("closed", 0) + (1 if row["date_close"] else 0)
-    rows = [buckets[key] for key in sorted(buckets)]
+    grouped = _base(user_org, filters).filter(how=1, irp_type=irp_type).values(
+        period_value=_period_expression(monthly)
+    ).annotate(
+        total=Count("pk"),
+        op1=Count("pk", filter=Q(line_one=1)),
+        op2=Count("pk", filter=Q(line_one=2)),
+        sp1=Count("pk", filter=Q(line_one=3)),
+        redirected=Count("pk", filter=Q(pr_out__isnull=False)),
+        closed=Count("pk", filter=Q(date_close__isnull=False)),
+    ).order_by("period_value")
+    rows = [
+        {"month": _bucket_label(row.pop("period_value"), monthly), **row}
+        for row in grouped
+    ]
     rows.append(
         {
             "month": "ИТОГО",

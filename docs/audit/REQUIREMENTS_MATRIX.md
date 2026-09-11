@@ -8,7 +8,7 @@
 | 4 способа регистрации и единый ФЛК | ТЗ 2.2 | ТФОМС, СМО | journal/exchange | forms/importers/command | exchange tests | Импорт atomic; нет эталонного Приложения 10 для доказательства формата | частично |
 | История, результат, переадресация, предварительный ответ | ТЗ 2.3 | ОП/СП | journal | IrpHistory/answers/redirect + persisted FSM | routing/lifecycle tests | Детальные цепочки назначения по линиям требуют эталонной оргструктуры | частично |
 | Ролевой deny-by-default доступ | ТЗ 2.4, 3.1 | Admin, ОП, СП, СМО | core/journal/exchange/reports | capability policy + org scope + terminal-state guards | permission/lifecycle tests | Детальные destination rules зависят от оргструктуры | реализовано |
-| 9 отчётных форм и фильтры | ТЗ 2.5 | ТФОМС, СМО | reports | registry/export | reports tests | Нет оригинальных Приложений 1–9 | неоднозначно |
+| 9 отчётных форм и фильтры | ТЗ 2.5 | ТФОМС, СМО | reports | registry/export + SQL aggregation | result/query-count reports tests | Нет оригинальных Приложений 1–9 | неоднозначно |
 | Защищённая выдача вложений | ТЗ 3.1 | все | journal/system downloads | object-scoped FileResponse | regression tests | Web-сервер не должен публиковать media напрямую | реализовано |
 | Блокировка после 10 попыток и стойкие пароли | ТЗ 3.1 | все | core/auth | backend/signals/atomic counter/validator | core + employee tests | Временное окно намеренно не применяется: разблокировка только администратором | реализовано |
 | Временные токены и единый репозиторий | ТЗ 3.1 | все | core/tokens, core/token-login | JWT exchange + Employee repository adapter | unit/view tests | POST-only обмен временного JWT на сессию, inactive/locked deny, safe redirect | реализовано |

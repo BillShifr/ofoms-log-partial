@@ -5,7 +5,9 @@ import io
 import uuid
 
 from django.contrib.auth.models import Group
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from openpyxl import load_workbook
 
@@ -73,6 +75,16 @@ class BaseReportTestCase(TestCase):
 
 
 class ReportQueriesTests(BaseReportTestCase):
+    def test_each_report_build_uses_single_query_without_per_row_fetches(self):
+        self._make(irp_type=1, how=1, date_close=datetime.date.today())
+        self._make(irp_type=2, how=1, zh_d="1.1")
+        self._make(irp_type=4)
+
+        for report in REPORTS:
+            with self.subTest(report=report.slug), CaptureQueriesContext(connection) as queries:
+                report.build(self.tfoms_user.org, self._filters())
+            self.assertEqual(len(queries), 1)
+
     def test_scope_smo_sees_only_own(self):
         self._make(irp_type=2)
         self._make(owner=self.smo_user, irp_type=2)

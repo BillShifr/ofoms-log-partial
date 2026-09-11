@@ -249,18 +249,19 @@ def irp_create(request):
     if request.method == "POST":
         form = IrpForm(request.POST, user=request.user)
         if form.is_valid():
-            irp = form.save(commit=False)
-            irp.employee_one = request.user
-            irp.line_one = 1 if request.user.org == TFOMS else 3
-            irp.save()
-            _write_history(irp, request.user, created=True)
-            log_event(
-                module="journal",
-                event_type=EventLog.EventType.CREATE,
-                user=request.user,
-                target=f"irp:{irp.pk}:{irp.n_irp}",
-                ip=request.META.get("REMOTE_ADDR"),
-            )
+            with transaction.atomic():
+                irp = form.save(commit=False)
+                irp.employee_one = request.user
+                irp.line_one = 1 if request.user.org == TFOMS else 3
+                irp.save()
+                _write_history(irp, request.user, created=True)
+                log_event(
+                    module="journal",
+                    event_type=EventLog.EventType.CREATE,
+                    user=request.user,
+                    target=f"irp:{irp.pk}:{irp.n_irp}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
             messages.success(request, "Обращение зарегистрировано.")
             return redirect(reverse("journal:detail", args=[irp.pk]))
     else:
@@ -276,36 +277,43 @@ def irp_create(request):
 @require_http_methods(["GET", "POST"])
 def irp_edit(request, pk):
     """Редактирование карточки обращения с фиксацией изменений в истории."""
-    irp = _get_irp_for_user(request, pk)
     _require_capability(request, JOURNAL_CHANGE)
-    _require_mutable(irp)
     if request.method == "POST":
-        form = IrpForm(request.POST, instance=irp, user=request.user)
-        # ModelForm мутирует instance при валидации — снимок до is_valid()
-        before = {f: getattr(irp, f) for f in form.fields}
-        if form.is_valid():
-            old = {f: before[f] for f in form.changed_data}
-            irp = form.save(commit=False)
-            target = (
-                Irp.Status.CLOSED
-                if irp.date_close and irp.result
-                else Irp.Status.IN_PROGRESS
-                if irp.status == Irp.Status.REGISTERED
-                else irp.status
-            )
-            _transition(irp, target)
-            irp.save()
-            _write_history(irp, request.user, old)
-            log_event(
-                module="journal",
-                event_type=EventLog.EventType.UPDATE,
-                user=request.user,
-                target=f"irp:{irp.pk}:{irp.n_irp}",
-                ip=request.META.get("REMOTE_ADDR"),
-            )
+        with transaction.atomic():
+            irp = _get_irp_for_user(request, pk, for_update=True)
+            _require_mutable(irp)
+            form = IrpForm(request.POST, instance=irp, user=request.user)
+            # ModelForm мутирует instance при валидации — снимок до is_valid()
+            before = {f: getattr(irp, f) for f in form.fields}
+            if form.is_valid():
+                old = {f: before[f] for f in form.changed_data}
+                irp = form.save(commit=False)
+                target = (
+                    Irp.Status.CLOSED
+                    if irp.date_close and irp.result
+                    else Irp.Status.IN_PROGRESS
+                    if irp.status == Irp.Status.REGISTERED
+                    else irp.status
+                )
+                _transition(irp, target)
+                irp.save()
+                _write_history(irp, request.user, old)
+                log_event(
+                    module="journal",
+                    event_type=EventLog.EventType.UPDATE,
+                    user=request.user,
+                    target=f"irp:{irp.pk}:{irp.n_irp}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
+                saved = True
+            else:
+                saved = False
+        if saved:
             messages.success(request, "Обращение обновлено.")
             return redirect(reverse("journal:detail", args=[irp.pk]))
     else:
+        irp = _get_irp_for_user(request, pk)
+        _require_mutable(irp)
         form = IrpForm(instance=irp, user=request.user)
     return render(
         request,
@@ -319,34 +327,39 @@ def irp_edit(request, pk):
 @require_http_methods(["POST"])
 def irp_answer_create(request, pk):
     """Добавление ответа на обращение (ТЗ п. 215: предварительный ответ)."""
-    irp = _get_irp_for_user(request, pk)
     _require_capability(request, JOURNAL_CHANGE)
-    _require_mutable(irp)
-    form = IrpAnswerForm(request.POST)
-    if form.is_valid():
-        answer = form.save(commit=False)
-        answer.irp = irp
-        answer.user = request.user
-        answer.save()
-        target = (
-            Irp.Status.PRELIMINARY
-            if answer.is_preliminary
-            else Irp.Status.IN_PROGRESS
-            if irp.status == Irp.Status.REGISTERED
-            else irp.status
-        )
-        _transition(irp, target)
-        irp.save(update_fields=["status"])
-        IrpHistory.objects.create(
-            irp=irp, user=request.user, field_name="answer",
-            old_value="—",
-            new_value="предварительный" if answer.is_preliminary else "итоговый",
-        )
-        log_event(
-            module="journal", event_type=EventLog.EventType.UPDATE,
-            user=request.user, target=f"irp:{irp.pk}:answer:{answer.pk}",
-            ip=request.META.get("REMOTE_ADDR"),
-        )
+    with transaction.atomic():
+        irp = _get_irp_for_user(request, pk, for_update=True)
+        _require_mutable(irp)
+        form = IrpAnswerForm(request.POST)
+        if form.is_valid():
+            answer = form.save(commit=False)
+            answer.irp = irp
+            answer.user = request.user
+            answer.save()
+            target = (
+                Irp.Status.PRELIMINARY
+                if answer.is_preliminary
+                else Irp.Status.IN_PROGRESS
+                if irp.status == Irp.Status.REGISTERED
+                else irp.status
+            )
+            _transition(irp, target)
+            irp.save(update_fields=["status"])
+            IrpHistory.objects.create(
+                irp=irp, user=request.user, field_name="answer",
+                old_value="—",
+                new_value="предварительный" if answer.is_preliminary else "итоговый",
+            )
+            log_event(
+                module="journal", event_type=EventLog.EventType.UPDATE,
+                user=request.user, target=f"irp:{irp.pk}:answer:{answer.pk}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
+            saved = True
+        else:
+            saved = False
+    if saved:
         messages.success(request, "Ответ сохранён.")
     return redirect(reverse("journal:detail", args=[irp.pk]))
 
@@ -355,8 +368,8 @@ def irp_answer_create(request, pk):
 @require_http_methods(["POST"])
 def irp_file_upload(request, pk):
     """Прикрепление файла к обращению или к ответу (ТЗ п. 200)."""
-    irp = _get_irp_for_user(request, pk)
     _require_capability(request, JOURNAL_CHANGE)
+    irp = _get_irp_for_user(request, pk)
     _require_mutable(irp)
     uploaded = request.FILES.get("file")
     if uploaded:
@@ -370,17 +383,19 @@ def irp_file_upload(request, pk):
                 "Файл не прикреплён: недопустимый тип или размер файла.",
             )
             return redirect(reverse("journal:detail", args=[irp.pk]))
-        answer_id = request.POST.get("answer")
-        answer = None
-        if answer_id:
-            answer = get_object_or_404(IrpAnswer, pk=answer_id, irp=irp)
-        attachment = IrpFile(
-            irp=irp,
-            answer=answer,
-            file=uploaded,
-            uploader=request.user,
-        )
         with UploadedFileRollback() as file_rollback, transaction.atomic():
+            irp = _get_irp_for_user(request, pk, for_update=True)
+            _require_mutable(irp)
+            answer_id = request.POST.get("answer")
+            answer = None
+            if answer_id:
+                answer = get_object_or_404(IrpAnswer, pk=answer_id, irp=irp)
+            attachment = IrpFile(
+                irp=irp,
+                answer=answer,
+                file=uploaded,
+                uploader=request.user,
+            )
             file_rollback.track(attachment.file)
             attachment.save()
             log_event(
@@ -416,27 +431,35 @@ def irp_file_download(request, pk):
 @require_http_methods(["GET", "POST"])
 def irp_redirect(request, pk):
     """Переадресация обращения (ТЗ п. 212) + запись в историю."""
-    irp = _get_irp_for_user(request, pk)
     _require_capability(request, JOURNAL_REDIRECT)
-    _require_mutable(irp)
     if request.method == "POST":
-        form = IrpRedirectForm(request.POST, instance=irp, user=request.user)
-        before = {f: getattr(irp, f) for f in form.fields}
-        if form.is_valid():
-            old = {f: before[f] for f in form.changed_data}
-            irp = form.save(commit=False)
-            _transition(irp, Irp.Status.REDIRECTED)
-            irp.save()
-            _write_history(irp, request.user, old)
+        with transaction.atomic():
+            irp = _get_irp_for_user(request, pk, for_update=True)
+            _require_mutable(irp)
+            form = IrpRedirectForm(request.POST, instance=irp, user=request.user)
+            before = {f: getattr(irp, f) for f in form.fields}
+            if form.is_valid():
+                old = {f: before[f] for f in form.changed_data}
+                irp = form.save(commit=False)
+                _transition(irp, Irp.Status.REDIRECTED)
+                irp.save()
+                _write_history(irp, request.user, old)
+                if old:
+                    log_event(
+                        module="journal", event_type=EventLog.EventType.UPDATE,
+                        user=request.user, target=f"irp:{irp.pk}:redirect",
+                        ip=request.META.get("REMOTE_ADDR"),
+                    )
+                saved = True
+            else:
+                saved = False
+        if saved:
             if old:
-                log_event(
-                    module="journal", event_type=EventLog.EventType.UPDATE,
-                    user=request.user, target=f"irp:{irp.pk}:redirect",
-                    ip=request.META.get("REMOTE_ADDR"),
-                )
                 messages.success(request, "Обращение переадресовано.")
             return redirect(reverse("journal:detail", args=[irp.pk]))
     else:
+        irp = _get_irp_for_user(request, pk)
+        _require_mutable(irp)
         form = IrpRedirectForm(instance=irp, user=request.user)
     return render(
         request,
@@ -457,9 +480,12 @@ def irp_cover(request, pk):
     )
 
 
-def _get_irp_for_user(request, pk):
+def _get_irp_for_user(request, pk, *, for_update=False):
     _require_capability(request, JOURNAL_READ)
-    irp = get_object_or_404(Irp, pk=pk)
+    queryset = Irp.objects.select_related("employee_one")
+    if for_update:
+        queryset = queryset.select_for_update()
+    irp = get_object_or_404(queryset, pk=pk)
     if request.user.org != TFOMS and irp.employee_one.org != request.user.org:
         raise PermissionDenied
     return irp

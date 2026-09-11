@@ -363,6 +363,33 @@ class JournalScreenTests(TestCase):
         # заявитель зафиксирован как инициатор создания
         self.assertEqual(irp.employee_one, self.tfoms_user)
 
+    def test_create_rolls_back_record_and_history_when_audit_fails(self):
+        self.client.force_login(self.tfoms_user)
+
+        with (
+            patch("apps.journal.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("journal:create"),
+                {
+                    "irp_type": 2,
+                    "date_create": datetime.date.today().isoformat(),
+                    "way": 1,
+                    "how": 2,
+                    "theme": self.theme.pk,
+                    "otv_t": 1,
+                    "otv_kon": 81000,
+                    "data_plan": (
+                        datetime.date.today() + datetime.timedelta(days=30)
+                    ).isoformat(),
+                    "z_f": "Откат создания",
+                },
+            )
+
+        self.assertFalse(Irp.objects.filter(z_f="Откат создания").exists())
+        self.assertFalse(IrpHistory.objects.filter(field_name="__created__").exists())
+
     def test_edit_writes_history_diff(self):
         irp = self._make_irp()
         self.client.force_login(self.tfoms_user)
@@ -392,6 +419,35 @@ class JournalScreenTests(TestCase):
         entry = IrpHistory.objects.filter(irp=irp, field_name="z_f").latest("id")
         self.assertEqual(entry.old_value, "Петров")
         self.assertEqual(entry.new_value, "Иванов")
+
+    def test_edit_rolls_back_record_and_history_when_audit_fails(self):
+        irp = self._make_irp()
+        self.client.force_login(self.tfoms_user)
+
+        with (
+            patch("apps.journal.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("journal:edit", args=[irp.pk]),
+                {
+                    "n_irp": irp.n_irp,
+                    "irp_type": 1,
+                    "date_create": irp.date_create.isoformat(),
+                    "way": 1,
+                    "how": 1,
+                    "theme": self.theme.pk,
+                    "otv_t": 1,
+                    "otv_kon": 81000,
+                    "data_plan": irp.data_plan.isoformat(),
+                    "z_f": "Откат изменения",
+                },
+            )
+
+        irp.refresh_from_db()
+        self.assertEqual(irp.z_f, "Петров")
+        self.assertEqual(irp.status, Irp.Status.REGISTERED)
+        self.assertFalse(IrpHistory.objects.filter(irp=irp).exists())
 
     def test_smo_cannot_change_primary_owner_through_edit_post(self):
         irp = self._make_irp(owner=self.smo_user)
@@ -612,6 +668,24 @@ class RoutingTests(TestCase):
         self.assertEqual(irp.status, Irp.Status.PRELIMINARY)
         self.assertTrue(IrpHistory.objects.filter(irp=irp, field_name="answer").exists())
 
+    def test_answer_rolls_back_status_history_and_answer_when_audit_fails(self):
+        irp = self._make_irp()
+        self.client.force_login(self.tfoms_user)
+
+        with (
+            patch("apps.journal.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("journal:answer", args=[irp.pk]),
+                {"text": "Откат ответа", "is_preliminary": "on"},
+            )
+
+        irp.refresh_from_db()
+        self.assertEqual(irp.status, Irp.Status.REGISTERED)
+        self.assertFalse(irp.answers.exists())
+        self.assertFalse(IrpHistory.objects.filter(irp=irp).exists())
+
     def test_final_answer_flag(self):
         irp = self._make_irp()
         self.client.force_login(self.tfoms_user)
@@ -801,6 +875,33 @@ class RoutingTests(TestCase):
         self.assertEqual(irp.pr_out, 1)
         self.assertEqual(irp.status, Irp.Status.REDIRECTED)
         self.assertTrue(IrpHistory.objects.filter(irp=irp, field_name="pr_out").exists())
+
+    def test_redirect_rolls_back_route_and_history_when_audit_fails(self):
+        irp = self._make_irp()
+        original_org = irp.otv_kon
+        self.client.force_login(self.tfoms_user)
+
+        with (
+            patch("apps.journal.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("journal:redirect", args=[irp.pk]),
+                {
+                    "otv_t": 1,
+                    "otv_kon": 81007,
+                    "employee_it": self.tfoms_user.pk,
+                    "line_it": 1,
+                    "pr_out": 1,
+                    "date_cross": datetime.date.today().isoformat(),
+                    "time_cross": "12:00",
+                },
+            )
+
+        irp.refresh_from_db()
+        self.assertEqual(irp.otv_kon, original_org)
+        self.assertEqual(irp.status, Irp.Status.REGISTERED)
+        self.assertFalse(IrpHistory.objects.filter(irp=irp).exists())
 
     def test_closed_irp_is_terminal_for_mutations(self):
         irp = self._make_irp()

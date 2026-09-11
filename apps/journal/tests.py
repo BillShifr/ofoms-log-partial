@@ -149,6 +149,11 @@ class JournalScreenTests(TestCase):
         self.assertContains(resp, f'title="{irp.n_irp}"')
         self.assertContains(resp, f'…{irp.n_irp[-12:]}')
 
+        css = (settings.BASE_DIR / "static/css/portal.css").read_text()
+        self.assertIn(".data--journal .col-status", css)
+        self.assertIn("position: sticky", css)
+        self.assertIn("right: 0", css)
+
     def test_suggest_runs_in_database_and_preserves_org_scope(self):
         own = self._make_irp(owner=self.smo_user)
         own.z_f = "АЛЕКСАНДР Свой"

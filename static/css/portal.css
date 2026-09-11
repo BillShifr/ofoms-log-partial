@@ -336,7 +336,30 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .data--journal .col-theme { min-width: 180px; }
 .data--journal .col-n_irp { width: 172px; max-width: 172px; }
 .data--journal .col-z_f { min-width: 190px; }
-.data--journal .col-status { min-width: 132px; }
+.data--journal .col-status {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  min-width: 148px;
+  background: var(--card);
+  box-shadow: -12px 0 18px -18px color-mix(in srgb, var(--ink) 55%, transparent);
+}
+.data--journal thead .col-status {
+  z-index: 5;
+  background: color-mix(in srgb, var(--chip-blue) 42%, var(--card));
+}
+.data--journal tbody tr:nth-child(even):not(.row-detail) .col-status {
+  background: color-mix(in srgb, var(--bg) 22%, var(--card));
+}
+.data--journal tbody tr.row--overdue .col-status {
+  background: color-mix(in srgb, var(--danger) 4%, var(--card));
+}
+.data--journal tbody tr.row--open .col-status {
+  background: color-mix(in srgb, var(--warn) 4%, var(--card));
+}
+.data--journal tbody tr:hover .col-status {
+  background: color-mix(in srgb, var(--chip-blue) 40%, var(--card));
+}
 .cell-id { white-space: nowrap; letter-spacing: -.02em; }
 .compact-id { display: block; overflow: hidden; color: color-mix(in srgb, var(--ink) 78%, transparent); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
 .table-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }

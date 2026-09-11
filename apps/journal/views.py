@@ -15,6 +15,7 @@ import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -29,7 +30,7 @@ from apps.core.policy import (
     JOURNAL_REDIRECT,
     user_has_capability,
 )
-from apps.core.storage import open_field_file_or_404
+from apps.core.storage import UploadedFileRollback, open_field_file_or_404
 from apps.employee.models import TFOMS
 from apps.journal.forms import IrpAnswerForm, IrpFilterForm, IrpForm, IrpRedirectForm
 from apps.journal.models import RESULTS, Irp, IrpAnswer, IrpFile, IrpHistory
@@ -373,18 +374,21 @@ def irp_file_upload(request, pk):
         answer = None
         if answer_id:
             answer = get_object_or_404(IrpAnswer, pk=answer_id, irp=irp)
-        IrpFile.objects.create(
+        attachment = IrpFile(
             irp=irp,
             answer=answer,
             file=uploaded,
             uploader=request.user,
         )
-        log_event(
-            module="journal", event_type=EventLog.EventType.CREATE,
-            user=request.user,
-            target=f"irp:{irp.pk}:file:{uploaded.name}",
-            ip=request.META.get("REMOTE_ADDR"),
-        )
+        with UploadedFileRollback() as file_rollback, transaction.atomic():
+            file_rollback.track(attachment.file)
+            attachment.save()
+            log_event(
+                module="journal", event_type=EventLog.EventType.CREATE,
+                user=request.user,
+                target=f"irp:{irp.pk}:file:{uploaded.name}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
         messages.success(request, "Файл прикреплён.")
     return redirect(reverse("journal:detail", args=[irp.pk]))
 

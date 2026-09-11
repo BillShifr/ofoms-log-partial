@@ -26,7 +26,7 @@ from apps.core.fold import contains_folded, filter_contains_any
 from apps.core.models import EventLog, log_event
 from apps.core.policy import role_codes_for_user
 from apps.core.roles import Roles
-from apps.core.storage import open_field_file_or_404
+from apps.core.storage import UploadedFileRollback, open_field_file_or_404
 from apps.employee.models import Employee
 from apps.journal.table import JOURNAL_COLUMNS, JOURNAL_TABLE_KEY, SORTABLE_FIELDS
 from apps.system.forms import (
@@ -636,57 +636,52 @@ def thread_reply(request, pk):
     """Ответ в теме (с необязательным вложением-файлом)."""
     form = ReplyForm(request.POST)
     if form.is_valid():
-        attachment = None
-        try:
-            with transaction.atomic():
-                thread = get_object_or_404(
-                    MessageThread.objects.select_for_update().select_related(
-                        "conversation"
-                    ),
-                    pk=pk,
-                )
-                _participant_or_404(request.user, thread.conversation)
-                if thread.is_closed:
-                    raise PermissionDenied
+        with UploadedFileRollback() as file_rollback, transaction.atomic():
+            thread = get_object_or_404(
+                MessageThread.objects.select_for_update().select_related(
+                    "conversation"
+                ),
+                pk=pk,
+            )
+            _participant_or_404(request.user, thread.conversation)
+            if thread.is_closed:
+                raise PermissionDenied
 
-                reply = form.save(commit=False)
-                reply.thread = thread
-                reply.author = request.user
-                parent_id = (request.POST.get("parent") or "").strip()
-                if parent_id and parent_id.isdigit():
-                    parent = MessageReply.objects.filter(
-                        pk=parent_id, thread=thread
-                    ).first()
-                    reply.parent = parent
-                reply.save()
-                uploaded = request.FILES.get("attachment")
-                if uploaded is not None:
-                    from apps.system.validators import validate_attachment_file
+            reply = form.save(commit=False)
+            reply.thread = thread
+            reply.author = request.user
+            parent_id = (request.POST.get("parent") or "").strip()
+            if parent_id and parent_id.isdigit():
+                parent = MessageReply.objects.filter(
+                    pk=parent_id, thread=thread
+                ).first()
+                reply.parent = parent
+            reply.save()
+            uploaded = request.FILES.get("attachment")
+            if uploaded is not None:
+                from apps.system.validators import validate_attachment_file
 
-                    try:
-                        validate_attachment_file(uploaded)
-                    except Exception:  # noqa: BLE001 — не прошедший валидацию файл
-                        messages.error(
-                            request,
-                            "Вложение не прикреплено: недопустимый тип или размер файла.",
-                        )
-                    else:
-                        attachment = MessageAttachment(
-                            reply=reply, file=uploaded, uploaded_by=request.user
-                        )
-                        attachment.save()
-                log_event(
-                    module="system",
-                    event_type=EventLog.EventType.SEND,
-                    user=request.user,
-                    target=f"thread:{thread.pk}:reply:{reply.pk}",
-                    ip=request.META.get("REMOTE_ADDR"),
-                )
-                messages.success(request, "Сообщение отправлено.")
-        except BaseException:
-            if attachment is not None and attachment.file._committed:
-                attachment.file.delete(save=False)
-            raise
+                try:
+                    validate_attachment_file(uploaded)
+                except Exception:  # noqa: BLE001 — не прошедший валидацию файл
+                    messages.error(
+                        request,
+                        "Вложение не прикреплено: недопустимый тип или размер файла.",
+                    )
+                else:
+                    attachment = MessageAttachment(
+                        reply=reply, file=uploaded, uploaded_by=request.user
+                    )
+                    file_rollback.track(attachment.file)
+                    attachment.save()
+            log_event(
+                module="system",
+                event_type=EventLog.EventType.SEND,
+                user=request.user,
+                target=f"thread:{thread.pk}:reply:{reply.pk}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
+            messages.success(request, "Сообщение отправлено.")
     else:
         thread = get_object_or_404(
             MessageThread.objects.select_related("conversation"), pk=pk
@@ -927,10 +922,12 @@ def task_update(request, pk):
             tf = file_form.save(commit=False)
             tf.task = task
             tf.uploaded_by = request.user
-            tf.save()
-            log_event(module="system", event_type=EventLog.EventType.UPDATE,
-                      user=request.user, target=f"task:{task.pk}:file",
-                      ip=request.META.get("REMOTE_ADDR"))
+            with UploadedFileRollback() as file_rollback, transaction.atomic():
+                file_rollback.track(tf.file)
+                tf.save()
+                log_event(module="system", event_type=EventLog.EventType.UPDATE,
+                          user=request.user, target=f"task:{task.pk}:file",
+                          ip=request.META.get("REMOTE_ADDR"))
             messages.success(request, "Файл прикреплён.")
         else:
             messages.error(
@@ -1111,14 +1108,16 @@ def doc_upload(request):
             doc.file_type = ext if len(ext) <= 16 else ""
             if not form.cleaned_data.get("title"):
                 doc.title = (uploaded.name or "").rsplit(".", 1)[0][:200]
-        doc.save()
-        log_event(
-            module="system",
-            event_type=EventLog.EventType.CREATE,
-            user=request.user,
-            target=f"doc:{doc.pk}:{doc.file.name}",
-            ip=request.META.get("REMOTE_ADDR"),
-        )
+        with UploadedFileRollback() as file_rollback, transaction.atomic():
+            file_rollback.track(doc.file)
+            doc.save()
+            log_event(
+                module="system",
+                event_type=EventLog.EventType.CREATE,
+                user=request.user,
+                target=f"doc:{doc.pk}:{doc.file.name}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
         messages.success(request, "Документ добавлен.")
     else:
         errors = [
@@ -1273,14 +1272,17 @@ def news_create(request):
     if form.is_valid():
         item = form.save(commit=False)
         item.author = request.user
-        item.save()
-        log_event(
-            module="system",
-            event_type=EventLog.EventType.CREATE,
-            user=request.user,
-            target=f"news:{item.pk}",
-            ip=request.META.get("REMOTE_ADDR"),
-        )
+        with UploadedFileRollback() as file_rollback, transaction.atomic():
+            if item.cover_image:
+                file_rollback.track(item.cover_image)
+            item.save()
+            log_event(
+                module="system",
+                event_type=EventLog.EventType.CREATE,
+                user=request.user,
+                target=f"news:{item.pk}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
         messages.success(request, "Новость опубликована.")
     else:
         messages.error(request, "Не удалось опубликовать новость: проверьте форму.")
@@ -1294,14 +1296,17 @@ def news_update(request, pk):
     if request.method == "POST":
         form = NewsForm(request.POST, request.FILES, instance=item)
         if form.is_valid():
-            form.save()
-            log_event(
-                module="system",
-                event_type=EventLog.EventType.UPDATE,
-                user=request.user,
-                target=f"news:{item.pk}",
-                ip=request.META.get("REMOTE_ADDR"),
-            )
+            with UploadedFileRollback() as file_rollback, transaction.atomic():
+                if "cover_image" in form.changed_data and item.cover_image:
+                    file_rollback.track(item.cover_image)
+                form.save()
+                log_event(
+                    module="system",
+                    event_type=EventLog.EventType.UPDATE,
+                    user=request.user,
+                    target=f"news:{item.pk}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
             messages.success(request, "Новость обновлена.")
             return redirect("system:news")
     else:

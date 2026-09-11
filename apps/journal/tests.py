@@ -6,6 +6,7 @@
 
 import datetime
 import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 from django.conf import settings
@@ -754,6 +755,30 @@ class RoutingTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(irp.files.exists())
         self.assertContains(response, "Файл не прикреплён")
+
+    def test_file_upload_rollback_removes_storage_object(self):
+        irp = self._make_irp()
+        self.client.force_login(self.tfoms_user)
+
+        with tempfile.TemporaryDirectory() as media_root, override_settings(
+            MEDIA_ROOT=media_root
+        ):
+            with (
+                patch(
+                    "apps.journal.views.log_event",
+                    side_effect=RuntimeError("audit"),
+                ),
+                self.assertRaises(RuntimeError),
+            ):
+                self.client.post(
+                    reverse("journal:file", args=[irp.pk]),
+                    {"file": SimpleUploadedFile("rollback.txt", b"private")},
+                )
+            self.assertFalse(
+                any(path.is_file() for path in Path(media_root).rglob("*"))
+            )
+
+        self.assertFalse(irp.files.exists())
 
     def test_redirect_updates_route_and_history(self):
         irp = self._make_irp()

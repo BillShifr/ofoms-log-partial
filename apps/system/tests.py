@@ -1,5 +1,6 @@
 """Тесты общесистемных модулей (ТЗ разд. 3.2–3.8)."""
 
+import base64
 import datetime
 import io
 import tempfile
@@ -808,6 +809,33 @@ class DocTests(BaseSystemTestCase):
         self.assertEqual(doc.title, "Руководство пользователя")
         self.assertTrue(doc.file.name.endswith("manual.pdf"))
 
+    def test_document_upload_rollback_removes_storage_object(self):
+        self.client.force_login(self.admin)
+
+        with tempfile.TemporaryDirectory() as media_root, override_settings(
+            MEDIA_ROOT=media_root
+        ):
+            with (
+                patch(
+                    "apps.system.views.log_event",
+                    side_effect=RuntimeError("audit"),
+                ),
+                self.assertRaises(RuntimeError),
+            ):
+                self.client.post(
+                    reverse("system:doc_upload"),
+                    {
+                        "title": "Откат",
+                        "sort_order": "0",
+                        "file": SimpleUploadedFile("rollback.pdf", b"%PDF-1.4"),
+                    },
+                )
+            self.assertFalse(
+                any(path.is_file() for path in Path(media_root).rglob("*"))
+            )
+
+        self.assertFalse(SystemDocument.objects.filter(title="Откат").exists())
+
     def test_regular_user_sees_docs(self):
         SystemDocument.objects.create(
             title="Спецификация",
@@ -999,6 +1027,86 @@ class NewsTests(BaseSystemTestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertFalse(NewsItem.objects.filter(title="Большая обложка").exists())
+
+    def test_news_create_rollback_removes_cover_from_storage(self):
+        self.client.force_login(self.admin)
+
+        with tempfile.TemporaryDirectory() as media_root, override_settings(
+            MEDIA_ROOT=media_root
+        ):
+            with (
+                patch(
+                    "apps.system.views.log_event",
+                    side_effect=RuntimeError("audit"),
+                ),
+                self.assertRaises(RuntimeError),
+            ):
+                self.client.post(
+                    reverse("system:news_create"),
+                    {
+                        "title": "Откат обложки",
+                        "text": "Текст",
+                        "cover_image": SimpleUploadedFile(
+                            "rollback.png",
+                            base64.b64decode(
+                                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC"
+                                "AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+                            ),
+                            content_type="image/png",
+                        ),
+                    },
+                )
+            self.assertFalse(
+                any(path.is_file() for path in Path(media_root).rglob("*"))
+            )
+
+        self.assertFalse(NewsItem.objects.filter(title="Откат обложки").exists())
+
+    def test_news_update_rollback_preserves_old_cover_and_removes_new_one(self):
+        with tempfile.TemporaryDirectory() as media_root, override_settings(
+            MEDIA_ROOT=media_root
+        ):
+            item = NewsItem.objects.create(
+                title="Исходная новость",
+                text="Исходный текст",
+                author=self.admin,
+                cover_image=SimpleUploadedFile("old.png", b"old"),
+            )
+            old_name = item.cover_image.name
+            self.client.force_login(self.admin)
+
+            with (
+                patch(
+                    "apps.system.views.log_event",
+                    side_effect=RuntimeError("audit"),
+                ),
+                self.assertRaises(RuntimeError),
+            ):
+                self.client.post(
+                    reverse("system:news_update", args=[item.pk]),
+                    {
+                        "title": "Изменённая новость",
+                        "text": "Изменённый текст",
+                        "cover_image": SimpleUploadedFile(
+                            "new.png",
+                            base64.b64decode(
+                                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC"
+                                "AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+                            ),
+                            content_type="image/png",
+                        ),
+                    },
+                )
+
+            item.refresh_from_db()
+            self.assertEqual(item.title, "Исходная новость")
+            self.assertEqual(item.cover_image.name, old_name)
+            stored_files = [
+                path.relative_to(media_root).as_posix()
+                for path in Path(media_root).rglob("*")
+                if path.is_file()
+            ]
+            self.assertEqual(stored_files, [old_name])
 
     def test_hidden_news_not_for_regular_user(self):
         NewsItem.objects.create(title="Черновик", text="x", author=self.admin, is_active=False)
@@ -1460,6 +1568,33 @@ class TaskTests(BaseSystemTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(task.files.exists())
         self.assertContains(response, "допустимы документы и архивы до 20 МБ")
+
+    def test_task_file_rollback_removes_storage_object(self):
+        task = self._make_task()
+        self.client.force_login(self.admin)
+
+        with tempfile.TemporaryDirectory() as media_root, override_settings(
+            MEDIA_ROOT=media_root
+        ):
+            with (
+                patch(
+                    "apps.system.views.log_event",
+                    side_effect=RuntimeError("audit"),
+                ),
+                self.assertRaises(RuntimeError),
+            ):
+                self.client.post(
+                    reverse("system:task_update", args=[task.pk]),
+                    {
+                        "action": "file",
+                        "file": SimpleUploadedFile("rollback.txt", b"private"),
+                    },
+                )
+            self.assertFalse(
+                any(path.is_file() for path in Path(media_root).rglob("*"))
+            )
+
+        self.assertFalse(task.files.exists())
 
     @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
     def test_deleting_task_removes_cascaded_attachment_file(self):

@@ -10,6 +10,9 @@ const username = process.env.QA_USERNAME;
 const password = process.env.QA_PASSWORD;
 const chromePath = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const outputDir = process.env.QA_OUTPUT_DIR || ".artifacts/visual-qa";
+const expectedForbidden = new Set(
+  (process.env.QA_EXPECT_FORBIDDEN || "").split(",").map((value) => value.trim()).filter(Boolean),
+);
 
 if (!username || !password) {
   console.error("Set QA_USERNAME and QA_PASSWORD for a local non-production account.");
@@ -37,6 +40,13 @@ const routes = [
   ["events", "/system/events/"],
   ["exchange", "/exchange/logs/"],
 ];
+if (process.env.QA_EXTRA_ROUTES) {
+  const extraRoutes = JSON.parse(process.env.QA_EXTRA_ROUTES);
+  if (!Array.isArray(extraRoutes) || extraRoutes.some((item) =>
+    !Array.isArray(item) || item.length !== 2 || item.some((value) => typeof value !== "string")
+  )) throw new Error("QA_EXTRA_ROUTES must be a JSON array of [name, path] pairs");
+  routes.push(...extraRoutes);
+}
 
 const profileDir = await mkdtemp(join(tmpdir(), "ofoms-visual-qa-"));
 await mkdir(outputDir, { recursive: true });
@@ -131,6 +141,7 @@ try {
       const metrics = await evaluate(`(() => ({
         path: location.pathname,
         title: document.title,
+        forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
         documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
         width: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth
@@ -148,9 +159,10 @@ try {
       for (const [name, path] of routes) {
         await navigate(`${baseUrl}${path}`);
         await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}; document.documentElement.dataset.font=${JSON.stringify(font)}`);
-        const metrics = await evaluate(`(() => ({
+      const metrics = await evaluate(`(() => ({
           path: location.pathname,
           title: document.title,
+          forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
           documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
           width: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth
@@ -163,12 +175,19 @@ try {
     }
   }
 
+  const checkedResults = results.map((item) => ({
+    ...item,
+    expectedForbidden: expectedForbidden.has(item.name),
+  }));
   const report = {
     generatedAt: new Date().toISOString(),
     baseUrl,
     cases: results.length,
-    failures: results.filter((item) => item.documentOverflow || item.path.includes("login")),
-    results,
+    expectedForbidden: [...expectedForbidden],
+    failures: checkedResults.filter((item) =>
+      item.documentOverflow || item.path.includes("login") || item.forbidden !== item.expectedForbidden
+    ),
+    results: checkedResults,
   };
   await writeFile(join(outputDir, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   console.log(`Visual QA: ${report.cases} cases, ${report.failures.length} failures. Report: ${join(outputDir, "report.json")}`);

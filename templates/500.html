@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Сервис временно недоступен{% endblock %}
+
+{% block content %}
+<section class="error-page" aria-labelledby="error-title">
+  <div class="error-page__card">
+    <div class="error-page__code" aria-hidden="true">500</div>
+    <h1 class="error-page__title" id="error-title">Не удалось выполнить запрос</h1>
+    <p class="error-page__text">Мы сохранили информацию об ошибке. Повторите попытку позже или вернитесь в журнал.</p>
+    <div class="error-page__actions">
+      <a class="btn btn--primary" href="/journal/">Перейти в журнал</a>
+      <button class="btn btn--ghost" type="button" onclick="location.reload()">Повторить попытку</button>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -74,6 +74,7 @@ class AccessTests(BaseSystemTestCase):
         for name in ("users", "user_create", "events", "tasks", "task_create"):
             resp = self.client.get(reverse(f"system:{name}"))
             self.assertEqual(resp.status_code, 403, name)
+            self.assertContains(resp, "Недостаточно прав", status_code=403)
 
     def test_admin_can_open_admin_screens(self):
         self.admin.groups.add(Group.objects.get(name="ОП1"))

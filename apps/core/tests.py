@@ -251,3 +251,10 @@ class FoldTests(TestCase):
         from apps.core.fold import contains_folded
 
         self.assertEqual(contains_folded("qs", "target", "   ", None), "qs")
+
+
+class ErrorPageTests(TestCase):
+    def test_not_found_uses_portal_error_page(self):
+        response = self.client.get("/definitely-missing-page/")
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "Страница не найдена", status_code=404)

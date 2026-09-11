@@ -7,7 +7,7 @@
   <title>{% block title %}{{ SYSTEM_META.SYSTEM_SHORT_TITLE }}{% endblock %} — {{ SYSTEM_META.SYSTEM_ORG }}</title>
   <link rel="preload" as="font" type="font/woff2" crossorigin
         href="{% static 'fonts/GolosText-Regular.woff2' %}">
-  <link rel="stylesheet" href="{% static 'css/portal.css' %}">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260911-2">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -15,24 +15,28 @@
 
   <header class="header">
     <div class="container header__inner">
-      <div class="header__brand">
+      <a class="header__brand" href="{% url 'journal:list' %}" aria-label="На главную страницу журнала">
         <span class="header__logo" aria-hidden="true">{{ SYSTEM_META.SYSTEM_SHORT_TITLE|slice:":1" }}</span>
         <div class="header__title-wrap">
           <div class="header__title">{{ SYSTEM_META.SYSTEM_SHORT_TITLE }}</div>
           <div class="header__org">{{ SYSTEM_META.SYSTEM_ORG }}</div>
         </div>
-      </div>
+      </a>
       <div class="header__actions">
         {% if user.is_authenticated %}
           <div class="header__user">
-            <span class="header__user-name">{{ user.full_name|default:user.username }}</span>
-            {% if SYSTEM_ROLE %}<span class="badge badge--role">{{ SYSTEM_ROLE }}</span>{% endif %}
+            <span class="header__user-copy">
+              <span class="header__user-name">{{ user.full_name|default:user.username }}</span>
+              {% if SYSTEM_ROLE %}<span class="header__user-role">Роль {{ SYSTEM_ROLE }}</span>{% endif %}
+            </span>
           </div>
-          <button class="btn btn--ghost btn--sm" type="button" data-ui-theme="dark" aria-label="Тёмная тема">Тёмная</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-ui-theme="light" aria-label="Светлая тема">Светлая</button>
+          <div class="theme-switch" role="group" aria-label="Цветовая тема">
+            <button class="theme-switch__btn" type="button" data-ui-theme="light" aria-label="Светлая тема" aria-pressed="false" title="Светлая тема">☀</button>
+            <button class="theme-switch__btn" type="button" data-ui-theme="dark" aria-label="Тёмная тема" aria-pressed="false" title="Тёмная тема">☾</button>
+          </div>
           <form method="post" action="{% url 'logout' %}" class="header__logout">
             {% csrf_token %}
-            <button class="btn btn--ghost" type="submit">Выйти</button>
+            <button class="btn btn--ghost btn--sm" type="submit">Выйти</button>
           </form>
         {% else %}
           <a class="btn btn--primary" href="{% url 'login' %}">Войти</a>
@@ -42,7 +46,8 @@
   </header>
 
   <nav class="nav" aria-label="Основное меню">
-    <div class="container nav__inner">
+    <div class="container nav__scroll">
+    <div class="nav__inner">
       <a class="nav__link {% if active_nav == 'journal' %}nav__link--active{% endif %}"
          href="{% url 'journal:list' %}">Журнал</a>
       {% if can_manage_system %}
@@ -72,6 +77,7 @@
         <a class="nav__link" href="/admin/">Администрирование</a>
       {% endif %}
     </div>
+    </div>
   </nav>
 
   <main id="main-content" class="container main">
@@ -98,7 +104,7 @@
   <script src="{% static 'js/collapsible.js' %}" defer></script>
   <script src="{% static 'js/autocomplete.js' %}" defer></script>
   <script src="{% static 'js/form-validate.js' %}" defer></script>
-  <script src="{% static 'js/ui-prefs.js' %}" defer></script>
+  <script src="{% static 'js/ui-prefs.js' %}?v=20260911" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

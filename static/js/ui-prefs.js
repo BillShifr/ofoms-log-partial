@@ -34,7 +34,9 @@
     var theme = document.documentElement.getAttribute('data-theme');
     var font = document.documentElement.getAttribute('data-font') || 'base';
     document.querySelectorAll('[data-ui-theme]').forEach(function (b) {
-      b.classList.toggle('btn--active', b.getAttribute('data-ui-theme') === theme);
+      var active = b.getAttribute('data-ui-theme') === theme;
+      b.classList.toggle('btn--active', active);
+      b.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
     document.querySelectorAll('[data-ui-font]').forEach(function (b) {
       b.classList.toggle('btn--active', b.getAttribute('data-ui-font') === font);

@@ -1,12 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Журнал обращений{% endblock %}
 {% block content %}
-<h1>Единый электронный журнал обращений граждан</h1>
+<div class="page-heading">
+  <div>
+    <p class="page-heading__eyebrow">Рабочий реестр</p>
+    <h1>Обращения граждан</h1>
+    <p class="page-heading__lead">Регистрация, контроль сроков и обработка обращений в едином окне.</p>
+  </div>
+  <div class="page-heading__metric" aria-label="Найдено обращений">
+    <strong>{{ page.paginator.count }}</strong>
+    <span>найдено</span>
+  </div>
+</div>
 
 <div class="card mb-2">
   <form method="get" id="journal-filter-form">
     <details class="collapsible" id="journal-filters" data-key="journal-filters">
-      <summary class="collapsible__toggle">Фильтры</summary>
+      <summary class="collapsible__toggle">Фильтры и поиск</summary>
       <div class="filters">
         <div class="field"><label for="id_id">ID</label>{{ form.id }}</div>
         <div class="field"><label for="id_n_irp">Номер</label>{{ form.n_irp }}</div>
@@ -19,18 +29,22 @@
         <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}</div>
       </div>
     </details>
-    <div class="form-actions">
-      <button class="btn btn--primary" type="submit">Применить</button>
-      <a class="btn btn--ghost" href="{% url 'journal:list' %}">Сбросить</a>
-      <a class="btn btn--accent" href="{% url 'journal:create' %}">+ Зарегистрировать обращение</a>
-      <a class="btn btn--ghost btn--sm" href="{% url 'system:prefs' %}">Настройки таблицы</a>
-      <a class="btn btn--ghost btn--sm" href="{{ print_url }}" target="_blank">Печать списка</a>
+    <div class="form-actions journal-actions">
+      <div class="journal-actions__primary">
+        <button class="btn btn--primary" type="submit">Применить фильтры</button>
+        <a class="btn btn--ghost" href="{% url 'journal:list' %}">Сбросить</a>
+      </div>
+      <div class="journal-actions__secondary">
+        <a class="btn btn--ghost btn--sm" href="{% url 'system:prefs' %}">Колонки</a>
+        <a class="btn btn--ghost btn--sm" href="{{ print_url }}" target="_blank">Печать</a>
+        <a class="btn btn--accent" href="{% url 'journal:create' %}"><span aria-hidden="true">＋</span> Новое обращение</a>
+      </div>
     </div>
   </form>
 </div>
 
-<div class="card">
-  <div class="table-wrap">
+<div class="card table-card">
+  <div class="table-wrap" tabindex="0" aria-label="Таблица обращений; прокручивается по горизонтали">
     <table class="data {% if fixed_first %}th-sticky{% endif %}">
       <thead>
         <tr class="group-row">

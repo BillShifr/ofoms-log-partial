@@ -10,11 +10,11 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock README.md ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+    UV_HTTP_TIMEOUT=60 UV_HTTP_RETRIES=10 uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev && \
+    UV_HTTP_TIMEOUT=60 UV_HTTP_RETRIES=10 uv sync --frozen --no-dev && \
     chmod +x .venv/bin/gunicorn && \
     .venv/bin/python manage.py collectstatic --noinput --settings config.settings.base && \
     mkdir -p /app/media /app/exchange/in /app/exchange/out /app/exchange/archive

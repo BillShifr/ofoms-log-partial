@@ -22,6 +22,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.auth import on_logged_in, on_login_failed
 from apps.core.models import ConsumedToken, EventLog, log_event
 from apps.core.tokens import (
     EmployeeRepository,
@@ -627,6 +628,32 @@ class FailedLoginLockTests(TestCase):
             )
         self.user.refresh_from_db()
         self.assertEqual(self.user.failed_attempts, 3)
+
+    def test_failed_login_counter_rolls_back_when_audit_fails(self):
+        with (
+            mock.patch("apps.core.auth.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            on_login_failed(
+                sender=User.__name__,
+                credentials={"username": self.user.username},
+            )
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.failed_attempts, 0)
+        self.assertIsNone(self.user.lock_until)
+
+    def test_login_reset_rolls_back_when_audit_fails(self):
+        self.user.record_failed_login()
+
+        with (
+            mock.patch("apps.core.auth.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            on_logged_in(sender=User.__name__, request=None, user=self.user)
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.failed_attempts, 1)
 
     def test_existing_session_is_invalidated_after_account_lock(self):
         self.client.force_login(self.user)

@@ -11,6 +11,7 @@ dist/
 .coverage
 htmlcov/
 coverage.xml
+.artifacts/
 
 # Django
 *.log

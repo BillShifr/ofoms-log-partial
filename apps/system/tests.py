@@ -38,6 +38,7 @@ from apps.system.models import (
     TaskJob,
     TaskNote,
     TaskRun,
+    TaskRunSuperseded,
     UserTableViewPref,
 )
 from apps.system.validators import (
@@ -1770,6 +1771,37 @@ class TaskTests(BaseSystemTestCase):
         self.assertEqual(run.result, "")
         self.assertIsNone(run.finished_at)
         self.assertIsNone(event.finished_at)
+
+    def test_late_worker_cannot_overwrite_stale_recovery_result(self):
+        task = self._make_task()
+
+        def recover_while_command_is_running(*args, **kwargs):
+            task.refresh_from_db()
+            recovered_at = task.last_started_at + datetime.timedelta(seconds=2)
+            with patch("apps.system.models.timezone.now", return_value=recovered_at):
+                self.assertEqual(TaskJob.recover_stale(stale_after_seconds=1), 1)
+            return "Поздний успешный результат"
+
+        with (
+            patch(
+                "apps.system.tasks.run_command",
+                side_effect=recover_while_command_is_running,
+            ),
+            self.assertRaises(TaskRunSuperseded),
+        ):
+            task.run()
+
+        task.refresh_from_db()
+        run = TaskRun.objects.get(task=task)
+        event = EventLog.objects.get(
+            event_type=EventLog.EventType.TASK,
+            target=f"task:{task.pk}:{task.command}",
+        )
+        self.assertEqual(task.status, TaskJob.Status.FAILED)
+        self.assertEqual(task.last_result, EventLog.Result.FAILED)
+        self.assertEqual(run.result, EventLog.Result.FAILED)
+        self.assertEqual(event.result, EventLog.Result.FAILED)
+        self.assertIn("таймаута", task.last_log)
 
     def test_failed_command_logged(self):
         task = self._make_task()

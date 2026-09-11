@@ -57,6 +57,7 @@ from apps.system.models import (
     TaskFile,
     TaskJob,
     TaskNote,
+    TaskRunSuperseded,
     UserTableViewPref,
 )
 from apps.system.validators import VIDEO_EXTENSIONS
@@ -1014,6 +1015,12 @@ def task_run(request, pk):
         run = task.run(user=request.user)
     except TaskAlreadyRunning:
         messages.warning(request, f"Задание «{task.name}» уже выполняется.")
+        return redirect("system:task_update", pk=task.pk)
+    except TaskRunSuperseded:
+        messages.warning(
+            request,
+            f"Запуск задания «{task.name}» уже закрыт механизмом восстановления.",
+        )
         return redirect("system:task_update", pk=task.pk)
     if run.result == EventLog.Result.OK:
         messages.success(request, f"Задание «{task.name}» выполнено успешно.")

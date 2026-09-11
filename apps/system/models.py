@@ -25,6 +25,10 @@ class TaskAlreadyRunning(RuntimeError):
     """Задание уже захвачено другим worker-процессом."""
 
 
+class TaskRunSuperseded(RuntimeError):
+    """Запуск уже финализирован recovery или другим владельцем claim."""
+
+
 class NewsCategory(models.Model):
     """Категория/тема новости (PRD v3 §2.7)."""
 
@@ -551,6 +555,13 @@ class TaskJob(models.Model):
         result = EventLog.Result.OK if ok else EventLog.Result.FAILED
         with transaction.atomic():
             current = TaskJob.objects.select_for_update().get(pk=self.pk)
+            if (
+                current.status != TaskJob.Status.RUNNING
+                or current.last_started_at != started_at
+            ):
+                raise TaskRunSuperseded(
+                    f"Запуск задания {self.pk} уже завершён другим процессом"
+                )
             current_run = TaskRun.objects.select_for_update().get(pk=run.pk)
             current_run.result = result
             current_run.finished_at = finished_at

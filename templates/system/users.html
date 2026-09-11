@@ -18,8 +18,8 @@
   </form>
 </div>
 
-<div class="card">
-  <div class="table-wrap">
+<div class="card table-card">
+  <div class="table-wrap" tabindex="0" aria-label="Таблица пользователей; прокручивается по горизонтали">
     <table class="data" data-client-sort>
       <thead>
         <tr>
@@ -46,7 +46,7 @@
             {% if not u.is_active or u.is_locked %}<span class="badge badge--overdue">Заблокирован</span>
             {% else %}<span class="badge badge--closed">Активен</span>{% endif %}
           </td>
-          <td class="text-nowrap">
+          <td class="text-nowrap"><div class="table-actions">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:user_update' u.pk %}">Изменить</a>
             {% if u.pk != request.user.pk %}
               {% if u.is_active and not u.is_locked %}
@@ -55,10 +55,10 @@
                 <form method="post" action="{% url 'system:user_unblock' u.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--sm btn--primary" type="submit">Разблок.</button></form>
               {% endif %}
             {% endif %}
-          </td>
+          </div></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-muted">Пользователи не найдены.</td></tr>
+        <tr><td colspan="7" class="text-muted table-empty">Пользователи не найдены.</td></tr>
         {% endfor %}
       </tbody>
     </table>

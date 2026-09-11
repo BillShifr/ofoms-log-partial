@@ -245,31 +245,50 @@ a:hover { text-decoration: underline; }
 .page-heading__metric span { margin-top: 5px; font-size: .72rem; opacity: .7; text-transform: uppercase; letter-spacing: .06em; }
 
 /* ---------- Таблицы ---------- */
-.table-card { padding: 14px 0 18px; overflow: hidden; }
-.table-wrap { overflow-x: auto; overscroll-behavior-inline: contain; }
+.table-card { padding: 0 0 16px; overflow: hidden; }
+.table-wrap {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-color: color-mix(in srgb, var(--primary) 50%, var(--line)) transparent;
+  scrollbar-width: thin;
+}
+.table-wrap::-webkit-scrollbar { height: 10px; }
+.table-wrap::-webkit-scrollbar-track { background: transparent; }
+.table-wrap::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--primary) 45%, var(--line)); border: 3px solid var(--card); border-radius: 99px; }
 .table-wrap:focus-visible { outline-offset: -3px; }
 .table-card .pagination { padding-inline: 22px; }
 table.data {
   width: 100%;
-  min-width: 980px;
-  border-collapse: collapse;
-  font-size: .93rem;
+  min-width: 820px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: .875rem;
+  font-variant-numeric: tabular-nums;
 }
+table.data.data--wide { min-width: 1220px; }
+table.data.data--events { min-width: 1160px; }
 table.data th, table.data td {
-  padding: 10px 12px;
+  padding: 12px 14px;
   text-align: left;
   border-bottom: 1px solid var(--line);
-  vertical-align: top;
+  vertical-align: middle;
 }
 table.data th {
-  background: var(--chip-blue);
-  font-weight: 700;
-  color: var(--primary);
+  background: color-mix(in srgb, var(--chip-blue) 78%, var(--card));
+  font-size: .76rem;
+  font-weight: 750;
+  letter-spacing: .025em;
+  color: color-mix(in srgb, var(--primary) 85%, var(--ink));
   white-space: nowrap;
   position: sticky;
   top: 0;
+  z-index: 2;
 }
-table.data tbody tr:hover { background: var(--chip-green); }
+table.data thead tr:first-child th:first-child { border-top-left-radius: var(--r-lg); }
+table.data thead tr:first-child th:last-child { border-top-right-radius: var(--r-lg); }
+table.data tbody tr:nth-child(even):not(.row-detail):not(.task-log-row) { background: color-mix(in srgb, var(--bg) 38%, transparent); }
+table.data tbody tr { transition: background-color .12s ease, box-shadow .12s ease; }
+table.data tbody tr:hover { background: color-mix(in srgb, var(--chip-green) 74%, var(--card)); box-shadow: inset 3px 0 var(--accent); }
 table.data tbody tr:last-child td { border-bottom: 0; }
 table.data tbody tr.clickable { cursor: pointer; }
 table.data tbody tr[data-href]:focus-within {
@@ -277,14 +296,23 @@ table.data tbody tr[data-href]:focus-within {
   outline-offset: -3px;
 }
 .table-row-link {
-  color: inherit;
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
+  display: inline-flex;
+  min-width: 28px;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--chip-blue);
+  color: var(--primary);
+  font-weight: 750;
+  text-decoration: none;
 }
-table.data tr.row--overdue { background: var(--chip-red); }
-table.data tr.row--open { background: var(--chip-yellow); }
+table.data tr.row--overdue { background: color-mix(in srgb, var(--chip-red) 60%, var(--card)); box-shadow: inset 4px 0 var(--danger); }
+table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%, var(--card)); box-shadow: inset 4px 0 var(--warn); }
+.cell-id { white-space: nowrap; letter-spacing: -.02em; }
+.table-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.table-actions .btn { min-height: 34px; }
+.table-empty { padding: 40px 20px !important; text-align: center !important; }
 
 /* ---------- Формы ---------- */
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px 20px; }
@@ -490,17 +518,19 @@ body.vis-black { --ink: #000; --bg: #fff; --card: #fff; --line: #000; display: b
 .message p { margin: 6px 0 0; white-space: pre-wrap; }
 .message--unread { background: var(--chip-yellow); margin: 0 -10px; padding: 10px; }
 table.data .group-row th {
-  text-align: left; font-weight: 600; color: var(--ink);
-  border: 1px solid var(--line); border-bottom: none;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--chip-green);
-  padding: 12px 14px 6px;
+  text-align: left; font-size: .7rem; font-weight: 750; color: color-mix(in srgb, var(--ink) 72%, transparent);
+  text-transform: uppercase; letter-spacing: .07em;
+  border: 0; border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--chip-green) 60%, var(--card));
+  padding: 11px 14px 8px;
 }
 table.data .group-row th.group-row__empty { background: transparent; border: none; border-radius: 0; }
 table.data th { border-top: 1px solid var(--line); }
 table.data.th-sticky th:first-child,
-table.data.th-sticky td:first-child { position: sticky; left: 0; background: var(--card); z-index: 1; }
-.task-log-row td { font-size: .78rem; }
+table.data.th-sticky td:first-child { position: sticky; left: 0; background: var(--card); z-index: 3; box-shadow: 1px 0 var(--line); }
+table.data.th-sticky th:first-child { position: sticky; left: 0; z-index: 4; box-shadow: 1px 0 var(--line); }
+.task-log-row td { font-size: .78rem; background: color-mix(in srgb, var(--bg) 45%, var(--card)); }
 
 /* ---------- Тема-переключатель (заглушка, подключится на Этапе 6) ---------- */
 

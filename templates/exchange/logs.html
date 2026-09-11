@@ -8,8 +8,8 @@
   <a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a>
 </div>
 
-<div class="card">
-  <div class="table-wrap">
+<div class="card table-card">
+  <div class="table-wrap" tabindex="0" aria-label="Таблица загрузок; прокручивается по горизонтали">
     <table class="data" data-client-sort>
       <thead>
         <tr>
@@ -31,7 +31,7 @@
           <td class="text-nowrap"><a class="btn btn--sm btn--ghost" href="{% url 'exchange:protocol' log.pk %}">Протокол</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-muted">Загрузок ещё не было.</td></tr>
+        <tr><td colspan="7" class="text-muted table-empty">Загрузок ещё не было.</td></tr>
         {% endfor %}
       </tbody>
     </table>

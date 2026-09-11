@@ -5,9 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}{{ SYSTEM_META.SYSTEM_SHORT_TITLE }}{% endblock %} — {{ SYSTEM_META.SYSTEM_ORG }}</title>
-  <link rel="preload" as="font" type="font/woff2" crossorigin
-        href="{% static 'fonts/GolosText-Regular.woff2' %}">
-  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260911-2">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260911-3">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -27,7 +25,7 @@
           <div class="header__user">
             <span class="header__user-copy">
               <span class="header__user-name">{{ user.full_name|default:user.username }}</span>
-              {% if SYSTEM_ROLE %}<span class="header__user-role">Роль {{ SYSTEM_ROLE }}</span>{% endif %}
+              {% if SYSTEM_ROLE_LABEL %}<span class="header__user-role">{{ SYSTEM_ROLE_LABEL }}</span>{% endif %}
             </span>
           </div>
           <div class="theme-switch" role="group" aria-label="Цветовая тема">

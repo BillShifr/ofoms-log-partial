@@ -6,7 +6,7 @@
   <form method="post" data-validate>
     {% csrf_token %}
     <h2 class="text-muted mt-1" style="font-size:1.05rem;">Колонки (порядок = число в поле «#»)</h2>
-    <div class="table-wrap">
+    <div class="table-wrap" tabindex="0" aria-label="Настройка колонок; прокручивается по горизонтали">
       <table class="data">
         <thead>
           <tr><th></th><th>#</th><th>Колонка</th><th>Группа</th></tr>

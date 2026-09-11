@@ -8,8 +8,8 @@
   <a class="btn btn--accent" href="{% url 'system:task_create' %}">+ Новое задание</a>
 </div>
 
-<div class="card">
-  <div class="table-wrap">
+<div class="card table-card">
+  <div class="table-wrap" tabindex="0" aria-label="Таблица заданий; прокручивается по горизонтали">
     <table class="data" data-client-sort>
       <thead>
         <tr>
@@ -43,7 +43,7 @@
           </td>
           <td>{{ t.get_run_mode_display }}</td>
           <td data-value="{{ t.last_finished_at|date:'Y-m-d\TH:i:s' }}">{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
-          <td class="text-nowrap">
+          <td class="text-nowrap"><div class="table-actions">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:task_update' t.pk %}">Карточка</a>
             <form method="post" action="{% url 'system:task_run' t.pk %}" class="inline-form">{% csrf_token %}
               <button class="btn btn--sm btn--primary" type="submit">Запустить</button>
@@ -51,7 +51,7 @@
             <form method="post" action="{% url 'system:task_toggle' t.pk %}" class="inline-form">{% csrf_token %}
               <button class="btn btn--sm btn--ghost" type="submit">{{ t.enabled|yesno:"Стоп,Вкл" }}</button>
             </form>
-          </td>
+          </div></td>
         </tr>
         {% if t.last_log %}
         <tr class="task-log-row" data-href="{% url 'system:task_update' t.pk %}" data-sort-group="task-{{ t.pk }}">
@@ -59,7 +59,7 @@
         </tr>
         {% endif %}
         {% empty %}
-        <tr><td colspan="8" class="text-muted">Заданий не создано.</td></tr>
+        <tr><td colspan="8" class="text-muted table-empty">Заданий не создано.</td></tr>
         {% endfor %}
       </tbody>
     </table>

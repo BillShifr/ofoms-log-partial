@@ -5,6 +5,7 @@
 """
 
 import os
+import re
 from ipaddress import ip_network
 from urllib.parse import urlsplit
 
@@ -61,6 +62,16 @@ def _production_log_level():
     if value not in allowed:
         raise ImproperlyConfigured(
             "LOG_LEVEL must be one of INFO, WARNING, ERROR, or CRITICAL in production."
+        )
+    return value
+
+
+def _jwt_audience():
+    value = os.getenv("JWT_AUDIENCE", "ejournal").strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", value):
+        raise ImproperlyConfigured(
+            "JWT_AUDIENCE must be a 1-128 character identifier containing only "
+            "letters, digits, dots, underscores, colons, or hyphens."
         )
     return value
 
@@ -128,6 +139,8 @@ def _trusted_proxy_networks(*, required):
 
 SECRET_KEY = _required_secret("SECRET_KEY")
 JWT_SECRET = _required_secret("JWT_SECRET")
+JWT_AUDIENCE = _jwt_audience()
+JWT_TTL = _bounded_int("JWT_TTL", 300, minimum=30, maximum=900)
 DB_PASSWORD = _required_secret(
     "DB_PASSWORD",
     min_length=16,

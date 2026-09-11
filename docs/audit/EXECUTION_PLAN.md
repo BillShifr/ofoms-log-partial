@@ -484,3 +484,9 @@
 - `TRUSTED_PROXY_IPS` принимает проверенные IPv4/IPv6 CIDR и обязателен при доверии хотя бы одному forwarded header; default ограничен loopback.
 - Sanitizing middleware выполняется раньше Django SecurityMiddleware: `X-Forwarded-Proto` от недоверенного peer удаляется до определения scheme, а `X-Forwarded-For` после валидации заменяет только `REMOTE_ADDR` и не передаётся дальше.
 - Интеграции подтверждают HTTPS без redirect от доверенного loopback, принудительный redirect при spoofing с внешнего peer и сохранение реального peer IP в обязательном аудите.
+
+### 2026-09-12 — границы временного SSO JWT
+
+- `JWT_TTL` явно передаётся web/scheduler через Compose и в production ограничен диапазоном 30–900 секунд при сохранении штатного значения 300 секунд.
+- `JWT_AUDIENCE` валидируется как один стабильный идентификатор длиной до 128 символов, без пробелов, URL и управляющих конструкций.
+- Subprocess-регрессии подтверждают fail-fast для многолетнего/отрицательного TTL и malformed audience, а token tests сохраняют контракт выпуска и проверки claims.

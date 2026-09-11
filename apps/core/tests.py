@@ -45,6 +45,8 @@ class ProductionSettingsTests(TestCase):
         environment.pop("TRUST_PROXY_SSL_HEADER", None)
         environment.pop("TRUSTED_PROXY_IPS", None)
         environment.pop("LOG_LEVEL", None)
+        environment.pop("JWT_AUDIENCE", None)
+        environment.pop("JWT_TTL", None)
         environment.update(
             {
                 "DJANGO_SETTINGS_MODULE": "config.settings.prod",
@@ -74,6 +76,42 @@ class ProductionSettingsTests(TestCase):
     def test_production_accepts_strong_database_password(self):
         result = self._import_settings("database-secret-4827-strong")
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_production_bounds_temporary_token_lifetime(self):
+        for ttl in ("29", "901", "not-a-number"):
+            with self.subTest(ttl=ttl):
+                result = self._import_settings(
+                    "database-secret-4827-strong",
+                    extra_environment={"JWT_TTL": ttl},
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("JWT_TTL", result.stderr)
+
+        accepted = self._import_settings(
+            "database-secret-4827-strong",
+            "from config.settings.prod import JWT_TTL; print(JWT_TTL)",
+            {"JWT_TTL": "600"},
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertEqual(accepted.stdout.strip(), "600")
+
+    def test_production_validates_jwt_audience_identifier(self):
+        for audience in ("", "two audiences", "https://sso.example/aud", "x" * 129):
+            with self.subTest(audience=audience):
+                result = self._import_settings(
+                    "database-secret-4827-strong",
+                    extra_environment={"JWT_AUDIENCE": audience},
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("JWT_AUDIENCE", result.stderr)
+
+        accepted = self._import_settings(
+            "database-secret-4827-strong",
+            "from config.settings.prod import JWT_AUDIENCE; print(JWT_AUDIENCE)",
+            {"JWT_AUDIENCE": "tfoms:ejournal-v2"},
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertEqual(accepted.stdout.strip(), "tfoms:ejournal-v2")
 
     def test_production_rejects_debug_or_invalid_logging(self):
         for level in ("DEBUG", "NOTSET", "verbose", ""):
@@ -315,6 +353,7 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("SESSION_COOKIE_SECURE=True", example)
         self.assertIn("SECURE_SSL_REDIRECT=True", example)
         self.assertIn("LOG_LEVEL: ${LOG_LEVEL:-INFO}", compose)
+        self.assertIn("JWT_TTL: ${JWT_TTL:-300}", compose)
         self.assertIn("LOG_LEVEL=INFO", example)
         self.assertLess(
             settings.MIDDLEWARE.index(

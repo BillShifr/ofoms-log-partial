@@ -203,3 +203,9 @@
 
 - Django-приложение запускается из checkout в CI и из `/app` в контейнере; распространяемый wheel для него не создаётся. `tool.uv.package = false` делает этот фактический контракт явным.
 - `uv sync --frozen` устанавливает только зафиксированные runtime/dev зависимости и больше не загружает Hatchling для editable build. Docker-контракт `--no-install-project` остаётся эквивалентным.
+
+## 2026-09-11 Непривилегированный container runtime
+
+- Gunicorn, миграции и scheduler выполняются от фиксированных UID/GID 10001; root используется только на этапе сборки image для установки файлов и назначения владельца каталогов.
+- Каталоги `media` и `exchange` создаются с владельцем приложения до объявления volumes. Одноразовый `volume-init` с root-правами приводит новые и существующие mounts к UID/GID 10001 и завершается до старта web; постоянные сервисы root не получают.
+- PostgreSQL Compose image закреплён multi-arch digest так же, как Python и uv. `JWT_AUDIENCE` явно передаётся web и scheduler из окружения Compose.

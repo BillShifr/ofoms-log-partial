@@ -302,3 +302,9 @@
 - Проект объявлен virtual application через `tool.uv.package = false`: CI и локальная среда больше не собирают ненужный editable wheel.
 - Runtime остаётся неизменным — Django импортирует код непосредственно из checkout/image, как уже делал production Dockerfile.
 - Frozen sync перестал зависеть от загрузки build backend Hatchling и согласован с контейнерным `--no-install-project`.
+
+### 2026-09-11 — non-root runtime
+
+- Production image создаёт отдельного пользователя UID/GID 10001 и переключается на него до CMD; web и scheduler наследуют этот контекст.
+- Рабочие каталоги media/exchange заранее принадлежат пользователю приложения; одноразовый `volume-init` нормализует права существующих mounts до старта web, после чего runtime-проверка подтверждает запись без root.
+- Compose PostgreSQL закреплён digest; `JWT_AUDIENCE` добавлен в общий environment contract.

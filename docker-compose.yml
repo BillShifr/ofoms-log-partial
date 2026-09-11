@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     environment:
       POSTGRES_DB: ${DB_NAME:-ejournal}
       POSTGRES_USER: ${DB_USER:-ejournal}
@@ -12,6 +12,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  volume-init:
+    build: .
+    user: "0:0"
+    command: ["sh", "-c", "chown -R 10001:10001 /app/media /app/exchange"]
+    volumes:
+      - media:/app/media
+      - exchange:/app/exchange
+    restart: "no"
 
   web:
     build: .
@@ -29,6 +38,7 @@ services:
       DB_PORT: "5432"
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-ejournal}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
       DEBUG: "False"
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-True}
@@ -44,6 +54,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      volume-init:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD

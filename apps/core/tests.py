@@ -93,17 +93,30 @@ class ProductionSettingsTests(TestCase):
 
     def test_build_executables_are_pinned_to_immutable_revisions(self):
         dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()
 
         self.assertIn("FROM python:3.13-slim@sha256:", dockerfile)
         self.assertIn("--from=ghcr.io/astral-sh/uv@sha256:", dockerfile)
         self.assertNotIn("uv:latest", dockerfile)
+        self.assertIn("image: postgres:16-alpine@sha256:", compose)
         action_refs = re.findall(r"^\s*-?\s*uses:\s+([^\s#]+)", workflow, re.MULTILINE)
         self.assertTrue(action_refs)
         self.assertEqual(
             [ref for ref in action_refs if not re.fullmatch(r"[^@]+@[0-9a-f]{40}", ref)],
             [],
         )
+
+    def test_application_image_uses_unprivileged_runtime_user(self):
+        dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+
+        self.assertIn("useradd --uid 10001", dockerfile)
+        self.assertIn("chown -R app:app /app/media /app/exchange", dockerfile)
+        self.assertRegex(dockerfile, r"(?m)^USER 10001:10001$")
+        self.assertIn("condition: service_completed_successfully", compose)
+        self.assertIn('user: "0:0"', compose)
+        self.assertIn("chown -R 10001:10001 /app/media /app/exchange", compose)
 
     def test_uv_sync_treats_application_as_virtual_project(self):
         project = (settings.BASE_DIR / "pyproject.toml").read_text()

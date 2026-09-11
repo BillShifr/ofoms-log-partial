@@ -28,6 +28,8 @@ docker compose logs --tail=200 web scheduler
 
 `web` сначала применяет миграции, затем запускает Gunicorn. `scheduler` начинает работу только после healthy-состояния `web` и раз в минуту вызывает `manage.py run_tasks`. Проверка доступности: `GET /healthz` (HTTP 200 либо HTTPS redirect до TLS-терминатора).
 
+Перед `web` Compose запускает одноразовый `volume-init`: он назначает рабочим каталогам `media` и `exchange` UID/GID 10001 и завершается. Gunicorn и scheduler постоянно работают без root-прав. Если внешний bind mount не допускает `chown`, запуск останавливается до исправления прав на host вместо старта приложения без доступа к файлам.
+
 Для обновления сначала создайте резервную копию, затем:
 
 ```bash

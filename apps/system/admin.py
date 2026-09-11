@@ -2,6 +2,7 @@
 
 from django.contrib import admin
 
+from apps.core.admin_utils import ImmutableAdminMixin
 from apps.system.models import (
     Conversation,
     MessageAttachment,
@@ -65,7 +66,7 @@ class TaskJobAdmin(admin.ModelAdmin):
 
 
 @admin.register(TaskRun)
-class TaskRunAdmin(admin.ModelAdmin):
+class TaskRunAdmin(ImmutableAdminMixin, admin.ModelAdmin):
     list_display = ("task", "triggered_by", "started_at", "result")
     list_filter = ("triggered_by", "result")
 

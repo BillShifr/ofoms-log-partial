@@ -8,6 +8,7 @@ from django_admin_listfilter_dropdown.filters import RelatedDropdownFilter
 from import_export.admin import ExportMixin
 from rangefilter.filters import DateRangeFilterBuilder
 
+from apps.core.admin_utils import ImmutableAdminMixin
 from apps.employee.models import ORGS, TFOMS, Employee
 from apps.journal.models import (
     Irp,
@@ -176,12 +177,15 @@ class IrpThemeAdmin(admin.ModelAdmin):
 
 
 @admin.register(XmlFiles)
-class XmlFilesAdmin(admin.ModelAdmin):
+class XmlFilesAdmin(ImmutableAdminMixin, admin.ModelAdmin):
     list_display = ("filename", "smo", "data", "version", "year", "month", "day")
     list_filter = ("smo", "year")
 
 
-admin.site.register(IrpHistory)
+@admin.register(IrpHistory)
+class IrpHistoryAdmin(ImmutableAdminMixin, admin.ModelAdmin):
+    list_display = ("irp", "user", "changed_at")
+    list_filter = ("changed_at",)
 
 
 @admin.register(IrpAnswer)

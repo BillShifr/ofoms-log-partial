@@ -11,6 +11,7 @@ from unittest import mock
 
 import jwt
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import ValidationError
@@ -31,8 +32,25 @@ from apps.core.tokens import (
 )
 from apps.core.uploads import BoundedUploadHandler
 from apps.core.validators import ComplexityPasswordValidator
+from apps.exchange.models import ImportLog
+from apps.journal.models import IrpHistory, XmlFiles
+from apps.system.models import TaskRun
 
 User = get_user_model()
+
+
+class ImmutableAuditAdminTests(TestCase):
+    def test_audit_and_provenance_models_are_view_only(self):
+        for model in (EventLog, ImportLog, XmlFiles, IrpHistory, TaskRun):
+            with self.subTest(model=model._meta.label):
+                model_admin = admin.site._registry[model]
+                self.assertFalse(model_admin.has_add_permission(request=None))
+                self.assertFalse(model_admin.has_change_permission(request=None))
+                self.assertFalse(model_admin.has_delete_permission(request=None))
+                self.assertEqual(
+                    set(model_admin.get_readonly_fields(request=None)),
+                    {field.name for field in model._meta.fields},
+                )
 
 
 class ProductionSettingsTests(TestCase):

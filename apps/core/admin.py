@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.contrib.admin import DateFieldListFilter, SimpleListFilter
 from rangefilter.filters import DateRangeFilter
 
+from apps.core.admin_utils import ImmutableAdminMixin
 from apps.core.models import EventLog
 
 
@@ -29,7 +30,7 @@ class EventUserFilter(SimpleListFilter):
 
 
 @admin.register(EventLog)
-class EventLogAdmin(admin.ModelAdmin):
+class EventLogAdmin(ImmutableAdminMixin, admin.ModelAdmin):
     list_display = (
         "id",
         "started_at",
@@ -50,14 +51,4 @@ class EventLogAdmin(admin.ModelAdmin):
         EventUserFilter,
     )
     search_fields = ("target", "detail", "ip")
-    readonly_fields = [f.name for f in EventLog._meta.fields]
     date_hierarchy = "started_at"
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False

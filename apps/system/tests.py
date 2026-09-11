@@ -137,6 +137,26 @@ class UserManagementTests(BaseSystemTestCase):
             ).exists()
         )
 
+    def test_user_create_rolls_back_account_and_roles_when_audit_fails(self):
+        self.client.force_login(self.admin)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:user_create"),
+                {
+                    "username": "rollback_user",
+                    "password1": PASSWORD,
+                    "password2": PASSWORD,
+                    "org": "81001",
+                    "roles": [Group.objects.get(name="СП1").pk],
+                },
+            )
+
+        self.assertFalse(Employee.objects.filter(username="rollback_user").exists())
+
     def test_update_user_roles(self):
         self.client.force_login(self.admin)
         user = Employee.objects.create_user(
@@ -154,6 +174,30 @@ class UserManagementTests(BaseSystemTestCase):
         self.assertEqual(resp.status_code, 302)
         user.refresh_from_db()
         self.assertTrue(user.groups.filter(name="ОП1").exists())
+
+    def test_user_update_rolls_back_profile_and_roles_when_audit_fails(self):
+        user = Employee.objects.create_user(
+            username="rollback_update", password=PASSWORD, org=81000
+        )
+        self.client.force_login(self.admin)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:user_update", args=[user.pk]),
+                {
+                    "last_name": "Не сохранится",
+                    "org": "81000",
+                    "roles": [Group.objects.get(name="ОП1").pk],
+                    "is_active": "on",
+                },
+            )
+
+        user.refresh_from_db()
+        self.assertEqual(user.last_name, "")
+        self.assertFalse(user.groups.exists())
 
     def test_role_must_match_selected_organization(self):
         self.client.force_login(self.admin)
@@ -192,6 +236,41 @@ class UserManagementTests(BaseSystemTestCase):
                 event_type=EventLog.EventType.BLOCK, target__startswith=f"employee:{user.pk}"
             ).exists()
         )
+
+    def test_block_rolls_back_when_audit_fails(self):
+        user = Employee.objects.create_user(
+            username="rollback_block", password=PASSWORD, org=81001
+        )
+        self.client.force_login(self.admin)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(reverse("system:user_block", args=[user.pk]))
+
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)
+
+    def test_unblock_rolls_back_account_and_counter_when_audit_fails(self):
+        user = Employee.objects.create_user(
+            username="rollback_unblock",
+            password=PASSWORD,
+            org=81001,
+            is_active=False,
+            failed_attempts=7,
+        )
+        self.client.force_login(self.admin)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(reverse("system:user_unblock", args=[user.pk]))
+
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)
+        self.assertEqual(user.failed_attempts, 7)
         resp = self.client.post(reverse("system:user_unblock", args=[user.pk]))
         self.assertEqual(resp.status_code, 302)
         user.refresh_from_db()

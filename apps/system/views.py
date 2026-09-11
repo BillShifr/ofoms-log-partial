@@ -136,14 +136,15 @@ def user_create(request):
     if request.method == "POST":
         form = EmployeeCreateForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            log_event(
-                module="employee",
-                event_type=EventLog.EventType.CREATE,
-                user=request.user,
-                target=f"employee:{user.pk}:{user.username}",
-                ip=request.META.get("REMOTE_ADDR"),
-            )
+            with transaction.atomic():
+                user = form.save()
+                log_event(
+                    module="employee",
+                    event_type=EventLog.EventType.CREATE,
+                    user=request.user,
+                    target=f"employee:{user.pk}:{user.username}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
             messages.success(request, f"Учётная запись «{user.username}» создана.")
             return redirect("system:users")
     else:
@@ -158,22 +159,28 @@ def user_create(request):
 @admin_required
 @require_http_methods(["GET", "POST"])
 def user_update(request, pk):
-    user = get_object_or_404(Employee, pk=pk)
     if request.method == "POST":
-        form = EmployeeUpdateForm(request.POST, instance=user, actor=request.user)
-        if form.is_valid():
-            changed = list(form.changed_data)
-            form.save()
-            log_event(
-                module="employee",
-                event_type=EventLog.EventType.UPDATE,
-                user=request.user,
-                target=f"employee:{user.pk}:{user.username}:{','.join(changed)}",
-                ip=request.META.get("REMOTE_ADDR"),
-            )
+        with transaction.atomic():
+            user = get_object_or_404(Employee.objects.select_for_update(), pk=pk)
+            form = EmployeeUpdateForm(request.POST, instance=user, actor=request.user)
+            if form.is_valid():
+                changed = list(form.changed_data)
+                form.save()
+                log_event(
+                    module="employee",
+                    event_type=EventLog.EventType.UPDATE,
+                    user=request.user,
+                    target=f"employee:{user.pk}:{user.username}:{','.join(changed)}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
+                saved = True
+            else:
+                saved = False
+        if saved:
             messages.success(request, "Учётная запись обновлена.")
             return redirect("system:users")
     else:
+        user = get_object_or_404(Employee, pk=pk)
         form = EmployeeUpdateForm(instance=user, actor=request.user)
     return render(
         request,
@@ -198,19 +205,20 @@ def _user_form_context(form, title, *, user=None):
 @admin_required
 @require_http_methods(["POST"])
 def user_block(request, pk):
-    user = get_object_or_404(Employee, pk=pk)
-    if user.pk == request.user.pk:
-        messages.error(request, "Нельзя заблокировать собственную учётную запись.")
-        return redirect("system:users")
-    user.is_active = False
-    user.save(update_fields=["is_active"])
-    log_event(
-        module="employee",
-        event_type=EventLog.EventType.BLOCK,
-        user=request.user,
-        target=f"employee:{user.pk}:{user.username}",
-        ip=request.META.get("REMOTE_ADDR"),
-    )
+    with transaction.atomic():
+        user = get_object_or_404(Employee.objects.select_for_update(), pk=pk)
+        if user.pk == request.user.pk:
+            messages.error(request, "Нельзя заблокировать собственную учётную запись.")
+            return redirect("system:users")
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+        log_event(
+            module="employee",
+            event_type=EventLog.EventType.BLOCK,
+            user=request.user,
+            target=f"employee:{user.pk}:{user.username}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
     messages.success(request, f"Учётная запись «{user.username}» заблокирована.")
     return redirect("system:users")
 
@@ -218,17 +226,18 @@ def user_block(request, pk):
 @admin_required
 @require_http_methods(["POST"])
 def user_unblock(request, pk):
-    user = get_object_or_404(Employee, pk=pk)
-    user.is_active = True
-    user.reset_failed_logins()
-    user.save(update_fields=["is_active"])
-    log_event(
-        module="employee",
-        event_type=EventLog.EventType.UNBLOCK,
-        user=request.user,
-        target=f"employee:{user.pk}:{user.username}",
-        ip=request.META.get("REMOTE_ADDR"),
-    )
+    with transaction.atomic():
+        user = get_object_or_404(Employee.objects.select_for_update(), pk=pk)
+        user.is_active = True
+        user.reset_failed_logins()
+        user.save(update_fields=["is_active"])
+        log_event(
+            module="employee",
+            event_type=EventLog.EventType.UNBLOCK,
+            user=request.user,
+            target=f"employee:{user.pk}:{user.username}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
     messages.success(request, f"Учётная запись «{user.username}» разблокирована.")
     return redirect("system:users")
 

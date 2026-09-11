@@ -131,6 +131,7 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 # overwrite (not append) this header; the Compose port is loopback-bound by default.
 if _boolean_env("TRUST_PROXY_SSL_HEADER", True):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+TRUST_PROXY_CLIENT_IP_HEADER = _boolean_env("TRUST_PROXY_CLIENT_IP_HEADER", True)
 
 # Пути ОС внутри контейнера
 STATIC_ROOT = os.getenv("STATIC_ROOT", "/app/staticfiles")

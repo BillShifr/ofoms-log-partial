@@ -64,6 +64,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ---------------------------------------------------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.core.middleware.TrustedProxyClientIPMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -141,6 +142,10 @@ LOGOUT_REDIRECT_URL = "login"
 AUTHENTICATION_BACKENDS = [
     "apps.core.auth.TFOMSAuthBackend",
 ]
+
+# В dev/tests X-Forwarded-For считается недоверенным. Production включает его
+# только вместе с контрактом reverse proxy, который обязан перезаписывать header.
+TRUST_PROXY_CLIENT_IP_HEADER = False
 
 # Парольная политика (ТЗ разд. 3.1): ≥8 символов, верх/низ/цифры/спецсимволы.
 AUTH_PASSWORD_VALIDATORS = [

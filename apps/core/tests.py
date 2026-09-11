@@ -96,6 +96,7 @@ class ProductionSettingsTests(TestCase):
             {"SESSION_COOKIE_SECURE": "treu"},
             {"SECURE_SSL_REDIRECT": "enabled"},
             {"TRUST_PROXY_SSL_HEADER": "sometimes"},
+            {"TRUST_PROXY_CLIENT_IP_HEADER": "sometimes"},
             {"SECURE_HSTS_SECONDS": "-1"},
             {"SECURE_HSTS_SECONDS": "not-a-number"},
             {"SESSION_COOKIE_AGE": "299"},
@@ -719,6 +720,42 @@ class AuthenticationAuditTests(TestCase):
         event = EventLog.objects.get(target="POST /accounts/logout/")
         self.assertEqual(event.event_type, EventLog.EventType.LOGOUT)
         self.assertEqual(event.user, self.user)
+
+    @override_settings(TRUST_PROXY_CLIENT_IP_HEADER=True)
+    def test_trusted_proxy_client_ip_is_recorded(self):
+        self.client.post(
+            reverse("login"),
+            {"username": self.user.username, "password": "wrong-password"},
+            REMOTE_ADDR="127.0.0.1",
+            HTTP_X_FORWARDED_FOR="192.0.2.41",
+        )
+
+        event = EventLog.objects.get(target="POST /accounts/login/")
+        self.assertEqual(event.ip, "192.0.2.41")
+
+    @override_settings(TRUST_PROXY_CLIENT_IP_HEADER=True)
+    def test_forwarded_chain_does_not_override_remote_address(self):
+        self.client.post(
+            reverse("login"),
+            {"username": self.user.username, "password": "wrong-password"},
+            REMOTE_ADDR="127.0.0.1",
+            HTTP_X_FORWARDED_FOR="198.51.100.7, 192.0.2.41",
+        )
+
+        event = EventLog.objects.get(target="POST /accounts/login/")
+        self.assertEqual(event.ip, "127.0.0.1")
+
+    @override_settings(TRUST_PROXY_CLIENT_IP_HEADER=True)
+    def test_invalid_forwarded_address_does_not_override_remote_address(self):
+        self.client.post(
+            reverse("login"),
+            {"username": self.user.username, "password": "wrong-password"},
+            REMOTE_ADDR="127.0.0.1",
+            HTTP_X_FORWARDED_FOR="not-an-ip-address",
+        )
+
+        event = EventLog.objects.get(target="POST /accounts/login/")
+        self.assertEqual(event.ip, "127.0.0.1")
 
 
 class FoldTests(TestCase):

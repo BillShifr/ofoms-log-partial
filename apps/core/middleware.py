@@ -4,6 +4,8 @@
 Не логирует статику и liveness/readiness-проверки.
 """
 
+import contextlib
+import ipaddress
 import time
 
 from django.conf import settings
@@ -15,6 +17,23 @@ from apps.core.models import EventLog, log_event
 _IGNORED_PREFIXES = ("/static/", "/media/", "/healthz", "/readyz", "/favicon.ico")
 _IGNORED_ADMIN_SEGMENTS = ("/admin/jsi18n",)
 _LOGIN_PATHS = ("/accounts/login/", "/accounts/token-login/")
+
+
+class TrustedProxyClientIPMiddleware:
+    """Восстанавливает REMOTE_ADDR только из проверенного proxy-контракта."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if settings.TRUST_PROXY_CLIENT_IP_HEADER:
+            forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "").strip()
+            if forwarded_for and "," not in forwarded_for:
+                with contextlib.suppress(ValueError):
+                    request.META["REMOTE_ADDR"] = str(
+                        ipaddress.ip_address(forwarded_for)
+                    )
+        return self.get_response(request)
 
 
 class AccountStateSessionMiddleware:

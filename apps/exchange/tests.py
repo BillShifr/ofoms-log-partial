@@ -285,6 +285,8 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
         response = self.client.get(reverse("exchange:upload"))
 
         self.assertContains(response, 'data-max-file-size="20971520"')
+        self.assertContains(response, 'accept=".xml,.xlsx"')
+        self.assertNotContains(response, ".xlsx,.xls")
         self.assertContains(response, "XLSX, не более 20 МБ")
         self.assertNotContains(response, "не более 10 МБ")
 

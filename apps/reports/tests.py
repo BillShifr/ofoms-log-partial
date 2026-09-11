@@ -1,11 +1,13 @@
 """Тесты модуля отчётов: реестр, фильтры, расчётные формы, экспорт (Этап 5)."""
 
 import datetime
+import io
 import uuid
 
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
+from openpyxl import load_workbook
 
 from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
@@ -301,6 +303,26 @@ class ExportBytesTests(BaseReportTestCase):
         rows = spec.build(self.tfoms_user.org, self._filters())
         data = write_xlsx_bytes(spec, rows)
         self.assertTrue(data.startswith(b"PK"))
+
+    def test_xlsx_user_text_cannot_become_formula(self):
+        spec = REPORT_INDEX["r4_complaints"]
+        row = dict.fromkeys(spec.keys, "")
+        row[spec.keys[0]] = '=HYPERLINK("https://example.invalid")'
+
+        workbook = load_workbook(io.BytesIO(write_xlsx_bytes(spec, [row])))
+        cell = workbook.active.cell(row=2, column=1)
+
+        self.assertEqual(cell.data_type, "s")
+        self.assertTrue(cell.value.startswith("'="))
+
+    def test_pdf_escapes_user_markup(self):
+        spec = REPORT_INDEX["r4_complaints"]
+        row = dict.fromkeys(spec.keys, "")
+        row[spec.keys[0]] = "<broken & text>"
+
+        data = write_pdf(spec, [row])
+
+        self.assertTrue(data.startswith(b"%PDF"))
 
     def test_write_pdf_returns_pdf(self):
         spec = REPORT_INDEX["r9_personal"]

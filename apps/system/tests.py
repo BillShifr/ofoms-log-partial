@@ -1,6 +1,7 @@
 """Тесты общесистемных модулей (ТЗ разд. 3.2–3.8)."""
 
 import datetime
+import io
 import tempfile
 
 from django.contrib import messages
@@ -11,6 +12,7 @@ from django.db import connection
 from django.test import Client, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from openpyxl import load_workbook
 
 from apps.core.models import EventLog, log_event
 from apps.core.roles import ensure_role_groups
@@ -213,6 +215,52 @@ class EventLogScreenTests(BaseSystemTestCase):
         self.assertContains(resp, "login:admin_sys")
         self.assertNotContains(resp, "irp:1")
         self.assertNotContains(resp, "Войти")  # фильтры работают
+
+    def test_event_export_treats_user_controlled_cells_as_text(self):
+        log_event(
+            module="journal",
+            event_type=EventLog.EventType.CREATE,
+            user=self.operator,
+            target='=HYPERLINK("https://example.invalid")',
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("system:events_export"))
+        workbook = load_workbook(io.BytesIO(response.content))
+        target_cells = list(workbook.active["H"])[1:]
+
+        self.assertEqual(response.status_code, 200)
+        dangerous_cell = next(
+            cell
+            for cell in target_cells
+            if cell.value == "'=HYPERLINK(\"https://example.invalid\")"
+        )
+        self.assertEqual(dangerous_cell.data_type, "s")
+
+    def test_event_initiator_suggest_is_filtered_and_limited_in_database(self):
+        for index in range(12):
+            Employee.objects.create_user(
+                username=f"audit_lookup_{index}",
+                first_name="АЛЕКСАНДР",
+                last_name=f"Проверка {index:02d}",
+                org=81000,
+            )
+        self.client.force_login(self.admin)
+
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.get(
+                reverse("system:event_initiator_suggest"), {"q": "александр"}
+            )
+
+        self.assertEqual(len(response.json()["suggestions"]), 10)
+        employee_queries = [
+            query["sql"].lower()
+            for query in captured.captured_queries
+            if "employee_employee" in query["sql"].lower()
+        ]
+        self.assertTrue(
+            any("translate" in sql and "limit 10" in sql for sql in employee_queries)
+        )
 
 
 class MessageTests(BaseSystemTestCase):

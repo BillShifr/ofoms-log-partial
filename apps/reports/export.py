@@ -2,10 +2,12 @@
 
 import io
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
+from apps.core.exports import excel_safe_value
 from apps.reports.reports import Report
 
 FONT_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "fonts"
@@ -27,7 +29,7 @@ def write_xlsx_bytes(spec: Report, rows):
     ws.title = f"Приложение №{spec.number}"
     for i, line in enumerate(_excel_lines(spec, rows), start=1):
         for col, value in enumerate(line, start=1):
-            c = ws.cell(row=i, column=col, value=value)
+            c = ws.cell(row=i, column=col, value=excel_safe_value(value))
             if i == 1:
                 c.fill = _HEADER_FILL
                 c.font = _HEADER_FONT
@@ -93,7 +95,7 @@ def write_pdf(spec: Report, rows):
             style = cell_style
             if total:
                 style = ParagraphStyle("T", parent=cell_style, fontName="DejaVuSans-Bold")
-            cells.append(Paragraph(value, style))
+            cells.append(Paragraph(escape(value), style))
         data.append(cells)
 
     width, height = page_size

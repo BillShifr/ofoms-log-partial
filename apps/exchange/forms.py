@@ -13,7 +13,7 @@ class UploadFileForm(forms.Form):
     file = forms.FileField(
         label="Файл обмена (G1*.xml, users*.xml, *.xlsx)",
         widget=forms.ClearableFileInput(
-            attrs={"accept": ".xml,.xlsx,.xls"}
+            attrs={"accept": ".xml,.xlsx"}
         ),
     )
 

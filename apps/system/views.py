@@ -266,15 +266,24 @@ def event_initiator_suggest(request):
     q = (request.GET.get("q") or "").strip()
     if len(q) < 3:
         return JsonResponse({"suggestions": []})
-    matches = []
-    for e in Employee.objects.order_by("last_name", "first_name").values(
+    qs = Employee.objects.annotate(
+        search_name=Concat(
+            Coalesce("last_name", Value("")),
+            Value(" "),
+            Coalesce("first_name", Value("")),
+            output_field=CharField(),
+        )
+    )
+    qs = filter_contains_any(
+        qs, ("search_name", "username"), q, prefix="event_initiator_search_"
+    )
+    rows = qs.order_by("last_name", "first_name", "pk").values(
         "id", "last_name", "first_name", "username"
-    ):
+    )[:10]
+    matches = []
+    for e in rows:
         text = f"{e.get('last_name') or ''} {e.get('first_name') or ''}".strip() or e.get("username") or ""
-        if q.lower() in text.lower():
-            matches.append({"id": e["id"], "label": text})
-        if len(matches) == 10:
-            break
+        matches.append({"id": e["id"], "label": text})
     return JsonResponse({"suggestions": matches})
 
 
@@ -318,6 +327,8 @@ def event_export(request):
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font
 
+    from apps.core.exports import excel_safe_value
+
     wb = Workbook()
     ws = wb.active
     ws.title = "События"
@@ -328,7 +339,7 @@ def event_export(request):
         c.font = Font(bold=True)
         c.alignment = Alignment(horizontal="center")
     for e in rows:
-        ws.append([
+        ws.append([excel_safe_value(value) for value in [
             e.id,
             e.started_at.strftime("%d.%m.%Y %H:%M:%S") if e.started_at else "",
             e.finished_at.strftime("%d.%m.%Y %H:%M:%S") if e.finished_at else "",
@@ -339,7 +350,7 @@ def event_export(request):
             e.target,
             e.ip,
             e.duration_ms or "",
-        ])
+        ]])
     for col, width in zip(("ABCDEFGHIJ"), (8, 20, 20, 18, 12, 12, 28, 30, 16, 12), strict=True):
         ws.column_dimensions[col].width = width
 

@@ -53,6 +53,11 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = bool(SECURE_HSTS_SECONDS)
 SECURE_HSTS_PRELOAD = bool(SECURE_HSTS_SECONDS)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
+# Production topology terminates TLS at a trusted reverse proxy. The proxy must
+# overwrite (not append) this header; the Compose port is loopback-bound by default.
+if os.getenv("TRUST_PROXY_SSL_HEADER", "True").lower() in ("1", "true", "yes"):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # Пути ОС внутри контейнера
 STATIC_ROOT = os.getenv("STATIC_ROOT", "/app/staticfiles")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/app/media")

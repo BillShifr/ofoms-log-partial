@@ -23,8 +23,9 @@ User = get_user_model()
 
 
 class ProductionSettingsTests(TestCase):
-    def _import_settings(self, database_password):
+    def _import_settings(self, database_password, code="import config.settings.prod"):
         environment = os.environ.copy()
+        environment.pop("TRUST_PROXY_SSL_HEADER", None)
         environment.update(
             {
                 "DJANGO_SETTINGS_MODULE": "config.settings.prod",
@@ -34,7 +35,7 @@ class ProductionSettingsTests(TestCase):
             }
         )
         return subprocess.run(
-            [sys.executable, "-c", "import config.settings.prod"],
+            [sys.executable, "-c", code],
             cwd=settings.BASE_DIR,
             env=environment,
             capture_output=True,
@@ -52,6 +53,35 @@ class ProductionSettingsTests(TestCase):
     def test_production_accepts_strong_database_password(self):
         result = self._import_settings("database-secret-4827-strong")
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_production_trusts_tls_terminator_scheme_by_default(self):
+        result = self._import_settings(
+            "database-secret-4827-strong",
+            "from config.settings.prod import SECURE_PROXY_SSL_HEADER; "
+            "print(SECURE_PROXY_SSL_HEADER)",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("HTTP_X_FORWARDED_PROTO", result.stdout)
+
+    def test_proxied_https_health_request_does_not_redirect(self):
+        result = self._import_settings(
+            "database-secret-4827-strong",
+            "import django; django.setup(); "
+            "from django.test import Client; "
+            "print(Client().get('/healthz', HTTP_HOST='localhost', "
+            "HTTP_X_FORWARDED_PROTO='https').status_code)",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "200")
+
+    def test_compose_binds_web_to_loopback_by_default(self):
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+        example = (settings.BASE_DIR / ".env.example").read_text()
+
+        self.assertIn("${WEB_BIND_ADDRESS:-127.0.0.1}:8000:8000", compose)
+        self.assertIn("TRUST_PROXY_SSL_HEADER: ${TRUST_PROXY_SSL_HEADER:-True}", compose)
+        self.assertIn("SESSION_COOKIE_SECURE=True", example)
+        self.assertIn("SECURE_SSL_REDIRECT=True", example)
 
 
 class ComplexityPasswordValidatorTests(TestCase):

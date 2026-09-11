@@ -252,7 +252,7 @@ class Irp(models.Model):
         blank=True, null=True, choices=ORGS, verbose_name="Страховая принадлежность"
     )
     z_doctype = models.SmallIntegerField(
-        default=14, blank=True, null=True, choices=DOC_TYPES,
+        blank=True, null=True, choices=DOC_TYPES,
         verbose_name="Тип документа, удостоверяющего личность",
     )
     z_docser = models.CharField(max_length=10, blank=True, null=True, verbose_name="Серия")

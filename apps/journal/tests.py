@@ -75,6 +75,10 @@ class IrpModelTests(TestCase):
         irp = self._create_irp(data_plan=yesterday, date_close=datetime.date.today())
         self.assertFalse(irp.is_overdue)
 
+    def test_document_type_is_not_invented_when_omitted(self):
+        irp = self._create_irp()
+        self.assertIsNone(irp.z_doctype)
+
 
 class JournalScreenTests(TestCase):
     """Тесты экранов журнала (Этап 2)."""
@@ -351,6 +355,7 @@ class JournalScreenTests(TestCase):
         response = self.client.get(reverse("journal:create"))
         self.assertContains(response, '<details class="form-disclosure">')
         self.assertContains(response, "При необходимости")
+        self.assertNotContains(response, 'value="14" selected')
 
     def test_populated_insured_person_section_is_open(self):
         irp = self._make_irp()

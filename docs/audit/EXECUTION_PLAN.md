@@ -321,3 +321,9 @@
 - `/healthz` оставлен лёгкой liveness-проверкой процесса; новый `/readyz` выполняет минимальный `SELECT 1` через основной Django connection.
 - Ошибка БД преобразуется в непрозрачный HTTP 503 без утечки текста исключения; оба endpoint запрещают кеширование и исключены из бизнес-аудита.
 - Compose больше не принимает 301/302 за healthy: внутренний probe передаёт доверенную схему HTTPS и требует точный HTTP 200 от `/readyz`, поэтому scheduler зависит от фактической доступности web и PostgreSQL.
+
+### 2026-09-11 — управляемый lifecycle контейнеров
+
+- db, web и scheduler получили `restart: unless-stopped`, поэтому восстановление после crash/reboot не зависит от ручного `docker compose up`.
+- После миграций shell заменяется через `exec` на Gunicorn; Docker init и 75-секундный grace period обеспечивают доставку SIGTERM и сбор дочерних процессов.
+- Бесконечный shell-loop scheduler заменён management-командой `run_scheduler`: она обрабатывает SIGTERM/SIGINT, ждёт завершения текущего цикла, не дрейфует на shell sleep и повторяет работу после временной ошибки.

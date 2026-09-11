@@ -12,6 +12,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   volume-init:
     build: .
@@ -24,10 +25,11 @@ services:
 
   web:
     build: .
+    init: true
     command: >
       sh -c "
         .venv/bin/python manage.py migrate --noinput --settings config.settings.prod &&
-        .venv/bin/gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60
+        exec .venv/bin/gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60
       "
     environment: &web_env
       DJANGO_SETTINGS_MODULE: config.settings.prod
@@ -69,11 +71,13 @@ services:
       timeout: 5s
       retries: 6
       start_period: 20s
+    restart: unless-stopped
+    stop_grace_period: 75s
 
   scheduler:
     build: .
-    command: >
-      sh -c "while true; do .venv/bin/python manage.py run_tasks; sleep 60; done"
+    init: true
+    command: [".venv/bin/python", "manage.py", "run_scheduler", "--interval", "60"]
     environment: *web_env
     volumes:
       - media:/app/media
@@ -81,6 +85,8 @@ services:
     depends_on:
       web:
         condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 75s
 
 volumes:
   pgdata:

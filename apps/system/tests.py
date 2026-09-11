@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import CommandError, call_command
 from django.db import IntegrityError, connection, transaction
 from django.test import Client, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
@@ -1264,6 +1265,17 @@ class TaskTests(BaseSystemTestCase):
         task.refresh_from_db()
         self.assertEqual(task.last_result, EventLog.Result.OK)
         self.assertIn("task", out.getvalue())
+
+    @patch("apps.system.management.commands.run_scheduler.call_command")
+    def test_scheduler_once_runs_exactly_one_task_cycle(self, run_tasks):
+        call_command("run_scheduler", once=True, interval=5, stdout=io.StringIO())
+
+        run_tasks.assert_called_once()
+        self.assertEqual(run_tasks.call_args.args, ("run_tasks",))
+
+    def test_scheduler_rejects_non_positive_interval(self):
+        with self.assertRaisesMessage(CommandError, "не меньше 1 секунды"):
+            call_command("run_scheduler", once=True, interval=0, stdout=io.StringIO())
 
     def test_recover_stale_run_closes_run_and_audit_event(self):
         from io import StringIO

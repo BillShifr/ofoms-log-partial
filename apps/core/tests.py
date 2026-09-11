@@ -142,6 +142,19 @@ class ProductionSettingsTests(TestCase):
         self.assertIn('user: "0:0"', compose)
         self.assertIn("chown -R 10001:10001 /app/media /app/exchange", compose)
 
+    def test_compose_services_restart_and_receive_termination_signals(self):
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+
+        self.assertEqual(compose.count("restart: unless-stopped"), 3)
+        self.assertEqual(compose.count("stop_grace_period: 75s"), 2)
+        self.assertEqual(compose.count("init: true"), 2)
+        self.assertIn("exec .venv/bin/gunicorn", compose)
+        self.assertIn(
+            'command: [".venv/bin/python", "manage.py", "run_scheduler", "--interval", "60"]',
+            compose,
+        )
+        self.assertNotIn("while true", compose)
+
     def test_uv_sync_treats_application_as_virtual_project(self):
         project = (settings.BASE_DIR / "pyproject.toml").read_text()
         lockfile = (settings.BASE_DIR / "uv.lock").read_text()

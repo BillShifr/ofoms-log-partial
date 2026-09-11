@@ -1345,6 +1345,19 @@ class PrefTests(BaseSystemTestCase):
             text="x",
         )
 
+    def test_ui_preferences_expose_required_accessibility_modes(self):
+        self.client.force_login(self.operator)
+        response = self.client.get(reverse("system:prefs"))
+
+        self.assertContains(response, 'data-ui-font="base"')
+        self.assertContains(response, 'data-ui-font="a"')
+        self.assertContains(response, 'data-ui-font="a-plus"')
+        self.assertContains(response, 'data-ui-font="a-plus-plus"')
+        self.assertContains(response, 'data-ui-contrast="white"')
+        self.assertContains(response, 'data-ui-contrast="black"')
+        self.assertContains(response, 'aria-labelledby="font-scale-label"')
+        self.assertContains(response, 'aria-labelledby="contrast-label"')
+
     def test_save_table_prefs(self):
         self.client.force_login(self.operator)
         resp = self.client.post(

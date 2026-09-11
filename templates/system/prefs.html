@@ -9,18 +9,27 @@
   <h3 class="mt-1 mb-1">Оформление</h3>
   <div class="form-grid">
     <div class="field">
-      <label>Тема</label>
-      <div class="option-group">
-        <button class="btn btn--ghost btn--sm" type="button" data-ui-theme="light">Светлая</button>
-        <button class="btn btn--ghost btn--sm" type="button" data-ui-theme="dark">Тёмная</button>
+      <span class="field-label" id="theme-label">Тема</span>
+      <div class="option-group" role="group" aria-labelledby="theme-label">
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-theme="light" aria-pressed="false">Светлая</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-theme="dark" aria-pressed="false">Тёмная</button>
       </div>
     </div>
     <div class="field">
-      <label>Масштаб шрифта</label>
-      <div class="option-group">
-        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="md">A-</button>
-        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="base">A</button>
-        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="lg">A+</button>
+      <span class="field-label" id="font-scale-label">Размер шрифта</span>
+      <div class="option-group" role="group" aria-labelledby="font-scale-label">
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="base" aria-pressed="false">Обычный</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="a" aria-pressed="false">A</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="a-plus" aria-pressed="false">A+</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="a-plus-plus" aria-pressed="false">A++</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label" id="contrast-label">Контраст</span>
+      <div class="option-group" role="group" aria-labelledby="contrast-label">
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-contrast="default" aria-pressed="false">Как в теме</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-contrast="white" aria-pressed="false">Белая</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-contrast="black" aria-pressed="false">Чёрная</button>
       </div>
     </div>
   </div>

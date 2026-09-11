@@ -61,9 +61,50 @@ html[data-theme="dark"] .header__org,
 html[data-theme="dark"] .header__user-role { color: #9ccfff; }
 
 /* ---------- Масштаб шрифта (2.12) ---------- */
-html[data-font="md"] { --fs: 15px; }
-html[data-font="lg"] { --fs: 19px; }
+html[data-font="a"] { --fs: 19px; }
+html[data-font="a-plus"] { --fs: 23px; }
+html[data-font="a-plus-plus"] { --fs: 27px; }
 .btn--active { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* Режим контраста имеет приоритет над выбранной цветовой темой. */
+html[data-contrast="white"] {
+  color-scheme: light;
+  --ink: #000;
+  --primary: #003f73;
+  --primary-hover: #002f57;
+  --accent: #006b80;
+  --accent-hover: #005363;
+  --green: #12643f;
+  --danger: #9f1717;
+  --warn: #704500;
+  --bg: #fff;
+  --card: #fff;
+  --line: #000;
+  --chip-blue: #fff;
+  --chip-green: #fff;
+  --chip-red: #fff;
+  --chip-yellow: #fff;
+  --shadow: none;
+}
+html[data-contrast="black"] {
+  color-scheme: dark;
+  --ink: #fff;
+  --primary: #8dcdff;
+  --primary-hover: #b7dfff;
+  --accent: #83eaff;
+  --accent-hover: #b4f2ff;
+  --green: #81e7b6;
+  --danger: #ff9696;
+  --warn: #ffd27f;
+  --bg: #000;
+  --card: #000;
+  --line: #fff;
+  --chip-blue: #000;
+  --chip-green: #000;
+  --chip-red: #000;
+  --chip-yellow: #000;
+  --shadow: none;
+}
 
 /* ---------- Минимальный сброс ---------- */
 *, *::before, *::after { box-sizing: border-box; }
@@ -371,7 +412,7 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field[hidden] { display: none; }
 .field .field-error { color: var(--danger); font-size: .85rem; }
-.field label { font-weight: 600; font-size: .9rem; }
+.field label, .field-label { font-weight: 600; font-size: .9rem; }
 .field input,
 .field select,
 .field textarea {

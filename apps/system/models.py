@@ -519,25 +519,26 @@ class TaskJob(models.Model):
 
         started_at = timezone.now()
         triggered_by = "user" if user is not None else "auto"
-        claimed = (
-            TaskJob.objects.filter(pk=self.pk)
-            .exclude(status=TaskJob.Status.RUNNING)
-            .update(status=TaskJob.Status.RUNNING, last_started_at=started_at)
-        )
-        if not claimed:
-            raise TaskAlreadyRunning(f"Задание {self.pk} уже выполняется")
+        with transaction.atomic():
+            claimed = (
+                TaskJob.objects.filter(pk=self.pk)
+                .exclude(status=TaskJob.Status.RUNNING)
+                .update(status=TaskJob.Status.RUNNING, last_started_at=started_at)
+            )
+            if not claimed:
+                raise TaskAlreadyRunning(f"Задание {self.pk} уже выполняется")
+            run = TaskRun.objects.create(
+                task_id=self.pk, triggered_by=triggered_by, started_at=started_at
+            )
+            event = log_event(
+                module="system",
+                event_type=EventLog.EventType.TASK,
+                user=user,
+                target=f"task:{self.pk}:{self.command}",
+                pending=True,
+            )
         self.status = TaskJob.Status.RUNNING
         self.last_started_at = started_at
-        run = TaskRun.objects.create(
-            task=self, triggered_by=triggered_by, started_at=started_at
-        )
-        event = log_event(
-            module="system",
-            event_type=EventLog.EventType.TASK,
-            user=user,
-            target=f"task:{self.pk}:{self.command}",
-            pending=True,
-        )
         try:
             log = run_command(self.command, self.params or {})
             ok = True
@@ -548,36 +549,43 @@ class TaskJob(models.Model):
 
         finished_at = timezone.now()
         result = EventLog.Result.OK if ok else EventLog.Result.FAILED
-        run.result = result
-        run.started_at = started_at
-        run.finished_at = finished_at
-        run.log = log
-        run.save()
+        with transaction.atomic():
+            current = TaskJob.objects.select_for_update().get(pk=self.pk)
+            current_run = TaskRun.objects.select_for_update().get(pk=run.pk)
+            current_run.result = result
+            current_run.finished_at = finished_at
+            current_run.log = log
+            current_run.save(update_fields=["result", "finished_at", "log"])
 
-        self.last_started_at = started_at
-        self.last_finished_at = finished_at
-        self.last_result = result
-        self.last_log = log
-        self.status = TaskJob.Status.COMPLETED if ok else TaskJob.Status.FAILED
-        self.save(
-            update_fields=[
-                "status",
-                "last_started_at",
-                "last_finished_at",
-                "last_result",
-                "last_log",
-            ]
-        )
+            current.last_finished_at = finished_at
+            current.last_result = result
+            current.last_log = log
+            current.status = (
+                TaskJob.Status.COMPLETED if ok else TaskJob.Status.FAILED
+            )
+            current.save(
+                update_fields=[
+                    "status",
+                    "last_finished_at",
+                    "last_result",
+                    "last_log",
+                ]
+            )
 
-        log_event(
-            module="system",
-            event_type=EventLog.EventType.TASK,
-            user=user,
-            obj=event,
-            result=result,
-            detail=log[:2000],
-            duration_ms=int((finished_at - started_at).total_seconds() * 1000),
-        )
+            log_event(
+                module="system",
+                event_type=EventLog.EventType.TASK,
+                user=user,
+                obj=event,
+                result=result,
+                detail=log[:2000],
+                duration_ms=int((finished_at - started_at).total_seconds() * 1000),
+            )
+        self.status = current.status
+        self.last_finished_at = current.last_finished_at
+        self.last_result = current.last_result
+        self.last_log = current.last_log
+        run = current_run
         return run
 
     @classmethod

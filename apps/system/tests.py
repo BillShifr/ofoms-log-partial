@@ -1731,6 +1731,46 @@ class TaskTests(BaseSystemTestCase):
         self.assertContains(response, "уже выполняется")
         self.assertFalse(TaskRun.objects.exists())
 
+    def test_task_claim_rolls_back_when_pending_audit_fails(self):
+        task = self._make_task()
+
+        with (
+            patch("apps.core.models.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            task.run(user=self.admin)
+
+        task.refresh_from_db()
+        self.assertEqual(task.status, TaskJob.Status.CREATED)
+        self.assertIsNone(task.last_started_at)
+        self.assertFalse(TaskRun.objects.filter(task=task).exists())
+
+    def test_task_completion_rolls_back_to_recoverable_pending_state(self):
+        task = self._make_task()
+
+        def fail_completion_event(*args, **kwargs):
+            if kwargs.get("obj") is not None:
+                raise RuntimeError("audit")
+            return log_event(*args, **kwargs)
+
+        with (
+            patch("apps.core.models.log_event", side_effect=fail_completion_event),
+            self.assertRaises(RuntimeError),
+        ):
+            task.run(user=self.admin)
+
+        task.refresh_from_db()
+        run = TaskRun.objects.get(task=task)
+        event = EventLog.objects.get(
+            event_type=EventLog.EventType.TASK,
+            target=f"task:{task.pk}:{task.command}",
+        )
+        self.assertEqual(task.status, TaskJob.Status.RUNNING)
+        self.assertIsNone(task.last_finished_at)
+        self.assertEqual(run.result, "")
+        self.assertIsNone(run.finished_at)
+        self.assertIsNone(event.finished_at)
+
     def test_failed_command_logged(self):
         task = self._make_task()
         with patch("apps.system.tasks.run_command", side_effect=RuntimeError("boom")):

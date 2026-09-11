@@ -26,7 +26,11 @@ from apps.core.fold import contains_folded, filter_contains_any
 from apps.core.models import EventLog, log_event
 from apps.core.policy import role_codes_for_user
 from apps.core.roles import Roles
-from apps.core.storage import UploadedFileRollback, open_field_file_or_404
+from apps.core.storage import (
+    UploadedFileRollback,
+    close_file_on_error,
+    open_field_file_or_404,
+)
 from apps.employee.models import Employee
 from apps.journal.table import JOURNAL_COLUMNS, JOURNAL_TABLE_KEY, SORTABLE_FIELDS
 from apps.system.forms import (
@@ -717,19 +721,19 @@ def message_attachment_download(request, pk):
         pk=pk,
     )
     _participant_or_404(request.user, attachment.reply.thread.conversation)
-    file_handle = open_field_file_or_404(attachment.file)
-    log_event(
-        module="system",
-        event_type=EventLog.EventType.EXPORT,
-        user=request.user,
-        target=f"message-attachment:{attachment.pk}",
-        ip=request.META.get("REMOTE_ADDR"),
-    )
-    return FileResponse(
-        file_handle,
-        filename=attachment.file.name.rsplit("/", 1)[-1],
-        as_attachment=True,
-    )
+    with close_file_on_error(open_field_file_or_404(attachment.file)) as file_handle:
+        log_event(
+            module="system",
+            event_type=EventLog.EventType.EXPORT,
+            user=request.user,
+            target=f"message-attachment:{attachment.pk}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+        return FileResponse(
+            file_handle,
+            filename=attachment.file.name.rsplit("/", 1)[-1],
+            as_attachment=True,
+        )
 
 
 @login_required
@@ -1062,19 +1066,19 @@ def task_toggle(request, pk):
 def task_file_download(request, pk):
     """Выдаёт служебное вложение задачи только администратору."""
     attachment = get_object_or_404(TaskFile, pk=pk)
-    file_handle = open_field_file_or_404(attachment.file)
-    log_event(
-        module="system",
-        event_type=EventLog.EventType.EXPORT,
-        user=request.user,
-        target=f"task-file:{attachment.pk}",
-        ip=request.META.get("REMOTE_ADDR"),
-    )
-    return FileResponse(
-        file_handle,
-        filename=attachment.file.name.rsplit("/", 1)[-1],
-        as_attachment=True,
-    )
+    with close_file_on_error(open_field_file_or_404(attachment.file)) as file_handle:
+        log_event(
+            module="system",
+            event_type=EventLog.EventType.EXPORT,
+            user=request.user,
+            target=f"task-file:{attachment.pk}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+        return FileResponse(
+            file_handle,
+            filename=attachment.file.name.rsplit("/", 1)[-1],
+            as_attachment=True,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1171,8 +1175,7 @@ def doc_upload(request):
 def doc_download(request, pk):
     """Скачивание документа с учётом счётчика загрузок (PRD v3 §2.8)."""
     doc = get_object_or_404(SystemDocument, pk=pk)
-    file_handle = open_field_file_or_404(doc.file)
-    try:
+    with close_file_on_error(open_field_file_or_404(doc.file)) as file_handle:
         with transaction.atomic():
             SystemDocument.objects.filter(pk=pk).update(
                 downloads_count=F("downloads_count") + 1
@@ -1184,10 +1187,11 @@ def doc_download(request, pk):
                 target=f"doc:{doc.pk}:{doc.title}",
                 ip=request.META.get("REMOTE_ADDR"),
             )
-    except Exception:
-        file_handle.close()
-        raise
-    return FileResponse(file_handle, filename=doc.file.name.split("/")[-1], as_attachment=True)
+        return FileResponse(
+            file_handle,
+            filename=doc.file.name.split("/")[-1],
+            as_attachment=True,
+        )
 
 
 @login_required
@@ -1201,20 +1205,20 @@ def doc_view(request, pk):
 
     filename = doc.file.name.rsplit("/", 1)[-1]
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    file_handle = open_field_file_or_404(doc.file)
-    log_event(
-        module="system",
-        event_type=EventLog.EventType.VIEW,
-        user=request.user,
-        target=f"doc:{doc.pk}:view",
-        ip=request.META.get("REMOTE_ADDR"),
-    )
-    return FileResponse(
-        file_handle,
-        as_attachment=False,
-        filename=filename,
-        content_type=content_type,
-    )
+    with close_file_on_error(open_field_file_or_404(doc.file)) as file_handle:
+        log_event(
+            module="system",
+            event_type=EventLog.EventType.VIEW,
+            user=request.user,
+            target=f"doc:{doc.pk}:view",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+        return FileResponse(
+            file_handle,
+            as_attachment=False,
+            filename=filename,
+            content_type=content_type,
+        )
 
 
 @login_required
@@ -1401,13 +1405,13 @@ def news_cover(request, pk):
 
     filename = item.cover_image.name.rsplit("/", 1)[-1]
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    file_handle = open_field_file_or_404(item.cover_image)
-    return FileResponse(
-        file_handle,
-        as_attachment=False,
-        filename=filename,
-        content_type=content_type,
-    )
+    with close_file_on_error(open_field_file_or_404(item.cover_image)) as file_handle:
+        return FileResponse(
+            file_handle,
+            as_attachment=False,
+            filename=filename,
+            content_type=content_type,
+        )
 
 
 @login_required

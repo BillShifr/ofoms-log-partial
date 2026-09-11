@@ -1,6 +1,7 @@
 """Тесты core: парольная политика, блокировка, токены, журнал событий."""
 
 import datetime
+import io
 import os
 import re
 import subprocess
@@ -24,6 +25,7 @@ from django.utils import timezone
 
 from apps.core.auth import on_logged_in, on_login_failed
 from apps.core.models import ConsumedToken, EventLog, log_event
+from apps.core.storage import close_file_on_error
 from apps.core.tokens import (
     EmployeeRepository,
     consume_token,
@@ -49,6 +51,25 @@ from apps.system.models import (
 )
 
 User = get_user_model()
+
+
+class FileOwnershipTests(TestCase):
+    def test_close_file_on_error_closes_handle_when_handoff_fails(self):
+        file_handle = io.BytesIO(b"content")
+
+        with self.assertRaises(RuntimeError), close_file_on_error(file_handle):
+            raise RuntimeError("audit")
+
+        self.assertTrue(file_handle.closed)
+
+    def test_close_file_on_error_keeps_handle_open_after_successful_handoff(self):
+        file_handle = io.BytesIO(b"content")
+
+        with close_file_on_error(file_handle) as handed_off:
+            self.assertIs(handed_off, file_handle)
+
+        self.assertFalse(file_handle.closed)
+        file_handle.close()
 
 
 class ProtectedAdminTests(TestCase):

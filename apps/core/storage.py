@@ -1,5 +1,7 @@
 """Транзакционно-безопасные операции с файловым хранилищем."""
 
+from contextlib import contextmanager
+
 from django.db import transaction
 from django.http import Http404
 
@@ -33,6 +35,16 @@ def open_field_file_or_404(field_file):
         return field_file.open("rb")
     except (FileNotFoundError, OSError):
         raise Http404("Файл недоступен.") from None
+
+
+@contextmanager
+def close_file_on_error(file_handle):
+    """Закрывает handle, пока владение ещё не передано streaming response."""
+    try:
+        yield file_handle
+    except BaseException:
+        file_handle.close()
+        raise
 
 
 def delete_field_file_after_commit(field_file) -> None:

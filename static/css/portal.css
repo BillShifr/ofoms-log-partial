@@ -343,6 +343,38 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .journal-actions { justify-content: space-between; align-items: center; }
 .journal-actions__primary, .journal-actions__secondary { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
+/* ---------- Карточка обращения и длинные формы ---------- */
+.record-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 22px; }
+.record-heading h1 { margin: 0; overflow-wrap: anywhere; }
+.record-heading__copy { min-width: 0; }
+.record-heading__status { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.record-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; flex: 0 0 auto; }
+.record-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.record-layout .card + .card { margin-top: 0; }
+.record-section--main { grid-column: 1 / -1; }
+.record-section--full { margin-top: 18px; }
+.section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: -2px 0 18px; padding-bottom: 13px; border-bottom: 1px solid var(--line); }
+.section-heading > div { display: flex; gap: 10px; align-items: baseline; }
+.section-heading h2 { margin: 0; font-size: 1.08rem; }
+.section-heading__index { margin: 0; color: var(--accent); font-size: .72rem; font-weight: 800; letter-spacing: .06em; }
+.section-heading > span { color: color-mix(in srgb, var(--ink) 62%, transparent); font-size: .78rem; text-align: right; }
+.detail-list { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(0, 1.6fr); margin: 0; column-gap: 24px; }
+.detail-list dt, .detail-list dd { padding: 9px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent); }
+.detail-list dt { color: color-mix(in srgb, var(--ink) 62%, transparent); font-size: .82rem; font-weight: 600; }
+.detail-list dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.detail-list dt:last-of-type, .detail-list dd:last-of-type { border-bottom: 0; }
+.empty-state { padding: 24px; border: 1px dashed var(--line); border-radius: 12px; color: color-mix(in srgb, var(--ink) 60%, transparent); text-align: center; background: color-mix(in srgb, var(--bg) 42%, transparent); }
+.form-card { padding: 0; overflow: hidden; }
+.form-card > form { padding: 0 26px; }
+.form-section-heading { display: flex; gap: 14px; align-items: flex-start; margin: 0 -26px 20px; padding: 19px 26px 14px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--chip-blue) 52%, var(--card)); }
+.form-section-heading:first-of-type { border-top: 0; }
+.form-section-heading > span { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; background: var(--card); color: var(--primary); font-size: .72rem; font-weight: 800; box-shadow: inset 0 0 0 1px var(--line); }
+.form-section-heading h2 { margin: 0; font-size: 1.06rem; }
+.form-section-heading p { margin: 3px 0 0; color: color-mix(in srgb, var(--ink) 60%, transparent); font-size: .8rem; }
+.form-card .form-grid { margin-bottom: 26px; }
+.field:has(:required) > label::after { content: " *"; color: var(--danger); }
+.form-actions--sticky { position: sticky; bottom: 0; z-index: 3; margin: 8px -26px 0; padding: 14px 26px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--card) 94%, transparent); box-shadow: 0 -8px 20px rgba(14,36,51,.06); backdrop-filter: blur(10px); }
+
 /* ---------- Фильтры ---------- */
 .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .filters .field { flex: 1 1 180px; }
@@ -414,7 +446,7 @@ tbody tr.js-event-row { cursor: pointer; }
 @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } .dl { grid-template-columns: 1fr; } }
 
 /* ---------- Этап 4: маршрутизация и ответы ---------- */
-.answer { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
+.answer { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; background: color-mix(in srgb, var(--bg) 34%, var(--card)); }
 .answer .flex { justify-content: space-between; margin-bottom: 6px; }
 .answer p { margin: 0; }
 .answer-form { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line); display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
@@ -675,6 +707,8 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
   .header__user-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .filters .field { flex: 1 1 45%; }
   .nav__sep { display: none; }
+  .record-heading { align-items: flex-start; flex-direction: column; }
+  .record-actions { justify-content: flex-start; }
 }
 @media (max-width: 720px) {
   :root { --wrap: 100%; }
@@ -699,4 +733,25 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
   .page-heading { align-items: center; margin-bottom: 18px; }
   .page-heading__lead { display: none; }
   .page-heading__metric { min-width: 72px; padding-right: 0; }
+  .record-heading { margin-bottom: 16px; }
+  .record-heading h1 { font-size: 1.45rem; }
+  .record-actions { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .record-actions .btn { justify-content: center; padding-inline: 12px; }
+  .record-layout { grid-template-columns: 1fr; gap: 12px; }
+  .record-section--main { grid-column: auto; }
+  .record-layout .record-section, .record-section--full { margin-inline: -12px; border-radius: 0; border-inline: 0; }
+  .record-section--full { margin-top: 12px; }
+  .section-heading { align-items: baseline; }
+  .section-heading > span { display: none; }
+  .detail-list { grid-template-columns: 1fr; }
+  .detail-list dt { padding: 10px 0 2px; border-bottom: 0; }
+  .detail-list dd { padding: 0 0 10px; }
+  .form-page-heading { display: block; }
+  .form-card { margin-inline: -12px; border-radius: 0; border-inline: 0; }
+  .form-card > form { padding-inline: 16px; }
+  .form-section-heading { margin-inline: -16px; padding-inline: 16px; }
+  .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .form-actions--sticky { margin-inline: -16px; padding-inline: 16px; }
+  .form-actions--sticky .btn { flex: 1; justify-content: center; }
+  .answer .flex { align-items: flex-start; }
 }

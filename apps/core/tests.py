@@ -124,12 +124,21 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("--from=ghcr.io/astral-sh/uv@sha256:", dockerfile)
         self.assertNotIn("uv:latest", dockerfile)
         self.assertIn("image: postgres:16-alpine@sha256:", compose)
+        self.assertIn("image: postgres:16-alpine@sha256:", workflow)
         action_refs = re.findall(r"^\s*-?\s*uses:\s+([^\s#]+)", workflow, re.MULTILINE)
         self.assertTrue(action_refs)
         self.assertEqual(
             [ref for ref in action_refs if not re.fullmatch(r"[^@]+@[0-9a-f]{40}", ref)],
             [],
         )
+
+    def test_ci_uses_least_privilege_and_bounded_jobs(self):
+        workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()
+
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertEqual(workflow.count("timeout-minutes: 30"), 2)
+        self.assertEqual(workflow.count("persist-credentials: false"), 2)
+        self.assertIn("cancel-in-progress: true", workflow)
 
     def test_application_image_uses_unprivileged_runtime_user(self):
         dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()

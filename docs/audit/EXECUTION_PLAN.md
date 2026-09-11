@@ -327,3 +327,9 @@
 - db, web и scheduler получили `restart: unless-stopped`, поэтому восстановление после crash/reboot не зависит от ручного `docker compose up`.
 - После миграций shell заменяется через `exec` на Gunicorn; Docker init и 75-секундный grace period обеспечивают доставку SIGTERM и сбор дочерних процессов.
 - Бесконечный shell-loop scheduler заменён management-командой `run_scheduler`: она обрабатывает SIGTERM/SIGINT, ждёт завершения текущего цикла, не дрейфует на shell sleep и повторяет работу после временной ошибки.
+
+### 2026-09-11 — минимальные права и воспроизводимость CI
+
+- PostgreSQL service container в GitHub Actions закреплён тем же проверенным digest, что и production Compose; плавающий `postgres:16` удалён из исполняемой цепочки.
+- Workflow задаёт только `contents: read`, а checkout не сохраняет credential в git config рабочего каталога job.
+- Обе job ограничены 30 минутами; concurrency отменяет устаревший run того же ref, предотвращая накопление зависших или уже неактуальных проверок.

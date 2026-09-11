@@ -227,3 +227,9 @@
 - `unless-stopped` выбран вместо `always`: аварийное завершение и reboot восстанавливают сервис, но явная остановка оператора сохраняется.
 - Gunicorn становится основным процессом контейнера после одноразовых миграций через shell `exec`; это сохраняет последовательность старта и корректную обработку SIGTERM master-процессом.
 - Scheduler реализован как Python management-команда, а не shell-loop: signal handler прекращает новые циклы, текущий `run_tasks` получает время завершиться, временная ошибка журналируется и повторяется на следующем интервале.
+
+## 2026-09-11 CI least privilege
+
+- Workflow не изменяет репозиторий и публикует image в Docker Hub по отдельным credentials, поэтому встроенному `GITHUB_TOKEN` достаточно `contents: read`.
+- `persist-credentials: false` исключает сохранение token checkout в локальной конфигурации git, где его мог бы прочитать последующий build step.
+- Service images считаются частью исполняемой цепочки CI и обязаны быть закреплены digest так же, как production images и Actions SHA.

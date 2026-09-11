@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connection, transaction
+from django.db.models import QuerySet
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
@@ -39,7 +40,7 @@ from apps.exchange.importers import (
     write_unique_artifact,
 )
 from apps.exchange.models import ImportLog
-from apps.journal.models import Irp, IrpTheme
+from apps.journal.models import Irp, IrpTheme, XmlFiles
 
 SAMPLE_USERS = """<?xml version="1.0" encoding="windows-1251"?>
 <USER_COLLECTION>
@@ -135,6 +136,86 @@ class EmployeeImportConcurrencyTests(TransactionTestCase):
         self.assertEqual(len({username for _, username in results}), 2)
         self.assertEqual(Employee.objects.filter(guid__in=guids).count(), 2)
         self.assertTrue(all(len(username) <= 150 for _, username in results))
+
+
+class IrpImportConcurrencyTests(TransactionTestCase):
+    def setUp(self):
+        self.employee = Employee.objects.create_user(
+            username="irp-import-owner",
+            org=81000,
+            is_active=False,
+        )
+        self.theme = IrpTheme.objects.create(
+            code_name="CI.01",
+            title="Concurrency",
+            version=3,
+        )
+
+    def _source(self, suffix):
+        return XmlFiles.objects.create(
+            year="2026",
+            month="09",
+            day="12",
+            smo=81000,
+            filename=f"G1R_{suffix}.xml",
+            real_filename=f"/exchange/G1R_{suffix}.xml",
+        )
+
+    def test_concurrent_same_n_irp_creates_one_consistent_record(self):
+        n_irp = str(uuid.uuid4())
+        sources = (self._source("first"), self._source("second"))
+        barrier = Barrier(2)
+        thread_state = threading.local()
+        original_first = QuerySet.first
+
+        def synchronize_absent_irp_lookup(queryset):
+            result = original_first(queryset)
+            if queryset.model is Irp and not getattr(thread_state, "checked", False):
+                thread_state.checked = True
+                barrier.wait(timeout=5)
+            return result
+
+        def import_record(index):
+            connection.close()
+            try:
+                importer = IrpXMLFile(81000, Path(f"G1R_race_{index}.xml"))
+                importer._import_one(
+                    {
+                        "n_irp": n_irp,
+                        "irp_type": "1",
+                        "date_create": "2026-09-12",
+                        "way": "1",
+                        "how": "1",
+                        "theme": self.theme.code_name,
+                        "otv_t": "1",
+                        "otv_kon": "81000",
+                        "employee_1": str(self.employee.guid),
+                        "data_plan": "2026-10-12",
+                        "z_f": f"Фамилия-{index}",
+                        "z_i": f"Имя-{index}",
+                    },
+                    input_file=sources[index],
+                )
+                return importer.rows, importer.errors
+            finally:
+                connection.close()
+
+        with (
+            patch.object(QuerySet, "first", synchronize_absent_irp_lookup),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            results = list(executor.map(import_record, range(2)))
+
+        self.assertEqual(results, [(1, []), (1, [])])
+        self.assertEqual(Irp.objects.filter(n_irp=n_irp).count(), 1)
+        irp = Irp.objects.get(n_irp=n_irp)
+        self.assertIn(
+            (irp.z_f, irp.z_i, irp.input_file_id),
+            {
+                ("Фамилия-0", "Имя-0", sources[0].pk),
+                ("Фамилия-1", "Имя-1", sources[1].pk),
+            },
+        )
 
 
 class ExchangeTestMixin:

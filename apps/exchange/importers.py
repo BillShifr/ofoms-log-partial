@@ -490,27 +490,48 @@ class IrpXMLFile(XsdExchangeFile):
             self.errors.extend(flc_errors)
             return
 
-        n_irp = d["n_irp"]
-        irp = Irp.objects.filter(n_irp=n_irp).first()
-        if irp is None:
-            irp = Irp(employee_one=employee_one, employee_it=employee_it, theme=theme)
-        for key, value in d.items():
-            setattr(irp, key, value)
-        irp.employee_one = employee_one
-        irp.employee_it = employee_it
-        irp.theme = theme
-        irp.input_file = input_file
         try:
-            irp.synchronize_imported_status()
-            irp.full_clean()
-            irp.save()
+            _upsert_imported_irp(
+                values=d,
+                employee_one=employee_one,
+                employee_it=employee_it,
+                theme=theme,
+                input_file=input_file,
+            )
         except ValidationError as e:
             for key, msgs in e.message_dict.items():
                 self.errors.append(
-                    flc.error_result(str(key).upper(), str(msgs), n_irp)
+                    flc.error_result(str(key).upper(), str(msgs), d["n_irp"])
                 )
             return
         self.rows += 1
+
+
+def _upsert_imported_irp(*, values, employee_one, employee_it, theme, input_file):
+    """Сериализует update и разрешает конкурентный insert по `n_irp`."""
+    n_irp = values["n_irp"]
+    for _ in range(2):
+        creating = False
+        try:
+            with transaction.atomic():
+                irp = Irp.objects.select_for_update().filter(n_irp=n_irp).first()
+                creating = irp is None
+                if creating:
+                    irp = Irp()
+                for key, value in values.items():
+                    setattr(irp, key, value)
+                irp.employee_one = employee_one
+                irp.employee_it = employee_it
+                irp.theme = theme
+                irp.input_file = input_file
+                irp.synchronize_imported_status()
+                irp.full_clean()
+                irp.save(force_insert=creating)
+                return irp
+        except IntegrityError:
+            if not creating or not Irp.objects.filter(n_irp=n_irp).exists():
+                raise
+    raise RuntimeError("Не удалось сериализовать импорт обращения")
 
 
 def _normalize_irp_fields(d: dict) -> dict:

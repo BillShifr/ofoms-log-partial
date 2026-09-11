@@ -38,6 +38,20 @@ class ImportLog(models.Model):
         indexes = [
             models.Index(fields=["org", "-created_at"], name="exchange_org_created_idx")
         ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(org__in=tuple(code for code, _ in ORGS)),
+                name="exchange_import_org_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(kind__in=("irp", "users", "excel")),
+                name="exchange_import_kind_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=("ok", "error")),
+                name="exchange_import_status_valid",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.filename} ({self.get_status_display()})"

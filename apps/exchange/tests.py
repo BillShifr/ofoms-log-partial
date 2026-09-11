@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -121,6 +122,27 @@ class FlcTests(TestCase):
         data = build_flcp("f.xml", [error_result("T", "тест", "1")])
         self.assertIn(b"windows-1251", data)
 
+
+class ImportLogConstraintTests(TestCase):
+    def _assert_rejected(self, **overrides):
+        values = {
+            "org": 81000,
+            "kind": ImportLog.Kind.IRP,
+            "filename": "G1.xml",
+            "status": ImportLog.Status.OK,
+        }
+        values.update(overrides)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            ImportLog.objects.create(**values)
+
+    def test_unknown_organization_is_rejected_by_database(self):
+        self._assert_rejected(org=99999)
+
+    def test_unknown_import_kind_is_rejected_by_database(self):
+        self._assert_rejected(kind="unknown")
+
+    def test_unknown_import_status_is_rejected_by_database(self):
+        self._assert_rejected(status="broken")
 
 class EmployeeImportTests(ExchangeTestMixin, TestCase):
     def test_import_creates_users(self):

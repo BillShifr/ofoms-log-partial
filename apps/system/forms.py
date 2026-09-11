@@ -232,7 +232,7 @@ class ThreadForm(forms.ModelForm):
 
     class Meta:
         model = MessageThread
-        fields = ("title", "is_closed")
+        fields = ("title",)
         widgets = {
             "title": forms.TextInput(attrs={"placeholder": "Тема обсуждения"}),
         }

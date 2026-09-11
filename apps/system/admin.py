@@ -37,24 +37,24 @@ class SystemDocumentAdmin(admin.ModelAdmin):
 
 
 @admin.register(Conversation)
-class ConversationAdmin(admin.ModelAdmin):
+class ConversationAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("id", "title", "created_at", "updated_at")
 
 
 @admin.register(MessageThread)
-class MessageThreadAdmin(admin.ModelAdmin):
+class MessageThreadAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("id", "conversation", "title", "created_by", "is_closed", "created_at")
     list_filter = ("is_closed",)
 
 
 @admin.register(MessageReply)
-class MessageReplyAdmin(admin.ModelAdmin):
+class MessageReplyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("id", "thread", "author", "created_at", "edited_at")
     search_fields = ("body",)
 
 
 @admin.register(MessageAttachment)
-class MessageAttachmentAdmin(admin.ModelAdmin):
+class MessageAttachmentAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("id", "reply", "uploaded_by", "created_at")
     search_fields = ("file",)
 

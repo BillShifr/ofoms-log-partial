@@ -34,7 +34,14 @@ from apps.core.uploads import BoundedUploadHandler
 from apps.core.validators import ComplexityPasswordValidator
 from apps.exchange.models import ImportLog
 from apps.journal.models import Irp, IrpAnswer, IrpFile, IrpHistory, XmlFiles
-from apps.system.models import NewsCategory, TaskRun
+from apps.system.models import (
+    Conversation,
+    MessageAttachment,
+    MessageReply,
+    MessageThread,
+    NewsCategory,
+    TaskRun,
+)
 
 User = get_user_model()
 
@@ -50,6 +57,10 @@ class ProtectedAdminTests(TestCase):
             Irp,
             IrpAnswer,
             IrpFile,
+            Conversation,
+            MessageThread,
+            MessageReply,
+            MessageAttachment,
         ):
             with self.subTest(model=model._meta.label):
                 model_admin = admin.site._registry[model]

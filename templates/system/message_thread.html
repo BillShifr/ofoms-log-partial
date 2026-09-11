@@ -13,7 +13,18 @@
     <header class="conversation-heading">
       <a class="conversation-heading__back" href="{% url 'system:conversation' conv.pk %}">← {{ conv.display_title }}</a>
       <div class="conversation-heading__title"><p class="page-heading__eyebrow">Тема обсуждения</p><h1>{{ thread.title }}</h1></div>
-      {% if thread.is_closed %}<span class="badge badge--open">Закрыта</span>{% endif %}
+      <div class="flex flex--wrap gap-6">
+        {% if thread.is_closed %}<span class="badge badge--open">Закрыта</span>{% endif %}
+        {% if can_manage_thread %}
+          <form method="post" action="{% url 'system:thread_toggle' thread.pk %}" class="inline-form">
+            {% csrf_token %}
+            <button class="btn btn--ghost btn--sm" type="submit"
+                    {% if not thread.is_closed %}data-confirm="Закрыть тему? Новые ответы станут недоступны."{% endif %}>
+              {% if thread.is_closed %}Открыть тему{% else %}Закрыть тему{% endif %}
+            </button>
+          </form>
+        {% endif %}
+      </div>
       <p>Создал {{ thread.created_by.full_name }} · {{ thread.created_at|date:"d.m.Y H:i" }}</p>
     </header>
 

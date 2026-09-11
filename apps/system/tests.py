@@ -22,6 +22,7 @@ from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
 from apps.journal.models import Irp, IrpTheme
 from apps.journal.table import JOURNAL_TABLE_KEY
+from apps.system.forms import ThreadForm
 from apps.system.models import (
     Conversation,
     MessageAttachment,
@@ -380,6 +381,67 @@ class MessageTests(BaseSystemTestCase):
         )
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(Conversation.objects.exists())
+
+    def test_new_thread_cannot_be_created_closed(self):
+        form = ThreadForm({"title": "Новая тема", "is_closed": "on"})
+
+        self.assertTrue(form.is_valid())
+        self.assertNotIn("is_closed", form.fields)
+        self.assertFalse(form.save(commit=False).is_closed)
+
+    def test_thread_author_can_close_and_reopen_topic(self):
+        conv = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=conv, created_by=self.operator, title="Управляемая тема"
+        )
+        self.client.force_login(self.operator)
+
+        closed = self.client.post(reverse("system:thread_toggle", args=[thread.pk]))
+        self.assertEqual(closed.status_code, 302)
+        thread.refresh_from_db()
+        self.assertTrue(thread.is_closed)
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.UPDATE,
+                user=self.operator,
+                target=f"thread:{thread.pk}:closed",
+            ).exists()
+        )
+
+        reopened = self.client.post(reverse("system:thread_toggle", args=[thread.pk]))
+        self.assertEqual(reopened.status_code, 302)
+        thread.refresh_from_db()
+        self.assertFalse(thread.is_closed)
+
+    def test_regular_participant_cannot_change_foreign_thread_state(self):
+        conv = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=conv, created_by=self.admin, title="Чужая тема"
+        )
+        self.client.force_login(self.operator)
+
+        response = self.client.post(reverse("system:thread_toggle", args=[thread.pk]))
+
+        self.assertEqual(response.status_code, 403)
+        thread.refresh_from_db()
+        self.assertFalse(thread.is_closed)
+        self.assertFalse(
+            EventLog.objects.filter(target__startswith=f"thread:{thread.pk}:").exists()
+        )
+
+    def test_admin_must_be_conversation_participant_to_manage_thread(self):
+        conv = Conversation.objects.create(title="Закрытый диалог")
+        conv.participants.set([self.operator, self.smo])
+        thread = MessageThread.objects.create(
+            conversation=conv, created_by=self.operator, title="Приватная тема"
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("system:thread_toggle", args=[thread.pk]))
+
+        self.assertEqual(response.status_code, 403)
+        thread.refresh_from_db()
+        self.assertFalse(thread.is_closed)
 
     def test_reply_to_thread_and_unread_badge(self):
         conv = self._conv()

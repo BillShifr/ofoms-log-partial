@@ -24,6 +24,7 @@ urlpatterns = [
     path("messages/conversation/<int:pk>/", views.conversation_detail, name="conversation"),
     path("messages/conversation/<int:pk>/threads/new/", views.conversation_thread_create, name="thread_create"),
     path("messages/thread/<int:pk>/", views.thread_detail, name="thread"),
+    path("messages/thread/<int:pk>/toggle/", views.thread_toggle, name="thread_toggle"),
     path("messages/thread/<int:pk>/reply/", views.thread_reply, name="reply"),
     path("messages/thread/<int:pk>/react/", views.thread_react, name="react"),
     path("messages/attachments/<int:pk>/download/", views.message_attachment_download, name="message_attachment_download"),

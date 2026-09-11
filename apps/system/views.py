@@ -589,11 +589,40 @@ def thread_detail(request, pk):
             "thread": thread,
             "replies": thread_replies,
             "reply_form": ReplyForm(),
+            "can_manage_thread": request.user == thread.created_by or _is_admin(request.user),
             "conversations": _conversations_meta(request.user),
             "emoji_set": EMOJI_SET,
             "active_nav": "messages",
         },
     )
+
+
+@login_required
+@require_http_methods(["POST"])
+def thread_toggle(request, pk):
+    """Закрывает или повторно открывает тему её автором либо администратором."""
+    thread = get_object_or_404(
+        MessageThread.objects.select_related("conversation", "created_by"), pk=pk
+    )
+    _participant_or_404(request.user, thread.conversation)
+    if request.user != thread.created_by and not _is_admin(request.user):
+        raise PermissionDenied
+
+    thread.is_closed = not thread.is_closed
+    thread.save(update_fields=["is_closed"])
+    state = "closed" if thread.is_closed else "open"
+    log_event(
+        module="system",
+        event_type=EventLog.EventType.UPDATE,
+        user=request.user,
+        target=f"thread:{thread.pk}:{state}",
+        ip=request.META.get("REMOTE_ADDR"),
+    )
+    messages.success(
+        request,
+        "Тема закрыта." if thread.is_closed else "Тема снова открыта.",
+    )
+    return redirect("system:thread", thread.pk)
 
 
 @login_required

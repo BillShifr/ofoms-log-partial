@@ -30,6 +30,13 @@ class TFOMSAuthBackend(ModelBackend):
             return None
         return user
 
+    def get_user(self, user_id):
+        """Не восстанавливает из сессии уже заблокированную учётную запись."""
+        user = super().get_user(user_id)
+        if user is None or user.is_locked:
+            return None
+        return user
+
 
 def _client_ip(request):
     if request is None:

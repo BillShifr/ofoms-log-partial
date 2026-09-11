@@ -7,6 +7,7 @@
 import time
 
 from django.conf import settings
+from django.contrib.auth import SESSION_KEY, logout
 from django.http import HttpResponse
 
 from apps.core.models import EventLog, log_event
@@ -14,6 +15,18 @@ from apps.core.models import EventLog, log_event
 _IGNORED_PREFIXES = ("/static/", "/media/", "/healthz", "/readyz", "/favicon.ico")
 _IGNORED_ADMIN_SEGMENTS = ("/admin/jsi18n",)
 _LOGIN_PATHS = ("/accounts/login/", "/accounts/token-login/")
+
+
+class AccountStateSessionMiddleware:
+    """Удаляет сессию, если её пользователь больше не может войти в систему."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if SESSION_KEY in request.session and not request.user.is_authenticated:
+            logout(request)
+        return self.get_response(request)
 
 
 class ContentSecurityPolicyMiddleware:

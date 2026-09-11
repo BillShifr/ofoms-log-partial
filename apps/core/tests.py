@@ -329,6 +329,20 @@ class FailedLoginLockTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.failed_attempts, 3)
 
+    def test_existing_session_is_invalidated_after_account_lock(self):
+        self.client.force_login(self.user)
+        self.assertTrue(self.client.get(reverse("journal:list")).wsgi_request.user.is_authenticated)
+
+        User.objects.filter(pk=self.user.pk).update(
+            lock_until=timezone.now().replace(year=9999)
+        )
+
+        response = self.client.get(reverse("journal:list"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f'{reverse("login")}?next={reverse("journal:list")}')
+        self.assertNotIn("_auth_user_id", self.client.session)
+
 
 class AuthenticationSurfaceTests(TestCase):
     def test_only_explicit_interactive_auth_routes_are_exposed(self):

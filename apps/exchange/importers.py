@@ -37,6 +37,27 @@ SAFE_INTERNAL_IMPORT_ERROR = (
 logger = logging.getLogger(__name__)
 
 
+def ensure_private_directory(path: Path) -> None:
+    """Создаёт/нормализует каталог artifacts для единственного runtime UID."""
+    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.chmod(0o700)
+
+
+def _open_private_exclusive(path: Path):
+    descriptor = os.open(
+        path,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+        0o600,
+    )
+    try:
+        os.fchmod(descriptor, 0o600)
+    except BaseException:
+        os.close(descriptor)
+        path.unlink(missing_ok=True)
+        raise
+    return os.fdopen(descriptor, "wb")
+
+
 def validate_xlsx_container(path: Path) -> None:
     """Отклоняет опасный ZIP-контейнер до передачи XLSX в openpyxl."""
     try:
@@ -64,10 +85,11 @@ def write_unique_artifact(path: Path, chunks) -> Path:
     """Атомарно создаёт новый artifact, не перезаписывая параллельный файл."""
     import uuid
 
+    ensure_private_directory(path.parent)
     candidate = path
     while True:
         try:
-            with open(candidate, "xb") as artifact:
+            with _open_private_exclusive(candidate) as artifact:
                 for chunk in chunks:
                     artifact.write(chunk)
             return candidate
@@ -84,10 +106,12 @@ def reserve_unique_artifact_path(path: Path) -> Path:
     """Атомарно резервирует свободное имя пустым файлом текущего процесса."""
     import uuid
 
+    ensure_private_directory(path.parent)
     candidate = path
     while True:
         try:
-            candidate.touch(exist_ok=False)
+            with _open_private_exclusive(candidate):
+                pass
             return candidate
         except FileExistsError:
             candidate = path.with_name(
@@ -97,8 +121,8 @@ def reserve_unique_artifact_path(path: Path) -> Path:
 
 def archive_artifact(source: Path, archive_dir: Path, org: int) -> Path:
     """Move a processed input exactly once, including across filesystems."""
+    source.chmod(0o600)
     org_dir = archive_dir / str(org)
-    org_dir.mkdir(parents=True, exist_ok=True)
     destination = reserve_unique_artifact_path(org_dir / source.name)
     try:
         os.replace(source, destination)
@@ -256,7 +280,6 @@ class XsdExchangeFile:
 
     def write_flcp(self, result: ImportResult) -> Path:
         org_dir = self._out_dir / str(self.org)
-        org_dir.mkdir(parents=True, exist_ok=True)
         return write_unique_artifact(
             org_dir / self.basename,
             (result.flcp_bytes(),),
@@ -699,7 +722,6 @@ class ExcelIrpFile:
 
     def write_flcp(self, result: ImportResult) -> Path:
         org_dir = self._out_dir / str(self.org)
-        org_dir.mkdir(parents=True, exist_ok=True)
         return write_unique_artifact(
             org_dir / self.basename,
             (result.flcp_bytes(),),

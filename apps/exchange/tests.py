@@ -5,6 +5,7 @@ upsert по guid/n_irp, ограничение доступа к протоко�
 
 import errno
 import os
+import stat
 import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -155,6 +156,10 @@ class ArtifactWriteTests(TestCase):
                 {path.read_bytes() for path in paths},
                 {b"first", b"second"},
             )
+            self.assertEqual(stat.S_IMODE(target.parent.stat().st_mode), 0o700)
+            self.assertTrue(
+                all(stat.S_IMODE(path.stat().st_mode) == 0o600 for path in paths)
+            )
 
     def test_failed_writer_removes_its_partial_artifact(self):
         import tempfile
@@ -170,6 +175,20 @@ class ArtifactWriteTests(TestCase):
                 write_unique_artifact(target, failing_chunks())
 
             self.assertFalse(target.exists())
+
+    def test_writer_enforces_private_mode_independently_of_umask(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "private.xml"
+            previous_umask = os.umask(0o777)
+            try:
+                result = write_unique_artifact(target, (b"private",))
+            finally:
+                os.umask(previous_umask)
+
+            self.assertEqual(stat.S_IMODE(result.stat().st_mode), 0o600)
+            self.assertEqual(stat.S_IMODE(result.parent.stat().st_mode), 0o700)
 
 
 class ImportLogConstraintTests(TestCase):
@@ -697,6 +716,16 @@ class ImportCommandTests(ExchangeTestMixin, TestCase):
         self.assertEqual(
             {destination.read_bytes() for destination in destinations},
             {b"first", b"second"},
+        )
+        self.assertEqual(
+            stat.S_IMODE(destinations[0].parent.stat().st_mode),
+            0o700,
+        )
+        self.assertTrue(
+            all(
+                stat.S_IMODE(destination.stat().st_mode) == 0o600
+                for destination in destinations
+            )
         )
         self.assertFalse(any(source.exists() for source in sources))
 

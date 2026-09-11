@@ -12,6 +12,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -312,6 +313,35 @@ class EventLogTests(TestCase):
         self.assertEqual(entry.module, "test")
         self.assertEqual(str(entry.user_id), "None" if entry.user_id is None else str(entry.user_id))
         self.assertEqual(EventLog.objects.count(), 1)
+
+    def _assert_invalid_event_rejected(self, **overrides):
+        values = {"module": "test", "event_type": EventLog.EventType.OTHER}
+        values.update(overrides)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            EventLog.objects.create(**values)
+
+    def test_database_rejects_unknown_event_type(self):
+        self._assert_invalid_event_rejected(event_type="unknown")
+
+    def test_database_rejects_unknown_result(self):
+        self._assert_invalid_event_rejected(result="unknown")
+
+    def test_database_rejects_blank_module(self):
+        self._assert_invalid_event_rejected(module="")
+
+    def test_database_rejects_incomplete_completion_pair(self):
+        self._assert_invalid_event_rejected(duration_ms=1)
+
+    def test_database_rejects_reverse_timeline(self):
+        started = timezone.now()
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            EventLog.objects.create(
+                module="test",
+                event_type=EventLog.EventType.OTHER,
+                started_at=started,
+                finished_at=started - datetime.timedelta(seconds=1),
+                duration_ms=0,
+            )
 
     def test_point_event_has_consistent_end_and_duration(self):
         entry = log_event(module="test", event_type=EventLog.EventType.CREATE)

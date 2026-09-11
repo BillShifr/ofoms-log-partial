@@ -88,6 +88,37 @@ class EventLog(models.Model):
             models.Index(fields=["started_at"], name="core_event_started_idx"),
             models.Index(fields=["result", "-id"], name="core_event_result_id_idx"),
         ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(module=""), name="core_event_module_not_blank"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    event_type__in=(
+                        "login", "login_failed", "logout", "create", "update",
+                        "delete", "import", "export", "print", "send", "block",
+                        "unblock", "task", "other",
+                    )
+                ),
+                name="core_event_type_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(result__in=("ok", "failed", "denied")),
+                name="core_event_result_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(finished_at__isnull=True, duration_ms__isnull=True)
+                    | models.Q(finished_at__isnull=False, duration_ms__isnull=False)
+                ),
+                name="core_event_completion_pair",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(finished_at__isnull=True)
+                | models.Q(finished_at__gte=models.F("started_at")),
+                name="core_event_timeline_valid",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.id}: {self.get_event_type_display()} / {self.module} / {self.user_id}"

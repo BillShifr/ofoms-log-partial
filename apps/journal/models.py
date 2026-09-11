@@ -8,7 +8,10 @@
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
+from apps.core.storage import delete_field_file_after_commit
 from apps.employee.models import ORGS, Employee
 from apps.system.validators import validate_document_file
 
@@ -469,3 +472,9 @@ class IrpFile(models.Model):
 
     def __str__(self) -> str:
         return f"{self.irp.n_irp}: {self.file.name}"
+
+
+@receiver(post_delete, sender=IrpFile)
+def delete_irp_file_after_commit(sender, instance, **kwargs):
+    """Удаляет вложение после успешного удаления файла, ответа или обращения."""
+    delete_field_file_after_commit(instance.file)

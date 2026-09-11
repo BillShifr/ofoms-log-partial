@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -522,8 +523,6 @@ class RoutingTests(TestCase):
         self.assertEqual(resp.status_code, 403)
 
     def test_file_download_enforces_parent_irp_scope(self):
-        from django.core.files.uploadedfile import SimpleUploadedFile
-
         irp = self._make_irp(owner=self.tfoms_user)
         attachment = IrpFile.objects.create(
             irp=irp,
@@ -537,6 +536,23 @@ class RoutingTests(TestCase):
         allowed = self.client.get(reverse("journal:file_download", args=[attachment.pk]))
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(b"".join(allowed.streaming_content), b"private")
+
+    @override_settings(MEDIA_ROOT=ROUTING_MEDIA_ROOT)
+    def test_deleting_irp_removes_cascaded_attachment_file(self):
+        irp = self._make_irp(owner=self.tfoms_user)
+        attachment = IrpFile.objects.create(
+            irp=irp,
+            file=SimpleUploadedFile("cascade-irp.txt", b"irp"),
+            uploader=self.tfoms_user,
+        )
+        storage = attachment.file.storage
+        name = attachment.file.name
+        self.assertTrue(storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            irp.delete()
+
+        self.assertFalse(storage.exists(name))
 
     def test_file_upload_rejects_unsafe_extension(self):
         from django.core.files.uploadedfile import SimpleUploadedFile

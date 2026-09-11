@@ -11,6 +11,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.text import slugify
 
+from apps.core.storage import delete_field_file_after_commit
 from apps.system.validators import validate_document_file, validate_image_file
 
 logger = logging.getLogger("apps.system")
@@ -97,10 +98,7 @@ class NewsItem(models.Model):
 @receiver(post_delete, sender=NewsItem)
 def delete_news_cover_after_commit(sender, instance, **kwargs):
     """Удаляет обложку только после успешного удаления новости из БД."""
-    if instance.cover_image and instance.cover_image.name:
-        storage = instance.cover_image.storage
-        name = instance.cover_image.name
-        transaction.on_commit(lambda: storage.delete(name))
+    delete_field_file_after_commit(instance.cover_image)
 
 
 class DocCategory(models.Model):
@@ -202,10 +200,7 @@ class SystemDocument(models.Model):
 @receiver(post_delete, sender=SystemDocument)
 def delete_document_file_after_commit(sender, instance, **kwargs):
     """Удаляет файл только после успешного удаления документа из БД."""
-    if instance.file and instance.file.name:
-        storage = instance.file.storage
-        name = instance.file.name
-        transaction.on_commit(lambda: storage.delete(name))
+    delete_field_file_after_commit(instance.file)
 
 
 class Conversation(models.Model):
@@ -348,6 +343,12 @@ class MessageAttachment(models.Model):
 
     def __str__(self):
         return self.file.name
+
+
+@receiver(post_delete, sender=MessageAttachment)
+def delete_message_attachment_after_commit(sender, instance, **kwargs):
+    """Удаляет файл вложения после успешного удаления сообщения или диалога."""
+    delete_field_file_after_commit(instance.file)
 
 
 class TaskJob(models.Model):
@@ -652,6 +653,12 @@ class TaskFile(models.Model):
 
     def __str__(self):
         return self.file.name
+
+
+@receiver(post_delete, sender=TaskFile)
+def delete_task_file_after_commit(sender, instance, **kwargs):
+    """Удаляет вложение после успешного удаления файла или самой задачи."""
+    delete_field_file_after_commit(instance.file)
 
 
 class TaskReport(models.Model):

@@ -420,6 +420,27 @@ class MessageTests(BaseSystemTestCase):
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(b"".join(allowed.streaming_content), b"private")
 
+    @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
+    def test_deleting_conversation_removes_cascaded_attachment_file(self):
+        conv = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=conv, created_by=self.admin, title="Удаляемая тема"
+        )
+        reply = MessageReply.objects.create(thread=thread, author=self.admin, body="Файл")
+        attachment = MessageAttachment.objects.create(
+            reply=reply,
+            file=SimpleUploadedFile("cascade-message.txt", b"message"),
+            uploaded_by=self.admin,
+        )
+        storage = attachment.file.storage
+        name = attachment.file.name
+        self.assertTrue(storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            conv.delete()
+
+        self.assertFalse(storage.exists(name))
+
 
 @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
 class DocTests(BaseSystemTestCase):
@@ -824,6 +845,23 @@ class TaskTests(BaseSystemTestCase):
         )
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(b"".join(allowed.streaming_content), b"result")
+
+    @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
+    def test_deleting_task_removes_cascaded_attachment_file(self):
+        task = self._make_task()
+        attachment = TaskFile.objects.create(
+            task=task,
+            file=SimpleUploadedFile("cascade-task.txt", b"task"),
+            uploaded_by=self.admin,
+        )
+        storage = attachment.file.storage
+        name = attachment.file.name
+        self.assertTrue(storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            task.delete()
+
+        self.assertFalse(storage.exists(name))
 
     def test_note_add_edit_delete(self):
         self.client.force_login(self.admin)

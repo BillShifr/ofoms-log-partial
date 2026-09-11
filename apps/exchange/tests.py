@@ -304,11 +304,35 @@ class IrpImportTests(ExchangeTestMixin, TestCase):
         out = imp.process()
         self.assertTrue(out.ok, out.errors)
         self.assertEqual(out.rows, 1)
-        self.assertTrue(Irp.objects.filter(employee_one=self.emp1).exists())
+        irp = Irp.objects.get(employee_one=self.emp1)
         # заголовок сохранён в XmlFiles
         from apps.journal.models import XmlFiles
 
         self.assertEqual(XmlFiles.objects.count(), 1)
+        self.assertEqual(irp.input_file_id, XmlFiles.objects.get().pk)
+
+    def test_reimport_updates_irp_source_file_provenance(self):
+        n_irp = str(uuid.uuid4())
+        first_path = Path(self.in_dir) / "G1R_source_first.xml"
+        first_path.write_bytes(_irp_xml("TT.01", str(self.emp1.guid), n_irp))
+        first_result = IrpXMLFile(
+            81000, first_path, **self._imp_kwargs()
+        ).process()
+        self.assertTrue(first_result.ok, first_result.errors)
+        first_source_id = Irp.objects.get(n_irp=n_irp).input_file_id
+
+        second_path = Path(self.in_dir) / "G1R_source_second.xml"
+        second_path.write_bytes(_irp_xml("TT.01", str(self.emp1.guid), n_irp))
+        second_result = IrpXMLFile(
+            81000, second_path, **self._imp_kwargs()
+        ).process()
+        self.assertTrue(second_result.ok, second_result.errors)
+
+        irp = Irp.objects.get(n_irp=n_irp)
+        self.assertIsNotNone(irp.input_file_id)
+        self.assertNotEqual(irp.input_file_id, first_source_id)
+        self.assertEqual(irp.input_file.filename, "G1R_MMYYDDNNNN.xml")
+        self.assertTrue(irp.input_file.real_filename.endswith("G1R_source_second.xml"))
 
     def test_unknown_employee_rejected(self):
         from pathlib import Path

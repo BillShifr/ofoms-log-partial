@@ -406,10 +406,12 @@ class IrpXMLFile(XsdExchangeFile):
     def load_db(self):
         if self.xml is None:
             return
-        self._load_header()
+        input_file = self._load_header()
+        if input_file is None:
+            return
         for node in self.xml.xpath("//IRP_LIST/IRP"):
             d = elem2dict(node)
-            self._import_one(d)
+            self._import_one(d, input_file=input_file)
 
     def _load_header(self):
         """Заголовок ZGLV -> XmlFiles (метаданные файла)."""
@@ -424,13 +426,15 @@ class IrpXMLFile(XsdExchangeFile):
         try:
             x.full_clean()
             x.save()
+            return x
         except ValidationError as e:
             for key, msgs in e.message_dict.items():
                 self.errors.append(
                     flc.error_result(str(key).upper(), str(msgs), "ZGLV")
                 )
+            return None
 
-    def _import_one(self, d: dict):
+    def _import_one(self, d: dict, *, input_file: XmlFiles):
         """Валидация ФЛК записи + upsert (v1 load_emploees.py)."""
         for block in ("z_sv", "in_sv"):
             if block in d and isinstance(d.get(block), dict):
@@ -495,6 +499,7 @@ class IrpXMLFile(XsdExchangeFile):
         irp.employee_one = employee_one
         irp.employee_it = employee_it
         irp.theme = theme
+        irp.input_file = input_file
         try:
             irp.synchronize_imported_status()
             irp.full_clean()

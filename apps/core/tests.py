@@ -40,7 +40,11 @@ from apps.system.models import (
     MessageReply,
     MessageThread,
     NewsCategory,
+    NewsItem,
+    SystemDocument,
+    TaskJob,
     TaskRun,
+    UserTableViewPref,
 )
 
 User = get_user_model()
@@ -61,6 +65,10 @@ class ProtectedAdminTests(TestCase):
             MessageThread,
             MessageReply,
             MessageAttachment,
+            NewsItem,
+            SystemDocument,
+            TaskJob,
+            UserTableViewPref,
         ):
             with self.subTest(model=model._meta.label):
                 model_admin = admin.site._registry[model]

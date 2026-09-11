@@ -24,14 +24,14 @@ class NewsCategoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(NewsItem)
-class NewsItemAdmin(admin.ModelAdmin):
+class NewsItemAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("title", "category", "author", "is_active", "is_pinned", "views_count", "created_at")
     list_filter = ("is_active", "is_pinned", "category")
     search_fields = ("title", "summary", "text")
 
 
 @admin.register(SystemDocument)
-class SystemDocumentAdmin(admin.ModelAdmin):
+class SystemDocumentAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("title", "sort_order", "uploaded_by", "created_at")
     search_fields = ("title", "description")
 
@@ -60,7 +60,7 @@ class MessageAttachmentAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(TaskJob)
-class TaskJobAdmin(admin.ModelAdmin):
+class TaskJobAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "command", "run_mode", "enabled", "last_result", "last_finished_at")
     list_filter = ("enabled", "run_mode", "command")
 
@@ -72,6 +72,6 @@ class TaskRunAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(UserTableViewPref)
-class UserTableViewPrefAdmin(admin.ModelAdmin):
+class UserTableViewPrefAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("user", "table_key", "updated_at")
     list_filter = ("table_key",)

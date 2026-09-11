@@ -1213,15 +1213,16 @@ def doc_suggest(request):
 @admin_required
 @require_http_methods(["POST"])
 def doc_delete(request, pk):
-    doc = get_object_or_404(SystemDocument, pk=pk)
-    log_event(
-        module="system",
-        event_type=EventLog.EventType.DELETE,
-        user=request.user,
-        target=f"doc:{doc.pk}:{doc.title}",
-        ip=request.META.get("REMOTE_ADDR"),
-    )
-    doc.delete()
+    with transaction.atomic():
+        doc = get_object_or_404(SystemDocument.objects.select_for_update(), pk=pk)
+        log_event(
+            module="system",
+            event_type=EventLog.EventType.DELETE,
+            user=request.user,
+            target=f"doc:{doc.pk}:{doc.title}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+        doc.delete()
     messages.success(request, "Документ удалён.")
     return redirect("system:docs")
 
@@ -1314,11 +1315,12 @@ def news_create(request):
 @admin_required
 @require_http_methods(["GET", "POST"])
 def news_update(request, pk):
-    item = get_object_or_404(NewsItem, pk=pk)
     if request.method == "POST":
-        form = NewsForm(request.POST, request.FILES, instance=item)
-        if form.is_valid():
-            with UploadedFileRollback() as file_rollback, transaction.atomic():
+        saved = False
+        with UploadedFileRollback() as file_rollback, transaction.atomic():
+            item = get_object_or_404(NewsItem.objects.select_for_update(), pk=pk)
+            form = NewsForm(request.POST, request.FILES, instance=item)
+            if form.is_valid():
                 if "cover_image" in form.changed_data and item.cover_image:
                     file_rollback.track(item.cover_image)
                 form.save()
@@ -1329,9 +1331,12 @@ def news_update(request, pk):
                     target=f"news:{item.pk}",
                     ip=request.META.get("REMOTE_ADDR"),
                 )
+                saved = True
+        if saved:
             messages.success(request, "Новость обновлена.")
             return redirect("system:news")
     else:
+        item = get_object_or_404(NewsItem, pk=pk)
         form = NewsForm(instance=item)
     return render(
         request,
@@ -1422,15 +1427,16 @@ def news_toggle(request, pk):
 @admin_required
 @require_http_methods(["POST"])
 def news_delete(request, pk):
-    item = get_object_or_404(NewsItem, pk=pk)
-    log_event(
-        module="system",
-        event_type=EventLog.EventType.DELETE,
-        user=request.user,
-        target=f"news:{item.pk}",
-        ip=request.META.get("REMOTE_ADDR"),
-    )
-    item.delete()
+    with transaction.atomic():
+        item = get_object_or_404(NewsItem.objects.select_for_update(), pk=pk)
+        log_event(
+            module="system",
+            event_type=EventLog.EventType.DELETE,
+            user=request.user,
+            target=f"news:{item.pk}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+        item.delete()
     messages.success(request, "Новость удалена.")
     return redirect("system:news")
 

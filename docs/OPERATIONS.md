@@ -116,6 +116,8 @@ docker compose up -d
 
 ## Мониторинг и диагностика
 
+Редактирование новости и удаление новостей/документов сериализуются блокировкой актуальной строки. Предметное событие фиксируется в той же транзакции: при отказе удаления запись остаётся доступной, а ложное событие `DELETE` не попадает в журнал.
+
 - `docker compose ps`: `db` и `web` должны быть healthy, `scheduler` — running;
 - `curl -fsS https://<host>/healthz` проверяет liveness, `curl -fsS https://<host>/readyz` — готовность приложения и PostgreSQL;
 - `docker compose logs web`: HTTP/WSGI ошибки и миграции;

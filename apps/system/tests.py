@@ -1005,6 +1005,28 @@ class DocTests(BaseSystemTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(storage.exists(name))
 
+    def test_document_delete_failure_rolls_back_semantic_audit(self):
+        doc = SystemDocument.objects.create(
+            title="Неудалённый документ",
+            file=SimpleUploadedFile("kept.pdf", b"%PDF-1.4"),
+            uploaded_by=self.admin,
+        )
+        target = f"doc:{doc.pk}:{doc.title}"
+        self.client.force_login(self.admin)
+
+        with (
+            patch.object(SystemDocument, "delete", side_effect=RuntimeError("delete")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(reverse("system:doc_delete", args=[doc.pk]))
+
+        self.assertTrue(SystemDocument.objects.filter(pk=doc.pk).exists())
+        self.assertFalse(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.DELETE, target=target
+            ).exists()
+        )
+
     def test_doc_download_increments_counter(self):
         doc = SystemDocument.objects.create(
             title="Руководство",
@@ -1303,6 +1325,26 @@ class NewsTests(BaseSystemTestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertFalse(storage.exists(name))
+
+    def test_news_delete_failure_rolls_back_semantic_audit(self):
+        item = NewsItem.objects.create(
+            title="Неудалённая новость", text="Текст", author=self.admin
+        )
+        target = f"news:{item.pk}"
+        self.client.force_login(self.admin)
+
+        with (
+            patch.object(NewsItem, "delete", side_effect=RuntimeError("delete")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(reverse("system:news_delete", args=[item.pk]))
+
+        self.assertTrue(NewsItem.objects.filter(pk=item.pk).exists())
+        self.assertFalse(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.DELETE, target=target
+            ).exists()
+        )
 
     @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
     def test_replacing_news_cover_removes_previous_file_after_commit(self):

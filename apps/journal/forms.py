@@ -4,6 +4,7 @@ import datetime
 import uuid
 
 from django import forms
+from django.db.models import Q
 
 from apps.employee.models import ORGS, Employee
 from apps.journal.models import (
@@ -15,6 +16,17 @@ from apps.journal.models import (
 )
 
 
+def _assignable_employees(user, current_id=None):
+    """Активные исполнители в доступном org scope плюс текущее назначение."""
+    scope = Q() if user.org == 81000 else Q(org__in=(user.org, 81000))
+    availability = Q(is_active=True)
+    if current_id:
+        availability |= Q(pk=current_id)
+    return Employee.objects.filter(scope & availability).order_by(
+        "last_name", "first_name", "pk"
+    )
+
+
 class IrpForm(forms.ModelForm):
     """Карточка обращения (регистрация / редактирование)."""
 
@@ -24,13 +36,22 @@ class IrpForm(forms.ModelForm):
         self.fields["theme"].queryset = IrpTheme.objects.filter(version=3)
         if user is not None:
             self.fields["theme"].empty_label = "— выберите тему —"
+            self.fields["otv_kon"].choices = [
+                org for org in ORGS if user.org == 81000 or org[0] == user.org
+            ]
+            self.fields["employee_one"].disabled = True
+            self.fields["employee_one"].help_text = (
+                "Первичный исполнитель фиксируется при регистрации."
+            )
+            self.fields["employee_it"].queryset = _assignable_employees(
+                user, self.instance.employee_it_id
+            )
             if self.instance.pk is None:
                 # По умолчанию: исполнитель = текущий пользователь,
                 # организация-ответственный = организация пользователя
                 self.fields["employee_one"].initial = user
                 self.fields["employee_it"].initial = user
                 self.fields["otv_kon"].initial = user.org
-                self.fields["otv_kon"].choices = [o for o in ORGS if o[0] == user.org or user.org == 81000]
                 # Уникальный номер генерируется сервером при отсутствии явного
                 self.fields["n_irp"].required = False
                 self.fields["n_irp"].initial = str(uuid.uuid4())
@@ -167,10 +188,12 @@ class IrpRedirectForm(forms.ModelForm):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["otv_kon"].choices = [o for o in ORGS if o[0] == user.org or user.org == 81000]
-        self.fields["employee_it"].queryset = (
-            Employee.objects.filter(org=user.org) | Employee.objects.filter(org=81000)
-        ).distinct()
+        self.fields["otv_kon"].choices = [
+            org for org in ORGS if user.org == 81000 or org[0] == user.org
+        ]
+        self.fields["employee_it"].queryset = _assignable_employees(
+            user, self.instance.employee_it_id
+        )
 
     def clean_date_cross(self):
         value = self.cleaned_data.get("date_cross")

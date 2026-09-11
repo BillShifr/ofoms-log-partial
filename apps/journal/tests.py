@@ -336,6 +336,63 @@ class JournalScreenTests(TestCase):
         self.assertEqual(entry.old_value, "Петров")
         self.assertEqual(entry.new_value, "Иванов")
 
+    def test_smo_cannot_change_primary_owner_through_edit_post(self):
+        irp = self._make_irp(owner=self.smo_user)
+        self.client.force_login(self.smo_user)
+
+        response = self.client.post(
+            reverse("journal:edit", args=[irp.pk]),
+            {
+                "n_irp": irp.n_irp,
+                "irp_type": 1,
+                "date_create": irp.date_create.isoformat(),
+                "way": 1,
+                "how": 1,
+                "theme": self.theme.pk,
+                "otv_t": 1,
+                "otv_kon": self.smo_user.org,
+                "employee_one": self.tfoms_user.pk,
+                "data_plan": irp.data_plan.isoformat(),
+                "z_f": "Владелец сохранён",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        irp.refresh_from_db()
+        self.assertEqual(irp.employee_one, self.smo_user)
+        self.assertEqual(irp.z_f, "Владелец сохранён")
+
+    def test_smo_cannot_assign_foreign_organization_or_employee(self):
+        irp = self._make_irp(owner=self.smo_user)
+        foreign = Employee.objects.create_user(
+            username="foreign_assignee", password="GoodPass!1", org=81007
+        )
+        self.client.force_login(self.smo_user)
+
+        response = self.client.post(
+            reverse("journal:edit", args=[irp.pk]),
+            {
+                "n_irp": irp.n_irp,
+                "irp_type": 1,
+                "date_create": irp.date_create.isoformat(),
+                "way": 1,
+                "how": 1,
+                "theme": self.theme.pk,
+                "otv_t": 1,
+                "otv_kon": foreign.org,
+                "employee_one": self.smo_user.pk,
+                "employee_it": foreign.pk,
+                "data_plan": irp.data_plan.isoformat(),
+                "z_f": "Подмена scope",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        irp.refresh_from_db()
+        self.assertEqual(irp.otv_kon, self.smo_user.org)
+        self.assertIsNone(irp.employee_it)
+        self.assertEqual(irp.z_f, "Петров")
+
     def test_edit_clears_inapplicable_conditional_fields(self):
         irp = self._make_irp()
         irp.zh_d = "1"

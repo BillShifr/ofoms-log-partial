@@ -1,23 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Загрузка файла обмена{% endblock %}
 {% block content %}
-<h1>Загрузка файла обмена</h1>
-<p class="text-muted">
-  Способ 2/3 регистрации: XML (Приложение №10) или Excel. Выполняется единый
-  форматно-логический контроль; протокол обработки (FLCP) будет доступен ниже.
-</p>
+<header class="module-heading"><a class="module-heading__back" href="{% url 'exchange:logs' %}">← Журнал загрузок</a><p class="page-heading__eyebrow">Обмен данными</p><h1>Загрузка файла</h1><p>XML или Excel будет автоматически проверен. После обработки откроется подробный протокол ФЛК.</p></header>
 
-<div class="card">
+<div class="card upload-card">
   <form method="post" enctype="multipart/form-data" id="upload-form">
     {% csrf_token %}
     <div class="grid-2">
-      <div class="field"><label for="id_org">Организация (отправитель)</label>{{ form.org }}{% for error in form.org.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
-      <div class="field"><label for="id_file">Файл обмена</label>{{ form.file }}{% for error in form.file.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_org">Организация-отправитель</label>{{ form.org }}{% for error in form.org.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_file">Файл обмена</label>{{ form.file }}<span class="helptext">G1*.xml, users*.xml или Excel, не более 10 МБ</span>{% for error in form.file.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
     </div>
     {% for error in form.non_field_errors %}<div class="alert alert--error">{{ error }}</div>{% endfor %}
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Загрузить и обработать</button>
-      <a class="btn btn--ghost" href="{% url 'exchange:logs' %}">Журнал загрузок</a>
+      <a class="btn btn--ghost" href="{% url 'exchange:logs' %}">Отмена</a>
     </div>
   </form>
 </div>

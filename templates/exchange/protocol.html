@@ -1,15 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Протокол обработки {{ log.filename }}{% endblock %}
 {% block content %}
-<h1>Протокол обработки</h1>
-
-<div class="flex mb-2">
-  <a class="btn btn--ghost" href="{% url 'exchange:logs' %}">← В журнал загрузок</a>
-  <a class="btn btn--ghost" href="{% url 'exchange:upload' %}">Загрузить ещё</a>
-</div>
+<header class="module-heading module-heading--actions">
+  <a class="module-heading__back" href="{% url 'exchange:logs' %}">← Журнал загрузок</a>
+  <div><p class="page-heading__eyebrow">Результат проверки</p><h1>Протокол обработки</h1></div>
+  <div class="page-heading__actions"><a class="btn btn--primary" href="{% url 'exchange:upload' %}">Загрузить ещё</a></div>
+</header>
 
 <div class="card">
-  <dl class="dl">
+  <dl class="detail-list">
     <dt>Файл</dt><dd class="mono">{{ log.filename }}</dd>
     <dt>Организация</dt><dd>{{ log.get_org_display }}</dd>
     <dt>Тип</dt><dd>{{ log.get_kind_display }}</dd>
@@ -21,7 +20,7 @@
 </div>
 
 <div class="card">
-  <h2 class="text-muted mt-1">Протокол FLCP</h2>
+  <div class="section-heading"><div><p class="section-heading__index">ФЛК</p><h2>Результаты контроля</h2></div><span>{{ prs|length }} записей</span></div>
   <div class="table-wrap" tabindex="0" aria-label="Протокол ФЛК; прокручивается по горизонтали">
     <table class="data" data-client-sort>
       <thead><tr><th>Код</th><th>Поле</th><th data-type="num">Обращение</th><th>Комментарий</th></tr></thead>
@@ -35,7 +34,7 @@
           <td>{{ pr.COMMENT }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="4" class="text-muted">Протокол пуст.</td></tr>
+        <tr><td colspan="4" class="table-empty">Нарушений не зафиксировано.</td></tr>
         {% endfor %}
       </tbody>
     </table>

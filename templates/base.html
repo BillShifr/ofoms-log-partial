@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}{{ SYSTEM_META.SYSTEM_SHORT_TITLE }}{% endblock %} — {{ SYSTEM_META.SYSTEM_ORG }}</title>
-  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260911-7">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260911-8">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -43,7 +43,7 @@
     </div>
   </header>
 
-  <nav class="nav" aria-label="Основное меню">
+  {% if user.is_authenticated %}<nav class="nav" aria-label="Основное меню">
     <div class="container nav__scroll">
     <div class="nav__inner">
       <a class="nav__link {% if active_nav == 'journal' %}nav__link--active{% endif %}"
@@ -76,7 +76,7 @@
       {% endif %}
     </div>
     </div>
-  </nav>
+  </nav>{% endif %}
 
   <main id="main-content" class="container main">
     {% if messages %}

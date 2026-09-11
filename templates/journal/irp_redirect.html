@@ -1,10 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Переадресация № {{ irp.n_irp }}{% endblock %}
 {% block content %}
-<div class="flex mb-2">
-  <h1>Переадресация обращения № {{ irp.n_irp }}</h1>
-  <a class="btn btn--ghost" href="{% url 'journal:detail' irp.pk %}">← К обращению</a>
-</div>
+<header class="module-heading"><a class="module-heading__back" href="{% url 'journal:detail' irp.pk %}">← К обращению</a><p class="page-heading__eyebrow">Изменение маршрута</p><h1>Переадресация № {{ irp.n_irp }}</h1><p>Укажите получателя и дату направления обращения.</p></header>
 
 <div class="card">
   <form method="post">
@@ -18,9 +15,9 @@
       </div>
       {% endfor %}
     </div>
-    <div class="form-actions">
+    <div class="form-actions form-actions--sticky">
       <button class="btn btn--primary" type="submit">Сохранить переадресацию</button>
-      <a class="btn btn--accent" href="{% url 'journal:cover' irp.pk %}" target="_blank">Сопроводительное письмо</a>
+      <a class="btn btn--ghost" href="{% url 'journal:cover' irp.pk %}" target="_blank" rel="noopener">Сопроводительное письмо</a>
     </div>
   </form>
 </div>

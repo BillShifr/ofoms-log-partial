@@ -1,15 +1,12 @@
 """Администрирование журнала обращений (перенос из v1 + экспорт/импорт)."""
 
-import datetime
-import uuid
-
 from django.contrib import admin
 from django_admin_listfilter_dropdown.filters import RelatedDropdownFilter
 from import_export.admin import ExportMixin
 from rangefilter.filters import DateRangeFilterBuilder
 
-from apps.core.admin_utils import ImmutableAdminMixin
-from apps.employee.models import ORGS, TFOMS, Employee
+from apps.core.admin_utils import ReadOnlyAdminMixin
+from apps.employee.models import ORGS, TFOMS
 from apps.journal.models import (
     Irp,
     IrpAnswer,
@@ -21,7 +18,7 @@ from apps.journal.models import (
 
 
 @admin.register(Irp)
-class IrpAdmin(ExportMixin, admin.ModelAdmin):
+class IrpAdmin(ReadOnlyAdminMixin, ExportMixin, admin.ModelAdmin):
     """Обращения: списком с фильтрами, карточка с полным набором реквизитов."""
 
     model = Irp
@@ -114,49 +111,6 @@ class IrpAdmin(ExportMixin, admin.ModelAdmin):
             qs = qs.filter(employee_one__org=org)
         return qs
 
-    def formfield_for_choice_field(self, db_field, request, **kwargs):
-        if db_field.name == "otv_t":
-            if request.user.org == TFOMS:
-                kwargs["choices"] = ((1, "ТФОМС"),)
-            else:
-                kwargs["choices"] = ((2, "СМО"),)
-        if db_field.name == "otv_kon":
-            kwargs["choices"] = (o for o in ORGS if o[0] == request.user.org)
-        return super().formfield_for_choice_field(db_field, request, **kwargs)
-
-    def get_readonly_fields(self, request, obj=None):
-        if obj:
-            return self.readonly_fields + (
-                "employee_one",
-                "n_irp",
-                "otv_kon",
-                "otv_t",
-                "tf_id",
-            )
-        return self.readonly_fields
-
-    def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, **kwargs)
-        if not obj:
-            form.base_fields["employee_it"].queryset = Employee.objects.filter(
-                org=request.user.org
-            )
-            form.base_fields["employee_one"].queryset = Employee.objects.filter(
-                org=request.user.org
-            )
-            form.base_fields["employee_one"].initial = Employee.objects.filter(
-                pk=request.user.pk
-            ).first()
-            form.base_fields["n_irp"].initial = str(uuid.uuid4())
-            form.base_fields["n_irp"].widget.attrs["readonly"] = True
-            form.base_fields["date_create"].initial = datetime.date.today()
-            form.base_fields["time_create"].initial = datetime.datetime.now()
-            form.base_fields["data_plan"].initial = (
-                datetime.date.today() + datetime.timedelta(days=30)
-            )
-            form.base_fields["theme"].queryset = IrpTheme.objects.filter(version=3)
-        return form
-
     def org_name(self, obj):
         for code, name in ORGS:
             if code == obj.employee_one.org:
@@ -177,22 +131,24 @@ class IrpThemeAdmin(admin.ModelAdmin):
 
 
 @admin.register(XmlFiles)
-class XmlFilesAdmin(ImmutableAdminMixin, admin.ModelAdmin):
+class XmlFilesAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("filename", "smo", "data", "version", "year", "month", "day")
     list_filter = ("smo", "year")
 
 
 @admin.register(IrpHistory)
-class IrpHistoryAdmin(ImmutableAdminMixin, admin.ModelAdmin):
+class IrpHistoryAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("irp", "user", "changed_at")
     list_filter = ("changed_at",)
 
 
 @admin.register(IrpAnswer)
-class IrpAnswerAdmin(admin.ModelAdmin):
+class IrpAnswerAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("irp", "user", "is_preliminary", "created_at")
     list_filter = ("is_preliminary",)
     search_fields = ("irp__n_irp", "text")
 
 
-admin.site.register(IrpFile)
+@admin.register(IrpFile)
+class IrpFileAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+    list_display = ("id", "irp", "answer", "uploader", "created_at")

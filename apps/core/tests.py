@@ -33,15 +33,24 @@ from apps.core.tokens import (
 from apps.core.uploads import BoundedUploadHandler
 from apps.core.validators import ComplexityPasswordValidator
 from apps.exchange.models import ImportLog
-from apps.journal.models import IrpHistory, XmlFiles
+from apps.journal.models import Irp, IrpAnswer, IrpFile, IrpHistory, XmlFiles
 from apps.system.models import NewsCategory, TaskRun
 
 User = get_user_model()
 
 
-class ImmutableAuditAdminTests(TestCase):
-    def test_audit_and_provenance_models_are_view_only(self):
-        for model in (EventLog, ImportLog, XmlFiles, IrpHistory, TaskRun):
+class ProtectedAdminTests(TestCase):
+    def test_audit_provenance_and_portal_managed_models_are_view_only(self):
+        for model in (
+            EventLog,
+            ImportLog,
+            XmlFiles,
+            IrpHistory,
+            TaskRun,
+            Irp,
+            IrpAnswer,
+            IrpFile,
+        ):
             with self.subTest(model=model._meta.label):
                 model_admin = admin.site._registry[model]
                 self.assertFalse(model_admin.has_add_permission(request=None))

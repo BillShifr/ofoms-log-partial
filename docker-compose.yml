@@ -63,7 +63,8 @@ services:
         - -c
         - >-
           import http.client,sys; c=http.client.HTTPConnection('127.0.0.1',8000,timeout=3);
-          c.request('GET','/healthz'); r=c.getresponse(); sys.exit(0 if r.status in (200,301,302) else 1)
+          c.request('GET','/readyz',headers={'X-Forwarded-Proto':'https'}); r=c.getresponse();
+          sys.exit(0 if r.status == 200 else 1)
       interval: 10s
       timeout: 5s
       retries: 6

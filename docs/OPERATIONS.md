@@ -26,7 +26,7 @@ docker compose ps
 docker compose logs --tail=200 web scheduler
 ```
 
-`web` сначала применяет миграции, затем запускает Gunicorn. `scheduler` начинает работу только после healthy-состояния `web` и раз в минуту вызывает `manage.py run_tasks`. Проверка доступности: `GET /healthz` (HTTP 200 либо HTTPS redirect до TLS-терминатора).
+`web` сначала применяет миграции, затем запускает Gunicorn. `scheduler` начинает работу только после ready-состояния `web` и раз в минуту вызывает `manage.py run_tasks`. `GET /healthz` проверяет только живой HTTP-процесс, а `GET /readyz` выполняет `SELECT 1` в основной БД и возвращает 503 при потере соединения. Compose обращается к readiness с внутренним доверенным `X-Forwarded-Proto: https` и принимает только HTTP 200, поэтому HTTPS redirect не может дать ложный healthy.
 
 Перед `web` Compose запускает одноразовый `volume-init`: он назначает рабочим каталогам `media` и `exchange` UID/GID 10001 и завершается. Gunicorn и scheduler постоянно работают без root-прав. Если внешний bind mount не допускает `chown`, запуск останавливается до исправления прав на host вместо старта приложения без доступа к файлам.
 
@@ -75,6 +75,7 @@ docker compose up -d
 ## Мониторинг и диагностика
 
 - `docker compose ps`: `db` и `web` должны быть healthy, `scheduler` — running;
+- `curl -fsS https://<host>/healthz` проверяет liveness, `curl -fsS https://<host>/readyz` — готовность приложения и PostgreSQL;
 - `docker compose logs web`: HTTP/WSGI ошибки и миграции;
 - `docker compose logs scheduler`: результаты автоматизированных заданий;
 - модуль «События»: действия пользователей и результаты операций;

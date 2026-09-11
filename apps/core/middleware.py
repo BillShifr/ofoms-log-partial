@@ -1,7 +1,7 @@
 """AuditMiddleware: сквозное журналирование HTTP-запросов (ТЗ разд. 3.4, СЗИ).
 
 Фиксирует вход, выход, критичные операции (POST с изменениями) и ошибки.
-Не логирует статику и healthz-проверки.
+Не логирует статику и liveness/readiness-проверки.
 """
 
 import time
@@ -11,7 +11,7 @@ from django.http import HttpResponse
 
 from apps.core.models import EventLog, log_event
 
-_IGNORED_PREFIXES = ("/static/", "/media/", "/healthz", "/favicon.ico")
+_IGNORED_PREFIXES = ("/static/", "/media/", "/healthz", "/readyz", "/favicon.ico")
 _IGNORED_ADMIN_SEGMENTS = ("/admin/jsi18n",)
 _LOGIN_PATHS = ("/accounts/login/", "/accounts/token-login/")
 

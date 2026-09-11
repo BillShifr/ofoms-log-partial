@@ -6,13 +6,14 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from unittest import mock
 
 import jwt
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -82,12 +83,35 @@ class ProductionSettingsTests(TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "200")
 
+    def test_liveness_and_readiness_are_uncached_and_readiness_queries_database(self):
+        with self.assertNumQueries(0):
+            liveness = self.client.get("/healthz")
+        with self.assertNumQueries(1):
+            readiness = self.client.get("/readyz")
+
+        self.assertEqual(liveness.status_code, 200)
+        self.assertEqual(liveness.content, b"ok")
+        self.assertEqual(readiness.status_code, 200)
+        self.assertEqual(readiness.content, b"ready")
+        self.assertEqual(liveness.headers["Cache-Control"], "no-store")
+        self.assertEqual(readiness.headers["Cache-Control"], "no-store")
+
+    def test_readiness_fails_closed_when_database_is_unavailable(self):
+        with mock.patch.object(connection, "cursor", side_effect=DatabaseError("offline")):
+            response = self.client.get("/readyz")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.content, b"unavailable")
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+
     def test_compose_binds_web_to_loopback_by_default(self):
         compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
         example = (settings.BASE_DIR / ".env.example").read_text()
 
         self.assertIn("${WEB_BIND_ADDRESS:-127.0.0.1}:8000:8000", compose)
         self.assertIn("TRUST_PROXY_SSL_HEADER: ${TRUST_PROXY_SSL_HEADER:-True}", compose)
+        self.assertIn("c.request('GET','/readyz',headers={'X-Forwarded-Proto':'https'})", compose)
+        self.assertIn("r.status == 200", compose)
         self.assertIn("SESSION_COOKIE_SECURE=True", example)
         self.assertIn("SECURE_SSL_REDIRECT=True", example)
 

@@ -324,15 +324,15 @@ table.data tbody tr[data-href]:focus-within {
 }
 table.data tr.row--overdue { background: color-mix(in srgb, var(--chip-red) 60%, var(--card)); box-shadow: inset 4px 0 var(--danger); }
 table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%, var(--card)); box-shadow: inset 4px 0 var(--warn); }
-.data--journal { font-size: .82rem; }
-.data--journal th, .data--journal td { padding: 10px 12px; }
-.data--journal thead tr:not(.group-row) th { background: color-mix(in srgb, var(--bg) 62%, var(--card)); }
-.data--journal tbody tr:nth-child(even):not(.row-detail) { background: color-mix(in srgb, var(--bg) 22%, var(--card)); }
-.data--journal tbody tr.row--overdue { background: color-mix(in srgb, var(--danger) 4%, var(--card)); box-shadow: none; }
-.data--journal tbody tr.row--open { background: color-mix(in srgb, var(--warn) 4%, var(--card)); box-shadow: none; }
+.data--journal { font-size: .8rem; }
+.data--journal th, .data--journal td { padding: 9px 10px; }
+.data--journal thead tr:not(.group-row) th { background: color-mix(in srgb, var(--bg) 44%, var(--card)); color: color-mix(in srgb, var(--ink) 78%, transparent); }
+.data--journal tbody tr:nth-child(even):not(.row-detail) { background: color-mix(in srgb, var(--bg) 12%, var(--card)); }
+.data--journal tbody tr.row--overdue { background: color-mix(in srgb, var(--danger) 2.5%, var(--card)); box-shadow: none; }
+.data--journal tbody tr.row--open { background: color-mix(in srgb, var(--warn) 2.5%, var(--card)); box-shadow: none; }
 .data--journal tbody tr.row--overdue td:first-child { border-left: 3px solid var(--danger); }
 .data--journal tbody tr.row--open td:first-child { border-left: 3px solid var(--warn); }
-.data--journal tbody tr:hover { background: color-mix(in srgb, var(--chip-blue) 40%, var(--card)); box-shadow: none; }
+.data--journal tbody tr:hover { background: color-mix(in srgb, var(--chip-blue) 24%, var(--card)); box-shadow: none; }
 .data--journal .col-theme { min-width: 180px; }
 .data--journal .col-n_irp { width: 172px; max-width: 172px; }
 .data--journal .col-z_f { min-width: 190px; }
@@ -346,19 +346,19 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 }
 .data--journal thead .col-status {
   z-index: 5;
-  background: color-mix(in srgb, var(--bg) 62%, var(--card));
+  background: color-mix(in srgb, var(--bg) 44%, var(--card));
 }
 .data--journal tbody tr:nth-child(even):not(.row-detail) .col-status {
-  background: color-mix(in srgb, var(--bg) 22%, var(--card));
+  background: color-mix(in srgb, var(--bg) 12%, var(--card));
 }
 .data--journal tbody tr.row--overdue .col-status {
-  background: color-mix(in srgb, var(--danger) 4%, var(--card));
+  background: color-mix(in srgb, var(--danger) 2.5%, var(--card));
 }
 .data--journal tbody tr.row--open .col-status {
-  background: color-mix(in srgb, var(--warn) 4%, var(--card));
+  background: color-mix(in srgb, var(--warn) 2.5%, var(--card));
 }
 .data--journal tbody tr:hover .col-status {
-  background: color-mix(in srgb, var(--chip-blue) 40%, var(--card));
+  background: color-mix(in srgb, var(--chip-blue) 24%, var(--card));
 }
 .cell-id { white-space: nowrap; letter-spacing: -.02em; }
 .compact-id { display: block; overflow: hidden; color: color-mix(in srgb, var(--ink) 78%, transparent); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -659,17 +659,16 @@ table.data .group-row th {
   text-transform: uppercase; letter-spacing: .07em;
   border: 0;
   border-radius: 0;
-  background: var(--card);
-  padding: 8px 12px 5px;
+  background: transparent;
+  padding: 9px 10px 7px;
 }
 table.data .group-row th.group-row__empty { background: transparent; border: none; border-radius: 0; }
 .group-row__label {
   display: inline-flex;
-  padding: 3px 8px;
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 4%, var(--card));
-  color: color-mix(in srgb, var(--ink) 72%, var(--accent));
+  padding: 1px 0 1px 7px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 62%, var(--line));
+  background: transparent;
+  color: color-mix(in srgb, var(--ink) 68%, transparent);
 }
 table.data th { border-top: 1px solid var(--line); }
 table.data.th-sticky th:first-child,

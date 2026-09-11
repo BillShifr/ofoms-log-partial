@@ -153,7 +153,9 @@ class JournalScreenTests(TestCase):
         self.assertIn(".data--journal .col-status", css)
         self.assertIn("position: sticky", css)
         self.assertIn("right: 0", css)
-        self.assertIn("background: color-mix(in srgb, var(--accent) 4%, var(--card))", css)
+        self.assertIn("border-left: 2px solid color-mix(in srgb, var(--accent) 62%, var(--line))", css)
+        self.assertIn("table.data .group-row th", css)
+        self.assertIn("background: transparent", css)
         self.assertNotIn("tbody tr:hover { background: color-mix(in srgb, var(--chip-green)", css)
 
     def test_suggest_runs_in_database_and_preserves_org_scope(self):

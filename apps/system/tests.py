@@ -557,12 +557,22 @@ class MessageTests(BaseSystemTestCase):
             reverse("system:message_attachment_download", args=[attachment.pk])
         )
         self.assertEqual(denied.status_code, 403)
+        self.assertFalse(
+            EventLog.objects.filter(target=f"message-attachment:{attachment.pk}").exists()
+        )
         self.client.force_login(self.operator)
         allowed = self.client.get(
             reverse("system:message_attachment_download", args=[attachment.pk])
         )
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(b"".join(allowed.streaming_content), b"private")
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.EXPORT,
+                user=self.operator,
+                target=f"message-attachment:{attachment.pk}",
+            ).exists()
+        )
 
     @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
     def test_deleting_conversation_removes_cascaded_attachment_file(self):
@@ -655,6 +665,32 @@ class DocTests(BaseSystemTestCase):
         self.assertEqual(resp.status_code, 200)
         doc.refresh_from_db()
         self.assertEqual(doc.downloads_count, 1)
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.EXPORT,
+                user=self.operator,
+                target=f"doc:{doc.pk}:{doc.title}",
+            ).exists()
+        )
+
+    def test_unavailable_document_is_not_counted_or_audited_as_downloaded(self):
+        doc = SystemDocument.objects.create(
+            title="Недоступный файл",
+            file=SimpleUploadedFile("missing.pdf", b"missing"),
+            uploaded_by=self.admin,
+        )
+        self.client.force_login(self.operator)
+
+        with patch.object(
+            doc.file.storage, "open", side_effect=OSError("offline")
+        ), self.assertRaises(OSError):
+            self.client.get(reverse("system:doc_download", args=[doc.pk]))
+
+        doc.refresh_from_db()
+        self.assertEqual(doc.downloads_count, 0)
+        self.assertFalse(
+            EventLog.objects.filter(target=f"doc:{doc.pk}:{doc.title}").exists()
+        )
 
     def test_video_can_be_viewed_inline_by_authenticated_user(self):
         doc = SystemDocument.objects.create(
@@ -668,6 +704,13 @@ class DocTests(BaseSystemTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "video/mp4")
         self.assertTrue(resp["Content-Disposition"].startswith("inline;"))
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.VIEW,
+                user=self.operator,
+                target=f"doc:{doc.pk}:view",
+            ).exists()
+        )
 
     def test_video_view_requires_authentication(self):
         doc = SystemDocument.objects.create(
@@ -1146,12 +1189,22 @@ class TaskTests(BaseSystemTestCase):
             reverse("system:task_file_download", args=[attachment.pk])
         )
         self.assertEqual(denied.status_code, 403)
+        self.assertFalse(
+            EventLog.objects.filter(target=f"task-file:{attachment.pk}").exists()
+        )
         self.client.force_login(self.admin)
         allowed = self.client.get(
             reverse("system:task_file_download", args=[attachment.pk])
         )
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(b"".join(allowed.streaming_content), b"result")
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.EXPORT,
+                user=self.admin,
+                target=f"task-file:{attachment.pk}",
+            ).exists()
+        )
 
     def test_task_rejects_video_attachment_with_visible_error(self):
         task = self._make_task()

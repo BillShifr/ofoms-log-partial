@@ -647,8 +647,16 @@ def message_attachment_download(request, pk):
         pk=pk,
     )
     _participant_or_404(request.user, attachment.reply.thread.conversation)
+    file_handle = attachment.file.open("rb")
+    log_event(
+        module="system",
+        event_type=EventLog.EventType.EXPORT,
+        user=request.user,
+        target=f"message-attachment:{attachment.pk}",
+        ip=request.META.get("REMOTE_ADDR"),
+    )
     return FileResponse(
-        attachment.file.open("rb"),
+        file_handle,
         filename=attachment.file.name.rsplit("/", 1)[-1],
         as_attachment=True,
     )
@@ -932,8 +940,16 @@ def task_toggle(request, pk):
 def task_file_download(request, pk):
     """Выдаёт служебное вложение задачи только администратору."""
     attachment = get_object_or_404(TaskFile, pk=pk)
+    file_handle = attachment.file.open("rb")
+    log_event(
+        module="system",
+        event_type=EventLog.EventType.EXPORT,
+        user=request.user,
+        target=f"task-file:{attachment.pk}",
+        ip=request.META.get("REMOTE_ADDR"),
+    )
     return FileResponse(
-        attachment.file.open("rb"),
+        file_handle,
         filename=attachment.file.name.rsplit("/", 1)[-1],
         as_attachment=True,
     )
@@ -1031,6 +1047,7 @@ def doc_upload(request):
 def doc_download(request, pk):
     """Скачивание документа с учётом счётчика загрузок (PRD v3 §2.8)."""
     doc = get_object_or_404(SystemDocument, pk=pk)
+    file_handle = doc.file.open("rb")
     SystemDocument.objects.filter(pk=pk).update(downloads_count=F("downloads_count") + 1)
     log_event(
         module="system",
@@ -1039,7 +1056,7 @@ def doc_download(request, pk):
         target=f"doc:{doc.pk}:{doc.title}",
         ip=request.META.get("REMOTE_ADDR"),
     )
-    return FileResponse(doc.file.open("rb"), filename=doc.file.name.split("/")[-1], as_attachment=True)
+    return FileResponse(file_handle, filename=doc.file.name.split("/")[-1], as_attachment=True)
 
 
 @login_required
@@ -1053,8 +1070,16 @@ def doc_view(request, pk):
 
     filename = doc.file.name.rsplit("/", 1)[-1]
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    file_handle = doc.file.open("rb")
+    log_event(
+        module="system",
+        event_type=EventLog.EventType.VIEW,
+        user=request.user,
+        target=f"doc:{doc.pk}:view",
+        ip=request.META.get("REMOTE_ADDR"),
+    )
     return FileResponse(
-        doc.file.open("rb"),
+        file_handle,
         as_attachment=False,
         filename=filename,
         content_type=content_type,

@@ -16,7 +16,8 @@ from apps.core.models import EventLog, log_event
 
 _IGNORED_PREFIXES = ("/static/", "/media/", "/healthz", "/readyz", "/favicon.ico")
 _IGNORED_ADMIN_SEGMENTS = ("/admin/jsi18n",)
-_LOGIN_PATHS = ("/accounts/login/", "/accounts/token-login/")
+_LOGIN_PATHS = ("/accounts/login/", "/accounts/token-login/", "/admin/login/")
+_LOGOUT_PATHS = ("/accounts/logout/", "/admin/logout/")
 
 
 class TrustedProxyClientIPMiddleware:
@@ -150,14 +151,12 @@ class AuditMiddleware:
                 if actor and actor.is_authenticated
                 else EventLog.EventType.LOGIN_FAILED
             )
-        elif request.path.startswith("/accounts/logout"):
+        elif request.path in _LOGOUT_PATHS and request.method == "POST":
             event_type = EventLog.EventType.LOGOUT
         elif status >= 500 or status >= 400:
             event_type = EventLog.EventType.OTHER
 
-        if event_type is not None or (
-            request.method not in ("GET", "HEAD") and not request.path.startswith("/admin/")
-        ):
+        if event_type is not None or request.method not in ("GET", "HEAD"):
             if status in (401, 403):
                 result = EventLog.Result.DENIED
             elif event_type == EventLog.EventType.LOGIN_FAILED or status >= 400:

@@ -34,7 +34,7 @@ from apps.core.uploads import BoundedUploadHandler
 from apps.core.validators import ComplexityPasswordValidator
 from apps.exchange.models import ImportLog
 from apps.journal.models import IrpHistory, XmlFiles
-from apps.system.models import TaskRun
+from apps.system.models import NewsCategory, TaskRun
 
 User = get_user_model()
 
@@ -1041,6 +1041,67 @@ class AuthenticationAuditTests(TestCase):
         event = EventLog.objects.get(target="POST /accounts/logout/")
         self.assertEqual(event.event_type, EventLog.EventType.LOGOUT)
         self.assertEqual(event.user, self.user)
+
+    def test_successful_django_admin_mutation_is_recorded_in_event_log(self):
+        administrator = User.objects.create_superuser(
+            username="audit-admin",
+            password="GoodPass!1",
+            org=81000,
+        )
+        self.client.force_login(administrator)
+        url = reverse("admin:system_newscategory_add")
+
+        response = self.client.post(
+            url,
+            {"name": "Служебные объявления", "slug": "service", "_save": "Сохранить"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(NewsCategory.objects.filter(slug="service").exists())
+        event = EventLog.objects.get(target=f"POST {url}")
+        self.assertEqual(event.event_type, EventLog.EventType.OTHER)
+        self.assertEqual(event.result, EventLog.Result.OK)
+        self.assertEqual(event.user, administrator)
+
+    def test_django_admin_login_uses_authentication_event_type(self):
+        administrator = User.objects.create_superuser(
+            username="login-audit-admin",
+            password="GoodPass!1",
+            org=81000,
+        )
+        url = reverse("admin:login")
+
+        response = self.client.post(
+            url,
+            {
+                "username": administrator.username,
+                "password": "GoodPass!1",
+                "next": reverse("admin:index"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        event = EventLog.objects.get(target=f"POST {url}")
+        self.assertEqual(event.event_type, EventLog.EventType.LOGIN)
+        self.assertEqual(event.result, EventLog.Result.OK)
+        self.assertEqual(event.user, administrator)
+
+    def test_django_admin_logout_keeps_pre_request_actor(self):
+        administrator = User.objects.create_superuser(
+            username="logout-audit-admin",
+            password="GoodPass!1",
+            org=81000,
+        )
+        self.client.force_login(administrator)
+        url = reverse("admin:logout")
+
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 302)
+        event = EventLog.objects.get(target=f"POST {url}")
+        self.assertEqual(event.event_type, EventLog.EventType.LOGOUT)
+        self.assertEqual(event.result, EventLog.Result.OK)
+        self.assertEqual(event.user, administrator)
 
     @override_settings(TRUST_PROXY_CLIENT_IP_HEADER=True)
     def test_trusted_proxy_client_ip_is_recorded(self):

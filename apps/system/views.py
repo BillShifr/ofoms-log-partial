@@ -510,16 +510,19 @@ def conversation_create(request):
         return redirect("system:messages")
     form = NewConversationForm(request.POST)
     if form.is_valid():
-        conv = form.save(commit=False)
-        conv.save()
-        conv.participants.set(list(form.cleaned_data["participants"]) + [request.user])
-        log_event(
-            module="system",
-            event_type=EventLog.EventType.CREATE,
-            user=request.user,
-            target=f"conversation:{conv.pk}",
-            ip=request.META.get("REMOTE_ADDR"),
-        )
+        with transaction.atomic():
+            conv = form.save(commit=False)
+            conv.save()
+            conv.participants.set(
+                list(form.cleaned_data["participants"]) + [request.user]
+            )
+            log_event(
+                module="system",
+                event_type=EventLog.EventType.CREATE,
+                user=request.user,
+                target=f"conversation:{conv.pk}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
         messages.success(request, "Диалог создан.")
         return redirect("system:conversation", conv.pk)
     messages.error(request, "Не удалось создать диалог: проверьте форму.")
@@ -561,17 +564,18 @@ def conversation_thread_create(request, pk):
     conv = _participant_or_404(request.user, get_object_or_404(Conversation, pk=pk))
     form = ThreadForm(request.POST)
     if form.is_valid():
-        thread = form.save(commit=False)
-        thread.conversation = conv
-        thread.created_by = request.user
-        thread.save()
-        log_event(
-            module="system",
-            event_type=EventLog.EventType.CREATE,
-            user=request.user,
-            target=f"thread:{thread.pk}",
-            ip=request.META.get("REMOTE_ADDR"),
-        )
+        with transaction.atomic():
+            thread = form.save(commit=False)
+            thread.conversation = conv
+            thread.created_by = request.user
+            thread.save()
+            log_event(
+                module="system",
+                event_type=EventLog.EventType.CREATE,
+                user=request.user,
+                target=f"thread:{thread.pk}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
         return redirect("system:thread", thread.pk)
     messages.error(request, "Не удалось создать тему: укажите тему обсуждения.")
     return redirect("system:conversation", conv.pk)

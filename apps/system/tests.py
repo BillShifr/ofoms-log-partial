@@ -418,6 +418,55 @@ class MessageTests(BaseSystemTestCase):
             EventLog.objects.filter(event_type=EventLog.EventType.CREATE).exists()
         )
 
+    def test_conversation_create_rolls_back_object_and_participants_on_audit_failure(self):
+        self.client.force_login(self.operator)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:conversation_create"),
+                {"title": "Откат диалога", "participants": [str(self.admin.pk)]},
+            )
+
+        self.assertFalse(Conversation.objects.filter(title="Откат диалога").exists())
+
+    def test_create_thread_records_author_and_audit(self):
+        conv = self._conv()
+        self.client.force_login(self.operator)
+
+        response = self.client.post(
+            reverse("system:thread_create", args=[conv.pk]),
+            {"title": "Новая тема"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        thread = MessageThread.objects.get(title="Новая тема")
+        self.assertEqual(thread.created_by, self.operator)
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.CREATE,
+                user=self.operator,
+                target=f"thread:{thread.pk}",
+            ).exists()
+        )
+
+    def test_thread_create_rolls_back_on_audit_failure(self):
+        conv = self._conv()
+        self.client.force_login(self.operator)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:thread_create", args=[conv.pk]),
+                {"title": "Откат темы"},
+            )
+
+        self.assertFalse(MessageThread.objects.filter(title="Откат темы").exists())
+
     def test_conversation_list_query_count_does_not_grow_per_conversation(self):
         from django.test.utils import CaptureQueriesContext
 

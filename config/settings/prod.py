@@ -13,15 +13,17 @@ from .base import *  # noqa: F403
 DEBUG = False
 
 
-def _required_secret(name):
+def _required_secret(name, *, min_length=50, forbidden_prefixes=()):
     value = os.getenv(name, "").strip()
     if (
-        len(value) < 50
+        len(value) < min_length
         or len(set(value)) < 5
-        or value.startswith(("change-me", "django-insecure"))
+        or value.lower().startswith(
+            ("change-me", "django-insecure", *forbidden_prefixes)
+        )
     ):
         raise ImproperlyConfigured(
-            f"{name} must contain at least 50 characters, at least 5 unique "
+            f"{name} must contain at least {min_length} characters, at least 5 unique "
             "characters, and must not use a known development prefix."
         )
     return value
@@ -29,6 +31,11 @@ def _required_secret(name):
 
 SECRET_KEY = _required_secret("SECRET_KEY")
 JWT_SECRET = _required_secret("JWT_SECRET")
+DB_PASSWORD = _required_secret(
+    "DB_PASSWORD",
+    min_length=16,
+    forbidden_prefixes=("ejournal", "postgres", "password"),
+)
 
 SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True").lower() in (
     "1",
@@ -57,7 +64,7 @@ DATABASES["default"].update(  # noqa: F405
     {
         "NAME": os.getenv("DB_NAME", "ejournal"),
         "USER": os.getenv("DB_USER", "ejournal"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        "PASSWORD": DB_PASSWORD,
         "HOST": os.getenv("DB_HOST", "db"),
         "PORT": os.getenv("DB_PORT", "5432"),
     }

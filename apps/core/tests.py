@@ -1,5 +1,8 @@
 """Тесты core: парольная политика, блокировка, токены, журнал событий."""
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import jwt
@@ -16,6 +19,38 @@ from apps.core.tokens import EmployeeRepository, decode_token, issue_token, reso
 from apps.core.validators import ComplexityPasswordValidator
 
 User = get_user_model()
+
+
+class ProductionSettingsTests(TestCase):
+    def _import_settings(self, database_password):
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "DJANGO_SETTINGS_MODULE": "config.settings.prod",
+                "SECRET_KEY": "test-secret-key-with-more-than-fifty-characters-123456789",
+                "JWT_SECRET": "test-jwt-secret-with-more-than-fifty-characters-987654321",
+                "DB_PASSWORD": database_password,
+            }
+        )
+        return subprocess.run(
+            [sys.executable, "-c", "import config.settings.prod"],
+            cwd=settings.BASE_DIR,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def test_production_rejects_missing_or_default_database_password(self):
+        for password in ("", "ejournal", "postgres", "password"):
+            with self.subTest(password=password):
+                result = self._import_settings(password)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("DB_PASSWORD", result.stderr)
+
+    def test_production_accepts_strong_database_password(self):
+        result = self._import_settings("database-secret-4827-strong")
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 class ComplexityPasswordValidatorTests(TestCase):

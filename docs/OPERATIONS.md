@@ -5,9 +5,10 @@
 - Linux-хост с Docker Engine и Docker Compose v2;
 - PostgreSQL 14+ при внешнем размещении либо штатный PostgreSQL 16 из Compose;
 - TLS-терминатор перед портом приложения;
-- отдельные случайные значения `SECRET_KEY` и `JWT_SECRET` длиной не менее 50 символов.
+- отдельные случайные значения `SECRET_KEY` и `JWT_SECRET` длиной не менее 50 символов;
+- случайный пароль `DB_PASSWORD` длиной не менее 16 символов, отличный от имени БД и пользователя.
 
-Скопируйте `.env.example` в `.env`, замените секреты и пароль БД, укажите публичные имена в `ALLOWED_HOSTS`. Production defaults включают secure cookies, HTTPS redirect и HSTS. Если TLS завершается на reverse proxy, он должен передавать запрос приложению по доверенной внутренней сети и корректно формировать схему запроса согласно принятой инфраструктурной конфигурации.
+Скопируйте `.env.example` в `.env`, замените все значения `change-me` и укажите публичные имена в `ALLOWED_HOSTS`. Без безопасных `SECRET_KEY`, `JWT_SECRET` и `DB_PASSWORD` production settings и Compose завершаются с ошибкой до запуска сервисов. Production defaults включают secure cookies, HTTPS redirect и HSTS. Если TLS завершается на reverse proxy, он должен передавать запрос приложению по доверенной внутренней сети и корректно формировать схему запроса согласно принятой инфраструктурной конфигурации.
 
 ## Запуск и обновление
 
@@ -72,4 +73,3 @@ docker compose up -d
 - модуль «Задачи»: последний результат и лог каждого задания.
 
 Зависший запуск старше `TASK_STALE_AFTER_SECONDS` автоматически закрывается как ошибочный. Ручная диагностика без запуска новых заданий: `docker compose exec web .venv/bin/python manage.py run_tasks --recover-only`.
-

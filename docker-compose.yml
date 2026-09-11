@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-ejournal}
       POSTGRES_USER: ${DB_USER:-ejournal}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-ejournal}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
       DJANGO_SETTINGS_MODULE: config.settings.prod
       DB_NAME: ${DB_NAME:-ejournal}
       DB_USER: ${DB_USER:-ejournal}
-      DB_PASSWORD: ${DB_PASSWORD:-ejournal}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       DB_HOST: db
       DB_PORT: "5432"
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}

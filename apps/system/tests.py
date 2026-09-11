@@ -3,6 +3,7 @@
 import datetime
 import io
 import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib import messages
@@ -619,6 +620,38 @@ class MessageTests(BaseSystemTestCase):
             self.client.post(
                 reverse("system:reply", args=[thread.pk]),
                 {"body": "Не должно сохраниться"},
+            )
+
+        self.assertFalse(thread.replies.exists())
+
+    def test_reply_rollback_removes_saved_attachment_from_storage(self):
+        conv = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=conv, created_by=self.admin, title="Атомарный файл"
+        )
+        self.client.force_login(self.operator)
+
+        with tempfile.TemporaryDirectory() as media_root, override_settings(
+            MEDIA_ROOT=media_root
+        ):
+            with (
+                patch(
+                    "apps.system.views.log_event",
+                    side_effect=RuntimeError("audit"),
+                ),
+                self.assertRaises(RuntimeError),
+            ):
+                self.client.post(
+                    reverse("system:reply", args=[thread.pk]),
+                    {
+                        "body": "Не должно сохраниться",
+                        "attachment": SimpleUploadedFile(
+                            "rollback.txt", b"private", content_type="text/plain"
+                        ),
+                    },
+                )
+            self.assertFalse(
+                any(path.is_file() for path in Path(media_root).rglob("*"))
             )
 
         self.assertFalse(thread.replies.exists())

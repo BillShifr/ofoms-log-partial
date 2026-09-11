@@ -636,48 +636,57 @@ def thread_reply(request, pk):
     """Ответ в теме (с необязательным вложением-файлом)."""
     form = ReplyForm(request.POST)
     if form.is_valid():
-        with transaction.atomic():
-            thread = get_object_or_404(
-                MessageThread.objects.select_for_update().select_related("conversation"),
-                pk=pk,
-            )
-            _participant_or_404(request.user, thread.conversation)
-            if thread.is_closed:
-                raise PermissionDenied
+        attachment = None
+        try:
+            with transaction.atomic():
+                thread = get_object_or_404(
+                    MessageThread.objects.select_for_update().select_related(
+                        "conversation"
+                    ),
+                    pk=pk,
+                )
+                _participant_or_404(request.user, thread.conversation)
+                if thread.is_closed:
+                    raise PermissionDenied
 
-            reply = form.save(commit=False)
-            reply.thread = thread
-            reply.author = request.user
-            parent_id = (request.POST.get("parent") or "").strip()
-            if parent_id and parent_id.isdigit():
-                parent = MessageReply.objects.filter(
-                    pk=parent_id, thread=thread
-                ).first()
-                reply.parent = parent
-            reply.save()
-            uploaded = request.FILES.get("attachment")
-            if uploaded is not None:
-                from apps.system.validators import validate_attachment_file
+                reply = form.save(commit=False)
+                reply.thread = thread
+                reply.author = request.user
+                parent_id = (request.POST.get("parent") or "").strip()
+                if parent_id and parent_id.isdigit():
+                    parent = MessageReply.objects.filter(
+                        pk=parent_id, thread=thread
+                    ).first()
+                    reply.parent = parent
+                reply.save()
+                uploaded = request.FILES.get("attachment")
+                if uploaded is not None:
+                    from apps.system.validators import validate_attachment_file
 
-                try:
-                    validate_attachment_file(uploaded)
-                except Exception:  # noqa: BLE001 — не прошедший валидацию файл
-                    messages.error(
-                        request,
-                        "Вложение не прикреплено: недопустимый тип или размер файла.",
-                    )
-                else:
-                    MessageAttachment.objects.create(
-                        reply=reply, file=uploaded, uploaded_by=request.user
-                    )
-            log_event(
-                module="system",
-                event_type=EventLog.EventType.SEND,
-                user=request.user,
-                target=f"thread:{thread.pk}:reply:{reply.pk}",
-                ip=request.META.get("REMOTE_ADDR"),
-            )
-            messages.success(request, "Сообщение отправлено.")
+                    try:
+                        validate_attachment_file(uploaded)
+                    except Exception:  # noqa: BLE001 — не прошедший валидацию файл
+                        messages.error(
+                            request,
+                            "Вложение не прикреплено: недопустимый тип или размер файла.",
+                        )
+                    else:
+                        attachment = MessageAttachment(
+                            reply=reply, file=uploaded, uploaded_by=request.user
+                        )
+                        attachment.save()
+                log_event(
+                    module="system",
+                    event_type=EventLog.EventType.SEND,
+                    user=request.user,
+                    target=f"thread:{thread.pk}:reply:{reply.pk}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
+                messages.success(request, "Сообщение отправлено.")
+        except BaseException:
+            if attachment is not None and attachment.file._committed:
+                attachment.file.delete(save=False)
+            raise
     else:
         thread = get_object_or_404(
             MessageThread.objects.select_related("conversation"), pk=pk

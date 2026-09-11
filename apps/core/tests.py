@@ -294,6 +294,8 @@ class ProductionSettingsTests(TestCase):
         self.assertEqual(compose.count("logging: *default-logging"), 4)
 
     def test_compose_hardens_long_running_application_services(self):
+        from apps.system.validators import VIDEO_MAX_SIZE_MB
+
         compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
 
         self.assertIn("x-app-security: &app-security", compose)
@@ -301,7 +303,10 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("read_only: true", compose)
         self.assertIn("no-new-privileges:true", compose)
         self.assertIn("cap_drop:\n    - ALL", compose)
-        self.assertIn("/tmp:size=64m,mode=1777", compose)
+        self.assertIn("/tmp:size=256m,mode=1777", compose)
+        tmpfs_size = re.search(r"/tmp:size=(\d+)m,mode=1777", compose)
+        self.assertIsNotNone(tmpfs_size)
+        self.assertGreater(int(tmpfs_size.group(1)), VIDEO_MAX_SIZE_MB)
 
     def test_uv_sync_treats_application_as_virtual_project(self):
         project = (settings.BASE_DIR / "pyproject.toml").read_text()

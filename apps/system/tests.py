@@ -36,6 +36,7 @@ from apps.system.models import (
     TaskAlreadyRunning,
     TaskFile,
     TaskJob,
+    TaskNote,
     TaskRun,
     UserTableViewPref,
 )
@@ -1568,6 +1569,25 @@ class TaskTests(BaseSystemTestCase):
 
         self.assertFalse(task.notes.exists())
 
+    def test_task_note_delete_rolls_back_when_audit_fails(self):
+        task = self._make_task()
+        note = TaskNote.objects.create(
+            task=task, author=self.admin, text="Останется после отката"
+        )
+        self.client.force_login(self.admin)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:task_update", args=[task.pk]),
+                {"action": "note_delete", "note_id": note.pk},
+            )
+
+        note.refresh_from_db()
+        self.assertEqual(note.text, "Останется после отката")
+
     def test_task_status_cannot_be_forged_through_form(self):
         self.client.force_login(self.admin)
 
@@ -1856,9 +1876,17 @@ class TaskTests(BaseSystemTestCase):
         self.assertEqual(resp.status_code, 302)
         note.refresh_from_db()
         self.assertEqual(note.text, "Изменённая заметка")
-        resp = self.client.post(url, {"action": "note_delete", "note_id": note.pk})
+        note_id = note.pk
+        resp = self.client.post(url, {"action": "note_delete", "note_id": note_id})
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(task.notes.exists())
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.DELETE,
+                user=self.admin,
+                target=f"task:{task.pk}:note:{note_id}",
+            ).exists()
+        )
 
     def test_assignee_suggest(self):
         self.client.force_login(self.admin)

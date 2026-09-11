@@ -932,9 +932,10 @@ def _task_update(request, pk, *, for_update=False):
         except TaskNote.DoesNotExist:
             messages.error(request, "Заметка не найдена.")
         else:
+            note_id = note.pk
             note.delete()
             log_event(module="system", event_type=EventLog.EventType.DELETE,
-                      user=request.user, target=f"task:{task.pk}:note:{note.pk}",
+                      user=request.user, target=f"task:{task.pk}:note:{note_id}",
                       ip=request.META.get("REMOTE_ADDR"))
             messages.success(request, "Заметка удалена.")
         return redirect("system:task_update", pk=task.pk)

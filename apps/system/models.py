@@ -6,7 +6,7 @@ from pathlib import PurePosixPath
 
 from django.conf import settings
 from django.db import models, transaction
-from django.db.models.signals import post_delete
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.text import slugify
@@ -93,6 +93,25 @@ class NewsItem(models.Model):
                 n += 1
             self.slug = slug
         return super().save(*args, **kwargs)
+
+
+@receiver(pre_save, sender=NewsItem)
+def capture_replaced_news_cover(sender, instance, **kwargs):
+    """Запоминает прежнюю обложку до обновления строки новости."""
+    if not instance.pk:
+        return
+    previous = sender.objects.filter(pk=instance.pk).only("cover_image").first()
+    if previous and previous.cover_image.name != instance.cover_image.name:
+        instance._replaced_cover_image = previous.cover_image
+
+
+@receiver(post_save, sender=NewsItem)
+def delete_replaced_news_cover_after_commit(sender, instance, **kwargs):
+    """Удаляет заменённую обложку после успешного сохранения новой версии."""
+    previous = getattr(instance, "_replaced_cover_image", None)
+    if previous is not None:
+        delete_field_file_after_commit(previous)
+        del instance._replaced_cover_image
 
 
 @receiver(post_delete, sender=NewsItem)

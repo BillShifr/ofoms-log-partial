@@ -645,6 +645,25 @@ class NewsTests(BaseSystemTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(storage.exists(name))
 
+    @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
+    def test_replacing_news_cover_removes_previous_file_after_commit(self):
+        item = NewsItem.objects.create(
+            title="Новость с заменяемой обложкой",
+            author=self.admin,
+            cover_image=SimpleUploadedFile("old-cover.png", b"old"),
+        )
+        storage = item.cover_image.storage
+        old_name = item.cover_image.name
+        self.assertTrue(storage.exists(old_name))
+
+        item.cover_image = SimpleUploadedFile("new-cover.png", b"new")
+        with self.captureOnCommitCallbacks(execute=True):
+            item.save()
+
+        self.assertFalse(storage.exists(old_name))
+        self.assertTrue(storage.exists(item.cover_image.name))
+        self.assertEqual(item.cover_image.read(), b"new")
+
     def test_detail_increments_views(self):
         item = NewsItem.objects.create(
             title="Сводка", text="<b>текст</b>", author=self.admin, is_active=True

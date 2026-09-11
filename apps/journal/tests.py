@@ -8,6 +8,7 @@ import datetime
 import tempfile
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -335,6 +336,24 @@ class JournalScreenTests(TestCase):
         self.assertContains(response, 'data-conditional-controller="id_irp_type"')
         self.assertContains(response, 'data-conditional-controller="id_pr_out"', count=2)
         self.assertContains(response, "js/conditional-fields.js")
+
+    def test_conditional_fields_css_can_override_field_layout(self):
+        css = (settings.BASE_DIR / "static/css/portal.css").read_text()
+        self.assertIn(".field[hidden] { display: none; }", css)
+
+    def test_empty_insured_person_section_is_collapsed(self):
+        self.client.force_login(self.tfoms_user)
+        response = self.client.get(reverse("journal:create"))
+        self.assertContains(response, '<details class="form-disclosure">')
+        self.assertContains(response, "При необходимости")
+
+    def test_populated_insured_person_section_is_open(self):
+        irp = self._make_irp()
+        irp.in_f = "Сидоров"
+        irp.save(update_fields=["in_f"])
+        self.client.force_login(self.tfoms_user)
+        response = self.client.get(reverse("journal:edit", args=[irp.pk]))
+        self.assertContains(response, '<details class="form-disclosure" open>')
 
     def test_print_requires_login(self):
         irp = self._make_irp()

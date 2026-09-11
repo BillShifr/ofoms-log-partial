@@ -332,6 +332,7 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 /* ---------- Формы ---------- */
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px 20px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
+.field[hidden] { display: none; }
 .field .field-error { color: var(--danger); font-size: .85rem; }
 .field label { font-weight: 600; font-size: .9rem; }
 .field input,
@@ -392,9 +393,19 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .form-card > form { padding: 0 26px; }
 .form-section-heading { display: flex; gap: 14px; align-items: flex-start; margin: 0 -26px 20px; padding: 19px 26px 14px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--chip-blue) 52%, var(--card)); }
 .form-section-heading:first-of-type { border-top: 0; }
-.form-section-heading > span { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; background: var(--card); color: var(--primary); font-size: .72rem; font-weight: 800; box-shadow: inset 0 0 0 1px var(--line); }
+.form-section-heading > span:first-child { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; background: var(--card); color: var(--primary); font-size: .72rem; font-weight: 800; box-shadow: inset 0 0 0 1px var(--line); }
 .form-section-heading h2 { margin: 0; font-size: 1.06rem; }
 .form-section-heading p { margin: 3px 0 0; color: color-mix(in srgb, var(--ink) 60%, transparent); font-size: .8rem; }
+.form-disclosure { margin: 0 -26px; }
+.form-disclosure__summary { margin-inline: 0; cursor: pointer; list-style: none; align-items: center; }
+.form-disclosure__summary::-webkit-details-marker { display: none; }
+.form-disclosure__summary::before { content: "›"; order: 3; color: var(--primary); font-size: 1.5rem; line-height: 1; transition: transform .16s ease; }
+.form-disclosure[open] .form-disclosure__summary::before { transform: rotate(90deg); }
+.form-disclosure__summary:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.form-disclosure__summary > div { flex: 1; min-width: 0; }
+.form-disclosure__action { flex: 0 0 auto; padding: 6px 10px; border-radius: 9px; background: var(--card); color: var(--primary); font-size: .78rem; font-weight: 800; box-shadow: inset 0 0 0 1px var(--line); }
+.form-disclosure[open] .form-disclosure__action { display: none; }
+.form-disclosure__content { margin-inline: 26px; }
 .form-card .form-grid { margin-bottom: 26px; }
 .field:has(:required) > label::after { content: " *"; color: var(--danger); }
 .form-actions--sticky { position: sticky; bottom: 0; z-index: 3; margin: 8px -26px 0; padding: 14px 26px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--card) 94%, transparent); box-shadow: 0 -8px 20px rgba(14,36,51,.06); backdrop-filter: blur(10px); }
@@ -840,6 +851,10 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
   .form-card { margin-inline: -12px; border-radius: 0; border-inline: 0; }
   .form-card > form { padding-inline: 16px; }
   .form-section-heading { margin-inline: -16px; padding-inline: 16px; }
+  .form-disclosure { margin-inline: -16px; }
+  .form-disclosure__summary { margin-inline: 0; }
+  .form-disclosure__content { margin-inline: 16px; }
+  .form-disclosure__action { display: none; }
   .form-grid { grid-template-columns: minmax(0, 1fr); }
   .form-actions--sticky { margin-inline: -16px; padding-inline: 16px; }
   .form-actions--sticky .btn { flex: 1; justify-content: center; }

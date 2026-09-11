@@ -52,8 +52,9 @@
       <div class="field"><label>E-mail</label>{{ form.e_mail }}{{ form.e_mail.errors }}</div>
     </div>
 
-    <div class="form-section-heading"><span>04</span><div><h2>Застрахованный</h2><p>Заполняется, если обращение подано за другого человека</p></div></div>
-    <div class="form-grid">
+    <details class="form-disclosure"{% if form.in_f.value or form.in_i.value or form.in_o.value or form.in_dr.value or form.in_enp.value or form.in_smo.value or form.in_doctype.value or form.in_docser.value or form.in_docnum.value %} open{% endif %}>
+      <summary class="form-section-heading form-disclosure__summary"><span>04</span><div><h2>Застрахованный</h2><p>Заполняется, если обращение подано за другого человека</p></div><span class="form-disclosure__action" aria-hidden="true">При необходимости</span></summary>
+      <div class="form-grid form-disclosure__content">
       <div class="field"><label>Фамилия</label>{{ form.in_f }}{{ form.in_f.errors }}</div>
       <div class="field"><label>Имя</label>{{ form.in_i }}{{ form.in_i.errors }}</div>
       <div class="field"><label>Отчество</label>{{ form.in_o }}{{ form.in_o.errors }}</div>
@@ -63,7 +64,8 @@
       <div class="field"><label>Тип документа</label>{{ form.in_doctype }}{{ form.in_doctype.errors }}</div>
       <div class="field"><label>Серия</label>{{ form.in_docser }}{{ form.in_docser.errors }}</div>
       <div class="field"><label>Номер</label>{{ form.in_docnum }}{{ form.in_docnum.errors }}</div>
-    </div>
+      </div>
+    </details>
 
     <div class="form-section-heading"><span>05</span><div><h2>Исполнение</h2><p>Ответственные организация и сотрудники</p></div></div>
     <div class="form-grid">

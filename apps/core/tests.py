@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from unittest import mock
 
@@ -606,6 +607,41 @@ class TokenTests(TestCase):
         token = issue_token(self.user, ttl=0)
         self.assertIsNone(resolve_user_catching(token))
 
+    @override_settings(JWT_TTL=300)
+    def test_decode_rejects_signed_token_exceeding_runtime_policy(self):
+        now = datetime.datetime.now(tz=datetime.UTC)
+        token = jwt.encode(
+            {
+                "sub": str(self.user.guid),
+                "aud": settings.JWT_AUDIENCE,
+                "jti": str(uuid.uuid4()),
+                "iat": now,
+                "exp": now + datetime.timedelta(seconds=301),
+            },
+            settings.JWT_SECRET,
+            algorithm=settings.JWT_ALGORITHM,
+        )
+
+        with self.assertRaises(jwt.InvalidTokenError):
+            decode_token(token)
+
+    @override_settings(JWT_TTL=300)
+    def test_decode_accepts_signed_token_at_runtime_policy_boundary(self):
+        now = datetime.datetime.now(tz=datetime.UTC)
+        token = jwt.encode(
+            {
+                "sub": str(self.user.guid),
+                "aud": settings.JWT_AUDIENCE,
+                "jti": str(uuid.uuid4()),
+                "iat": now,
+                "exp": now + datetime.timedelta(seconds=300),
+            },
+            settings.JWT_SECRET,
+            algorithm=settings.JWT_ALGORITHM,
+        )
+
+        self.assertEqual(decode_token(token)["sub"], str(self.user.guid))
+
     def test_resolve_user_uses_repository_adapter(self):
         class Repository(EmployeeRepository):
             def get_by_guid(self, guid):
@@ -739,6 +775,27 @@ class TokenLoginTests(TestCase):
         response = self.client.post(self.url, {"token": token})
         self.assertEqual(response.status_code, 403)
         self.assertNotIn("_auth_user_id", self.client.session)
+
+    @override_settings(JWT_TTL=300)
+    def test_signed_long_lived_token_is_rejected_without_consuming_jti(self):
+        now = datetime.datetime.now(tz=datetime.UTC)
+        token = jwt.encode(
+            {
+                "sub": str(self.user.guid),
+                "aud": settings.JWT_AUDIENCE,
+                "jti": str(uuid.uuid4()),
+                "iat": now,
+                "exp": now + datetime.timedelta(days=365),
+            },
+            settings.JWT_SECRET,
+            algorithm=settings.JWT_ALGORITHM,
+        )
+
+        response = self.client.post(self.url, {"token": token})
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertFalse(ConsumedToken.objects.exists())
 
     def test_unsafe_next_is_ignored(self):
         response = self.client.post(

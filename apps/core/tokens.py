@@ -7,6 +7,7 @@
 """
 
 import datetime as _dt
+import math
 import uuid
 
 import jwt
@@ -48,13 +49,31 @@ def issue_token(user, *, ttl: int | None = None, audience: str | None = None) ->
 def decode_token(token: str, *, audience: str | None = None):
     """Декодирование. Возвращает payload; кидает jwt-исключения при ошибках."""
     audience = settings.JWT_AUDIENCE if audience is None else audience
-    return jwt.decode(
+    payload = jwt.decode(
         token,
         settings.JWT_SECRET,
         algorithms=[settings.JWT_ALGORITHM],
         audience=audience,
         options={"require": ["sub", "aud", "jti", "iat", "exp"]},
     )
+    issued_at = payload["iat"]
+    expires_at = payload["exp"]
+    if isinstance(issued_at, bool) or isinstance(expires_at, bool):
+        raise jwt.InvalidTokenError("JWT timestamps must be numeric.")
+    try:
+        issued_at = float(issued_at)
+        expires_at = float(expires_at)
+    except (TypeError, ValueError) as error:
+        raise jwt.InvalidTokenError("JWT timestamps must be numeric.") from error
+    lifetime = expires_at - issued_at
+    if (
+        not math.isfinite(issued_at)
+        or not math.isfinite(expires_at)
+        or lifetime <= 0
+        or lifetime > settings.JWT_TTL
+    ):
+        raise jwt.InvalidTokenError("JWT lifetime exceeds the configured policy.")
+    return payload
 
 
 def consume_token(payload: dict) -> bool:

@@ -136,6 +136,9 @@ class JournalScreenTests(TestCase):
         self.assertContains(resp, f'data-href="{reverse("journal:detail", args=[irp.pk])}"')
         self.assertContains(resp, "table-row-link")
         self.assertContains(resp, reverse("journal:list_print"))
+        self.assertContains(resp, 'class="data data--wide data--journal')
+        self.assertContains(resp, 'class="group-row__label"')
+        self.assertContains(resp, 'class="col-status"')
 
     def test_print_list_preserves_filters_and_org_scope(self):
         own = self._make_irp(owner=self.smo_user)

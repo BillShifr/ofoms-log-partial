@@ -45,16 +45,16 @@
 
 <div class="card table-card">
   <div class="table-wrap" tabindex="0" aria-label="Таблица обращений; прокручивается по горизонтали">
-    <table class="data data--wide {% if fixed_first %}th-sticky{% endif %}">
+    <table class="data data--wide data--journal {% if fixed_first %}th-sticky{% endif %}">
       <thead>
         <tr class="group-row">
           {% for g in table_groups %}
-            <th colspan="{{ g.colspan }}" class="{% if not g.label %}group-row__empty{% endif %}">{{ g.label }}</th>
+            <th colspan="{{ g.colspan }}" scope="colgroup" class="{% if not g.label %}group-row__empty{% endif %}">{% if g.label %}<span class="group-row__label">{{ g.label }}</span>{% endif %}</th>
           {% endfor %}
         </tr>
         <tr>
           {% for col in cols %}
-            <th{% if col.aria_sort %} aria-sort="{{ col.aria_sort }}"{% endif %}>
+            <th scope="col" class="col-{{ col.key }}"{% if col.aria_sort %} aria-sort="{{ col.aria_sort }}"{% endif %}>
               {% if col.sortable %}
                 <a href="{{ col.sort_url }}">{{ col.label }}</a>
               {% else %}
@@ -69,7 +69,7 @@
         <tr class="clickable {% if not irp.is_closed and irp.is_overdue %}row--overdue{% elif not irp.is_closed and not irp.result %}row--open{% endif %}"
             data-href="{% url 'journal:detail' irp.pk %}">
           {% for col in cols %}
-            <td{% if col.key == 'n_irp' %} class="cell-id"{% endif %}>
+            <td class="col-{{ col.key }}{% if col.key == 'n_irp' %} cell-id{% endif %}">
               {% if col.key == 'id' %}<a class="table-row-link" href="{% url 'journal:detail' irp.pk %}" aria-label="Открыть обращение № {{ irp.n_irp }}">{{ irp.id }}</a>
               {% elif col.key == 'n_irp' %}<span class="mono">{{ irp.n_irp }}</span>
               {% elif col.key == 'date_create' %}<span data-value="{{ irp.date_create|date:'Y-m-d' }}">{{ irp.date_create|date:"d.m.Y" }}</span><br><span class="text-muted">{{ irp.time_create|time:"H:i"|default:"" }}</span>

@@ -363,3 +363,9 @@
 - Единый middleware назначает `no-store, no-cache, max-age=0, private`, `Pragma: no-cache` и просроченный `Expires` всем динамическим ответам независимо от status и content type.
 - Контракт покрывает анонимный redirect, 403/404/500, HTML-карточки, XLSX/PDF и защищённые FileResponse; отдельным view больше не нужно помнить о заголовке.
 - `/static/` исключён из middleware и остаётся под fingerprint/cache policy WhiteNoise. Reverse proxy обязан сохранять application cache headers.
+
+### 2026-09-11 — минимальная auth-поверхность
+
+- Широкий include `django.contrib.auth.urls` заменён явными LoginView и LogoutView; существующие route names, шаблон входа, audit и POST-only logout сохранены.
+- Неиспользуемые password reset/change/confirm endpoints больше не рендерят Django Admin UI и не создают скрытую зависимость от ненастроенного SMTP.
+- Корпоративный сброс пароля и разблокировка остаются административным процессом ТФОМС; все удалённые URL покрыты 404-регрессией.

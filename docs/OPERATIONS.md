@@ -22,6 +22,8 @@ Production использует встроенный Django/psycopg pool. По �
 
 Server-to-server клиент без browser metadata продолжает использовать Bearer или form POST напрямую. Браузерная форма обязана приходить с того же origin. Если отдельная доверенная SSO-подсистема выполняет cross-origin browser POST, перечислите её точные HTTPS origins в `TOKEN_LOGIN_TRUSTED_ORIGINS`; HTTP, credentials, path/query/fragment запрещены. Cross-site запрос от любого иного origin отклоняется до потребления `jti`, поэтому он не может подменить сессию сотрудника или погасить валидный токен.
 
+Интерактивная auth-поверхность ограничена `/accounts/login/` и POST `/accounts/logout/`; интеграционный вход расположен на `/accounts/token-login/`. Стандартные Django password-reset/change endpoints намеренно не опубликованы: почтовое восстановление не настроено, смена, сброс и разблокировка корпоративной учётной записи выполняются администратором ТФОМС с аудитом через модуль пользователей.
+
 ## Запуск и обновление
 
 ```bash

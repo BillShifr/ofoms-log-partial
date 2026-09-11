@@ -330,6 +330,22 @@ class FailedLoginLockTests(TestCase):
         self.assertEqual(self.user.failed_attempts, 3)
 
 
+class AuthenticationSurfaceTests(TestCase):
+    def test_only_explicit_interactive_auth_routes_are_exposed(self):
+        self.assertEqual(self.client.get("/accounts/login/").status_code, 200)
+        self.assertEqual(self.client.get("/accounts/logout/").status_code, 405)
+        for path in (
+            "/accounts/password_reset/",
+            "/accounts/password_reset/done/",
+            "/accounts/password_change/",
+            "/accounts/password_change/done/",
+            "/accounts/reset/example/token/",
+            "/accounts/reset/done/",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
+
+
 class TokenTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(

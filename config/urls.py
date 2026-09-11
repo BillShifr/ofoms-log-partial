@@ -4,6 +4,7 @@
 """
 
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 from django.db import DatabaseError, connections
 from django.http import HttpResponse
 from django.urls import include, path
@@ -45,7 +46,8 @@ urlpatterns = [
     path("readyz", readyz, name="readyz"),
     path("admin/", admin.site.urls),
     path("accounts/", include("apps.core.urls")),
-    path("accounts/", include("django.contrib.auth.urls")),
+    path("accounts/login/", auth_views.LoginView.as_view(), name="login"),
+    path("accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("journal/", include("apps.journal.urls")),
     path("exchange/", include("apps.exchange.urls")),
     path("reports/", include("apps.reports.urls")),

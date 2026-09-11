@@ -249,6 +249,57 @@ class EventLogTests(TestCase):
         self.assertIsNotNone(completed.duration_ms)
 
 
+class AuthenticationAuditTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="audit-user", password="GoodPass!1", org=81000
+        )
+
+    def test_successful_login_is_recorded_with_authenticated_user(self):
+        response = self.client.post(
+            reverse("login"),
+            {"username": self.user.username, "password": "GoodPass!1"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        event = EventLog.objects.get(target="POST /accounts/login/")
+        self.assertEqual(event.event_type, EventLog.EventType.LOGIN)
+        self.assertEqual(event.result, EventLog.Result.OK)
+        self.assertEqual(event.user, self.user)
+
+    def test_failed_login_is_recorded_without_user(self):
+        response = self.client.post(
+            reverse("login"),
+            {"username": self.user.username, "password": "wrong-password"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        event = EventLog.objects.get(target="POST /accounts/login/")
+        self.assertEqual(event.event_type, EventLog.EventType.LOGIN_FAILED)
+        self.assertEqual(event.result, EventLog.Result.FAILED)
+        self.assertIsNone(event.user)
+
+    def test_token_login_is_recorded_as_authenticated_login(self):
+        response = self.client.post(
+            reverse("core:token_login"), {"token": issue_token(self.user)}
+        )
+
+        self.assertEqual(response.status_code, 302)
+        event = EventLog.objects.get(target="POST /accounts/token-login/")
+        self.assertEqual(event.event_type, EventLog.EventType.LOGIN)
+        self.assertEqual(event.result, EventLog.Result.OK)
+        self.assertEqual(event.user, self.user)
+
+    def test_logout_keeps_pre_request_user_as_actor(self):
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("logout"))
+
+        self.assertEqual(response.status_code, 302)
+        event = EventLog.objects.get(target="POST /accounts/logout/")
+        self.assertEqual(event.event_type, EventLog.EventType.LOGOUT)
+        self.assertEqual(event.user, self.user)
+
+
 class FoldTests(TestCase):
     """Регистронезависимый поиск, не зависящий от локали БД (PRD v3 §2.3.2)."""
 

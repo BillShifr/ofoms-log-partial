@@ -13,6 +13,7 @@ from apps.core.models import EventLog, log_event
 
 _IGNORED_PREFIXES = ("/static/", "/media/", "/healthz", "/favicon.ico")
 _IGNORED_ADMIN_SEGMENTS = ("/admin/jsi18n",)
+_LOGIN_PATHS = ("/accounts/login/", "/accounts/token-login/")
 
 
 class ContentSecurityPolicyMiddleware:
@@ -47,8 +48,9 @@ class AuditMiddleware:
             return self.get_response(request)
 
         started_at = time.perf_counter()
-        user = request.user if getattr(request, "user", None) else None
+        user_before = request.user if getattr(request, "user", None) else None
         response = self.get_response(request)
+        user_after = request.user if getattr(request, "user", None) else None
 
         duration_ms = int((time.perf_counter() - started_at) * 1000)
 
@@ -59,10 +61,12 @@ class AuditMiddleware:
 
         # Логируем вход/выход и все не-GET запросы (изменения данных)
         event_type = None
-        if request.path.startswith("/accounts/login") and request.method == "POST":
+        actor = user_before
+        if request.path in _LOGIN_PATHS and request.method == "POST":
+            actor = user_after
             event_type = (
                 EventLog.EventType.LOGIN
-                if user and user.is_authenticated
+                if actor and actor.is_authenticated
                 else EventLog.EventType.LOGIN_FAILED
             )
         elif request.path.startswith("/accounts/logout"):
@@ -77,13 +81,11 @@ class AuditMiddleware:
                 module="http",
                 event_type=event_type or EventLog.EventType.OTHER,
                 result=(
-                    EventLog.Result.OK
-                    if status < 400
-                    else EventLog.Result.FAILED
-                    if status < 500
-                    else EventLog.Result.FAILED
+                    EventLog.Result.FAILED
+                    if event_type == EventLog.EventType.LOGIN_FAILED or status >= 400
+                    else EventLog.Result.OK
                 ),
-                user=user if user and user.is_authenticated else None,
+                user=actor if actor and actor.is_authenticated else None,
                 target=f"{request.method} {request.path}",
                 ip=request.META.get("REMOTE_ADDR"),
                 duration_ms=duration_ms,

@@ -60,15 +60,6 @@ def validate_xlsx_container(path: Path) -> None:
             raise ValueError("Распакованный XLSX превышает 100 МБ")
 
 
-def available_artifact_path(path: Path) -> Path:
-    """Preserve the original name once and never overwrite an existing artifact."""
-    if not path.exists():
-        return path
-    import uuid
-
-    return path.with_name(f"{path.stem}-{uuid.uuid4().hex[:8]}{path.suffix}")
-
-
 def write_unique_artifact(path: Path, chunks) -> Path:
     """Атомарно создаёт новый artifact, не перезаписывая параллельный файл."""
     import uuid
@@ -89,18 +80,39 @@ def write_unique_artifact(path: Path, chunks) -> Path:
             raise
 
 
+def reserve_unique_artifact_path(path: Path) -> Path:
+    """Атомарно резервирует свободное имя пустым файлом текущего процесса."""
+    import uuid
+
+    candidate = path
+    while True:
+        try:
+            candidate.touch(exist_ok=False)
+            return candidate
+        except FileExistsError:
+            candidate = path.with_name(
+                f"{path.stem}-{uuid.uuid4().hex[:8]}{path.suffix}"
+            )
+
+
 def archive_artifact(source: Path, archive_dir: Path, org: int) -> Path:
     """Move a processed input exactly once, including across filesystems."""
     org_dir = archive_dir / str(org)
     org_dir.mkdir(parents=True, exist_ok=True)
-    destination = available_artifact_path(org_dir / source.name)
+    destination = reserve_unique_artifact_path(org_dir / source.name)
     try:
         os.replace(source, destination)
     except OSError as exc:
-        if exc.errno != errno.EXDEV:
+        if exc.errno == errno.EXDEV:
+            try:
+                shutil.copy2(source, destination)
+                source.unlink()
+            except BaseException:
+                destination.unlink(missing_ok=True)
+                raise
+        else:
+            destination.unlink(missing_ok=True)
             raise
-        shutil.copy2(source, destination)
-        source.unlink()
     return destination
 
 
@@ -688,10 +700,10 @@ class ExcelIrpFile:
     def write_flcp(self, result: ImportResult) -> Path:
         org_dir = self._out_dir / str(self.org)
         org_dir.mkdir(parents=True, exist_ok=True)
-        out = available_artifact_path(org_dir / self.basename)
-        with open(out, "wb") as f:
-            f.write(result.flcp_bytes())
-        return out
+        return write_unique_artifact(
+            org_dir / self.basename,
+            (result.flcp_bytes(),),
+        )
 
 
 def _excel_row_to_irp(raw: dict) -> dict:

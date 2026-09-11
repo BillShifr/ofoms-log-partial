@@ -4,6 +4,7 @@ upsert по guid/n_irp, ограничение доступа к протоко�
 """
 
 import errno
+import os
 import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -660,6 +661,44 @@ class ImportCommandTests(ExchangeTestMixin, TestCase):
 
         copy_file.assert_not_called()
         self.assertTrue(source.exists())
+
+    def test_parallel_archives_never_overwrite_the_same_destination(self):
+        source_dirs = [Path(self.in_dir) / "first", Path(self.in_dir) / "second"]
+        sources = []
+        for source_dir, payload in zip(source_dirs, (b"first", b"second"), strict=True):
+            source_dir.mkdir()
+            source = source_dir / "G1R_same.xml"
+            source.write_bytes(payload)
+            sources.append(source)
+
+        barrier = Barrier(2)
+        real_replace = os.replace
+
+        def synchronized_replace(source, destination):
+            barrier.wait(timeout=5)
+            return real_replace(source, destination)
+
+        with patch(
+            "apps.exchange.importers.os.replace",
+            side_effect=synchronized_replace,
+        ), ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(
+                    archive_artifact,
+                    source,
+                    Path(self.arch_dir),
+                    81000,
+                )
+                for source in sources
+            ]
+            destinations = [future.result(timeout=5) for future in futures]
+
+        self.assertEqual(len(set(destinations)), 2)
+        self.assertEqual(
+            {destination.read_bytes() for destination in destinations},
+            {b"first", b"second"},
+        )
+        self.assertFalse(any(source.exists() for source in sources))
 
 
 class XsdValidationTests(ExchangeTestMixin, TestCase):

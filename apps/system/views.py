@@ -1183,6 +1183,30 @@ def news_detail(request, pk):
 
 @login_required
 @require_http_methods(["GET"])
+def news_cover(request, pk):
+    """Отдаёт обложку только пользователям, которым доступна сама новость."""
+    item = get_object_or_404(NewsItem, pk=pk)
+    if not item.is_active and not _is_admin(request.user):
+        raise Http404
+    if not item.cover_image:
+        raise Http404
+
+    filename = item.cover_image.name.rsplit("/", 1)[-1]
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    try:
+        file_handle = item.cover_image.open("rb")
+    except (FileNotFoundError, OSError):
+        raise Http404 from None
+    return FileResponse(
+        file_handle,
+        as_attachment=False,
+        filename=filename,
+        content_type=content_type,
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
 def news_suggest(request):
     """Автозаполнение поиска по новостям (PRD v3 §2.0.6)."""
     from django.http import JsonResponse

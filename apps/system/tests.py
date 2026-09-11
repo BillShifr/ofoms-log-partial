@@ -641,6 +641,54 @@ class NewsTests(BaseSystemTestCase):
         resp = self.client.get(reverse("system:news_detail", args=[item.pk]))
         self.assertEqual(resp.status_code, 404)
 
+    @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
+    def test_cover_uses_protected_endpoint(self):
+        item = NewsItem.objects.create(
+            title="Новость с обложкой",
+            text="Текст",
+            author=self.admin,
+            is_active=True,
+            cover_image=SimpleUploadedFile(
+                "protected-cover.png",
+                b"image-content",
+                content_type="image/png",
+            ),
+        )
+        cover_url = reverse("system:news_cover", args=[item.pk])
+
+        self.client.force_login(self.smo)
+        list_response = self.client.get(reverse("system:news"))
+        detail_response = self.client.get(reverse("system:news_detail", args=[item.pk]))
+        cover_response = self.client.get(cover_url)
+
+        self.assertContains(list_response, f'src="{cover_url}"')
+        self.assertContains(detail_response, f'src="{cover_url}"')
+        self.assertNotContains(list_response, item.cover_image.url)
+        self.assertEqual(cover_response.status_code, 200)
+        self.assertEqual(cover_response["Content-Type"], "image/png")
+        self.assertEqual(b"".join(cover_response.streaming_content), b"image-content")
+
+    @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
+    def test_cover_requires_login_and_respects_publication_status(self):
+        item = NewsItem.objects.create(
+            title="Скрытая обложка",
+            author=self.admin,
+            is_active=False,
+            cover_image=SimpleUploadedFile("hidden.png", b"hidden-image"),
+        )
+        cover_url = reverse("system:news_cover", args=[item.pk])
+
+        anonymous_response = self.client.get(cover_url)
+        self.assertEqual(anonymous_response.status_code, 302)
+
+        self.client.force_login(self.smo)
+        self.assertEqual(self.client.get(cover_url).status_code, 404)
+
+        self.client.force_login(self.admin)
+        admin_response = self.client.get(cover_url)
+        self.assertEqual(admin_response.status_code, 200)
+        self.assertEqual(b"".join(admin_response.streaming_content), b"hidden-image")
+
     def test_rich_text_rejects_script_and_protocol_relative_links(self):
         item = NewsItem.objects.create(
             title="Безопасная разметка",

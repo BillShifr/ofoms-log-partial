@@ -17,7 +17,7 @@
     {% if item.is_pinned %}<span class="badge badge--role">Закреплено</span>{% endif %}
   </div>
   <h1 class="mt-1 mb-1">{{ item.title }}</h1>
-  {% if item.cover_image %}<img class="news-detail__cover" src="{{ item.cover_image.url }}"
+  {% if item.cover_image %}<img class="news-detail__cover" src="{% url 'system:news_cover' item.pk %}"
       alt="{% if item.category %}{{ item.category.name }}{% endif %}">{% endif %}
   <div class="rich-text">{{ item.text|sanitize_rich }}</div>
 

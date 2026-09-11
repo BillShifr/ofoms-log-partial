@@ -14,3 +14,5 @@ tests
 .github
 .idea
 .vscode
+output
+tmp

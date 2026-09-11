@@ -101,6 +101,9 @@ class ReportQueriesTests(BaseReportTestCase):
         self.assertEqual(total["t1"], 1)
         self.assertEqual(total["t2"], 1)
         self.assertEqual(total["closed"], 1)
+        self.assertEqual(rows[0]["t3"], 0)
+        self.assertEqual(rows[0]["t4"], 0)
+        self.assertEqual(rows[0]["t5"], 0)
 
     def test_r2_by_type_percent(self):
         self._make(irp_type=1)

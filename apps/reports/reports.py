@@ -166,10 +166,12 @@ def r1_by_volume(user_org: int, filters: ReportFilters):
         bucket[f"t{row['irp_type']}"] = bucket.get(f"t{row['irp_type']}", 0) + 1
         if row["date_close"]:
             bucket["closed"] = bucket.get("closed", 0) + 1
-    rows = [
-        {"period": _bucket_label(key, monthly), **buckets[key]}
-        for key in sorted(buckets)
-    ]
+    rows = []
+    for key in sorted(buckets):
+        row = {"period": _bucket_label(key, monthly), **buckets[key]}
+        for report_key in ("total", "closed", "t1", "t2", "t3", "t4", "t5"):
+            row.setdefault(report_key, 0)
+        rows.append(row)
     total = {
         "period": "ИТОГО",
         "total": sum(r.get("total", 0) for r in rows),

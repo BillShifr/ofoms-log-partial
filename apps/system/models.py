@@ -21,6 +21,32 @@ from apps.system.validators import (
 logger = logging.getLogger("apps.system")
 
 
+def _save_with_generated_slug(instance, base, save, *args, **kwargs):
+    """Сохраняет bounded slug и повторяет insert только при его unique-гонке."""
+    if instance.slug:
+        return save(*args, **kwargs)
+
+    model = type(instance)
+    max_length = instance._meta.get_field("slug").max_length
+    base = base[:max_length]
+    suffix_number = 0
+    while True:
+        suffix = f"-{suffix_number}" if suffix_number else ""
+        candidate = f"{base[: max_length - len(suffix)]}{suffix}"
+        if model.objects.filter(slug=candidate).exclude(pk=instance.pk).exists():
+            suffix_number += 1
+            continue
+        instance.slug = candidate
+        try:
+            with transaction.atomic():
+                return save(*args, **kwargs)
+        except IntegrityError:
+            if not model.objects.filter(slug=candidate).exists():
+                raise
+            instance.slug = ""
+            suffix_number += 1
+
+
 class TaskAlreadyRunning(RuntimeError):
     """Задание уже захвачено другим worker-процессом."""
 
@@ -97,27 +123,8 @@ class NewsItem(models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
-        if self.slug:
-            return super().save(*args, **kwargs)
-
-        max_length = self._meta.get_field("slug").max_length
-        base = (slugify(self.title) or "news")[:max_length]
-        suffix_number = 0
-        while True:
-            suffix = f"-{suffix_number}" if suffix_number else ""
-            candidate = f"{base[: max_length - len(suffix)]}{suffix}"
-            if NewsItem.objects.filter(slug=candidate).exclude(pk=self.pk).exists():
-                suffix_number += 1
-                continue
-            self.slug = candidate
-            try:
-                with transaction.atomic():
-                    return super().save(*args, **kwargs)
-            except IntegrityError:
-                if not NewsItem.objects.filter(slug=candidate).exists():
-                    raise
-                self.slug = ""
-                suffix_number += 1
+        base = slugify(self.title) or "news"
+        return _save_with_generated_slug(self, base, super().save, *args, **kwargs)
 
 
 @receiver(pre_save, sender=NewsItem)
@@ -222,14 +229,8 @@ class SystemDocument(models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
-        if not self.slug:
-            base = slugify(self.title.split(".")[0]) or "doc"
-            slug, n = base, 1
-            while SystemDocument.objects.filter(slug=slug).exclude(pk=self.pk).exists():
-                slug = f"{base}-{n}"
-                n += 1
-            self.slug = slug
-        return super().save(*args, **kwargs)
+        base = slugify(self.title.split(".")[0]) or "doc"
+        return _save_with_generated_slug(self, base, super().save, *args, **kwargs)
 
     @property
     def size_display(self) -> str:

@@ -2260,36 +2260,52 @@ class TaskTests(BaseSystemTestCase):
         self.assertIn("Нет заданий", out.getvalue())
 
 
-class NewsSlugConcurrencyTests(TransactionTestCase):
-    def test_concurrent_equal_titles_receive_distinct_bounded_slugs(self):
+class GeneratedSlugConcurrencyTests(TransactionTestCase):
+    def _create_concurrently(self, model, factory):
         barrier = Barrier(2)
         thread_state = threading.local()
         original_exists = QuerySet.exists
 
-        def synchronize_first_news_slug_check(queryset):
+        def synchronize_first_slug_check(queryset):
             exists = original_exists(queryset)
-            if queryset.model is NewsItem and not getattr(thread_state, "checked", False):
+            if queryset.model is model and not getattr(thread_state, "checked", False):
                 thread_state.checked = True
                 barrier.wait(timeout=5)
             return exists
 
-        def create_news():
+        def create_object():
             connection.close()
             try:
-                item = NewsItem.objects.create(title="Long title " * 18, text="Текст")
-                return item.slug
+                return factory().slug
             finally:
                 connection.close()
 
         with (
-            patch.object(QuerySet, "exists", synchronize_first_news_slug_check),
+            patch.object(QuerySet, "exists", synchronize_first_slug_check),
             ThreadPoolExecutor(max_workers=2) as executor,
         ):
-            slugs = list(executor.map(lambda _: create_news(), range(2)))
+            slugs = list(executor.map(lambda _: create_object(), range(2)))
 
         self.assertEqual(len(set(slugs)), 2)
         self.assertTrue(all(len(slug) <= 50 for slug in slugs))
-        self.assertEqual(NewsItem.objects.count(), 2)
+        self.assertEqual(model.objects.count(), 2)
+
+    def test_concurrent_equal_news_titles_receive_distinct_bounded_slugs(self):
+        self._create_concurrently(
+            NewsItem,
+            lambda: NewsItem.objects.create(title="Long title " * 18, text="Текст"),
+        )
+
+    @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
+    def test_concurrent_equal_document_titles_receive_distinct_bounded_slugs(self):
+        def create_document():
+            filename = f"document-{threading.get_ident()}.pdf"
+            return SystemDocument.objects.create(
+                title="Verylongtitle" * 15,
+                file=SimpleUploadedFile(filename, b"%PDF-1.4"),
+            )
+
+        self._create_concurrently(SystemDocument, create_document)
 
 
 class TaskEnabledStateMigrationTests(TransactionTestCase):

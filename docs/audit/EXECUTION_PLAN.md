@@ -710,3 +710,9 @@
 - [x] Повторять insert после подтверждённого конкурентного slug-конфликта.
 - [x] Не скрывать остальные `IntegrityError` под retry.
 - [x] Проверить реальную гонку двумя PostgreSQL connections.
+
+## 2026-09-12 — конкурентное создание документов
+
+- [x] Убрать дублирующий exists-before-insert allocator документа.
+- [x] Применить общий bounded savepoint-retry контракт.
+- [x] Проверить одинаковые длинные названия двумя PostgreSQL connections.

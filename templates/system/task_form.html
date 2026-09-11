@@ -7,7 +7,7 @@
   <div><p class="page-heading__eyebrow">Автоматизированное задание</p><h1>{{ title }}</h1></div>
   {% if task %}
   <div class="page-heading__actions">
-    <form method="post" action="{% url 'system:task_run' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--primary" type="submit">Запустить</button></form>
+    <form method="post" action="{% url 'system:task_run' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--primary" type="submit"{% if not task.enabled %} disabled title="Сначала включите задание"{% endif %}>Запустить</button></form>
     <form method="post" action="{% url 'system:task_toggle' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--ghost" type="submit">{% if task.enabled %}Отключить{% else %}Включить{% endif %}</button></form>
   </div>
   {% endif %}

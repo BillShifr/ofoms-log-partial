@@ -45,7 +45,7 @@
           <td class="text-nowrap"><div class="table-actions">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:task_update' t.pk %}">Карточка</a>
             <form method="post" action="{% url 'system:task_run' t.pk %}" class="inline-form">{% csrf_token %}
-              <button class="btn btn--sm btn--primary" type="submit">Запустить</button>
+              <button class="btn btn--sm btn--primary" type="submit"{% if not t.enabled %} disabled title="Сначала включите задание"{% endif %}>Запустить</button>
             </form>
             <form method="post" action="{% url 'system:task_toggle' t.pk %}" class="inline-form">{% csrf_token %}
               <button class="btn btn--sm btn--ghost" type="submit">{{ t.enabled|yesno:"Стоп,Вкл" }}</button>

@@ -4,7 +4,12 @@
 интервал (due). Запуск по требованию: управляющий планировщик (systemd
 timer / Cron) вызывает: python manage.py run_tasks
 """
-from apps.system.models import TaskAlreadyRunning, TaskJob, TaskRunSuperseded
+from apps.system.models import (
+    TaskAlreadyRunning,
+    TaskDisabled,
+    TaskJob,
+    TaskRunSuperseded,
+)
 from django.core.management.base import BaseCommand
 
 
@@ -51,6 +56,11 @@ class Command(BaseCommand):
             except TaskAlreadyRunning:
                 self.stdout.write(
                     self.style.WARNING(f"task {task.pk}: уже выполняется, пропущено")
+                )
+                continue
+            except TaskDisabled:
+                self.stdout.write(
+                    self.style.WARNING(f"task {task.pk}: отключено, пропущено")
                 )
                 continue
             except TaskRunSuperseded:

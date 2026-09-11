@@ -54,6 +54,7 @@ from apps.system.models import (
     NewsItem,
     SystemDocument,
     TaskAlreadyRunning,
+    TaskDisabled,
     TaskFile,
     TaskJob,
     TaskNote,
@@ -1015,6 +1016,9 @@ def task_run(request, pk):
         run = task.run(user=request.user)
     except TaskAlreadyRunning:
         messages.warning(request, f"Задание «{task.name}» уже выполняется.")
+        return redirect("system:task_update", pk=task.pk)
+    except TaskDisabled:
+        messages.warning(request, f"Задание «{task.name}» отключено.")
         return redirect("system:task_update", pk=task.pk)
     except TaskRunSuperseded:
         messages.warning(

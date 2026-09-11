@@ -34,6 +34,7 @@ from apps.system.models import (
     NewsItem,
     SystemDocument,
     TaskAlreadyRunning,
+    TaskDisabled,
     TaskFile,
     TaskJob,
     TaskNote,
@@ -1731,6 +1732,30 @@ class TaskTests(BaseSystemTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "уже выполняется")
         self.assertFalse(TaskRun.objects.exists())
+
+    def test_disabled_task_cannot_be_started_through_model_or_portal(self):
+        task = self._make_task(enabled=False)
+
+        with self.assertRaises(TaskDisabled):
+            task.run(user=self.admin)
+
+        task.refresh_from_db()
+        self.assertEqual(task.status, TaskJob.Status.CREATED)
+        self.assertFalse(TaskRun.objects.exists())
+        self.assertFalse(
+            EventLog.objects.filter(event_type=EventLog.EventType.TASK).exists()
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("system:task_run", args=[task.pk]), follow=True
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "отключено")
+        self.assertFalse(TaskRun.objects.exists())
+
+        card = self.client.get(reverse("system:task_update", args=[task.pk]))
+        self.assertContains(card, 'disabled title="Сначала включите задание"')
 
     def test_task_claim_rolls_back_when_pending_audit_fails(self):
         task = self._make_task()

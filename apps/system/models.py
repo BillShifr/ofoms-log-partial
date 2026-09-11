@@ -25,6 +25,10 @@ class TaskAlreadyRunning(RuntimeError):
     """Задание уже захвачено другим worker-процессом."""
 
 
+class TaskDisabled(RuntimeError):
+    """Отключённое задание нельзя запустить вручную или через API модели."""
+
+
 class TaskRunSuperseded(RuntimeError):
     """Запуск уже финализирован recovery или другим владельцем claim."""
 
@@ -524,13 +528,14 @@ class TaskJob(models.Model):
         started_at = timezone.now()
         triggered_by = "user" if user is not None else "auto"
         with transaction.atomic():
-            claimed = (
-                TaskJob.objects.filter(pk=self.pk)
-                .exclude(status=TaskJob.Status.RUNNING)
-                .update(status=TaskJob.Status.RUNNING, last_started_at=started_at)
-            )
-            if not claimed:
+            current = TaskJob.objects.select_for_update().get(pk=self.pk)
+            if not current.enabled:
+                raise TaskDisabled(f"Задание {self.pk} отключено")
+            if current.status == TaskJob.Status.RUNNING:
                 raise TaskAlreadyRunning(f"Задание {self.pk} уже выполняется")
+            current.status = TaskJob.Status.RUNNING
+            current.last_started_at = started_at
+            current.save(update_fields=["status", "last_started_at"])
             run = TaskRun.objects.create(
                 task_id=self.pk, triggered_by=triggered_by, started_at=started_at
             )

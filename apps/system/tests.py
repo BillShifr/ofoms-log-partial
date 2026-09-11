@@ -91,6 +91,17 @@ class AccessTests(BaseSystemTestCase):
             resp = self.client.get(reverse(f"system:{name}"))
             self.assertEqual(resp.status_code, 200, name)
 
+    def test_admin_navigation_groups_management_destinations(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("system:users"))
+
+        self.assertContains(response, '<details class="nav__menu">')
+        self.assertContains(response, ">Управление</summary>")
+        self.assertContains(response, reverse("system:users"))
+        self.assertContains(response, reverse("system:events"))
+        self.assertContains(response, "/admin/")
+        self.assertContains(response, "nav__menu-link--active")
+
     def test_user_screens_for_regular_user(self):
         self.client.force_login(self.operator)
         for name in ("messages", "docs", "news", "prefs"):

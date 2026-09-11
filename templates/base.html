@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}{{ SYSTEM_META.SYSTEM_SHORT_TITLE }}{% endblock %} — {{ SYSTEM_META.SYSTEM_ORG }}</title>
-  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260911-18">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260911-19">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -62,17 +62,19 @@
          href="{% url 'system:news' %}">Новости</a>
       <a class="nav__link {% if active_nav == 'docs' %}nav__link--active{% endif %}"
          href="{% url 'system:docs' %}">Документация</a>
-      {% if can_manage_system %}
-        <span class="nav__sep"></span>
-        <a class="nav__link {% if active_nav == 'users' %}nav__link--active{% endif %}"
-           href="{% url 'system:users' %}">Пользователи</a>
-        <a class="nav__link {% if active_nav == 'events' %}nav__link--active{% endif %}"
-           href="{% url 'system:events' %}">События</a>
-      {% endif %}
       <a class="nav__link {% if active_nav == 'prefs' %}nav__link--active{% endif %}"
          href="{% url 'system:prefs' %}">Настройки</a>
-      {% if user.is_staff %}
-        <a class="nav__link" href="/admin/">Администрирование</a>
+      {% if can_manage_system or user.is_staff %}
+        <details class="nav__menu">
+          <summary class="nav__link {% if active_nav == 'users' or active_nav == 'events' %}nav__link--active{% endif %}">Управление</summary>
+          <div class="nav__menu-panel">
+            {% if can_manage_system %}
+              <a class="nav__menu-link {% if active_nav == 'users' %}nav__menu-link--active{% endif %}" href="{% url 'system:users' %}">Пользователи</a>
+              <a class="nav__menu-link {% if active_nav == 'events' %}nav__menu-link--active{% endif %}" href="{% url 'system:events' %}">События</a>
+            {% endif %}
+            {% if user.is_staff %}<a class="nav__menu-link" href="/admin/">Администрирование</a>{% endif %}
+          </div>
+        </details>
       {% endif %}
     </div>
     </div>

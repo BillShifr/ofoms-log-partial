@@ -137,12 +137,13 @@ try {
     await command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
     for (const [name, path] of routes) {
       await navigate(`${baseUrl}${path}`);
-      await evaluate(`document.documentElement.dataset.theme='light'; document.documentElement.removeAttribute('data-font')`);
+      await evaluate(`document.documentElement.dataset.theme='light'; document.documentElement.dataset.font='base'; document.documentElement.dataset.contrast='default'`);
       const metrics = await evaluate(`(() => ({
         path: location.pathname,
         title: document.title,
         forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
         documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+        navOverflow: Boolean(document.querySelector('.nav__scroll')) && document.querySelector('.nav__scroll').scrollWidth > document.querySelector('.nav__scroll').clientWidth + 1,
         width: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth
       }))()`);
@@ -153,24 +154,25 @@ try {
     }
   }
 
-  for (const [theme, font] of [["dark", "base"], ["light", "lg"]]) {
+  for (const [theme, font, contrast] of [["dark", "base", "default"], ["light", "a-plus-plus", "default"], ["light", "a", "black"]]) {
     for (const [width, height] of [[694, 869], [1024, 768], [1920, 1080]]) {
       await command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
       for (const [name, path] of routes) {
         await navigate(`${baseUrl}${path}`);
-        await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}; document.documentElement.dataset.font=${JSON.stringify(font)}`);
+        await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}; document.documentElement.dataset.font=${JSON.stringify(font)}; document.documentElement.dataset.contrast=${JSON.stringify(contrast)}`);
       const metrics = await evaluate(`(() => ({
           path: location.pathname,
           title: document.title,
           forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
           documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+          navOverflow: Boolean(document.querySelector('.nav__scroll')) && document.querySelector('.nav__scroll').scrollWidth > document.querySelector('.nav__scroll').clientWidth + 1,
           width: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth
         }))()`);
         const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
-        const filename = `${name}-${width}x${height}-${theme}-${font}.png`;
+        const filename = `${name}-${width}x${height}-${theme}-${font}-${contrast}.png`;
         await writeFile(join(outputDir, filename), Buffer.from(shot.data, "base64"));
-        results.push({ name, viewport: `${width}x${height}`, theme, font, ...metrics, screenshot: filename });
+        results.push({ name, viewport: `${width}x${height}`, theme, font, contrast, ...metrics, screenshot: filename });
       }
     }
   }
@@ -185,7 +187,7 @@ try {
     cases: results.length,
     expectedForbidden: [...expectedForbidden],
     failures: checkedResults.filter((item) =>
-      item.documentOverflow || item.path.includes("login") || item.forbidden !== item.expectedForbidden
+      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") || item.forbidden !== item.expectedForbidden
     ),
     results: checkedResults,
   };

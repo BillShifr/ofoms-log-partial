@@ -198,8 +198,8 @@ a:hover { text-decoration: underline; }
 
 /* ---------- Меню ---------- */
 .nav { background: #143f70; box-shadow: inset 0 -1px rgba(255,255,255,.08); }
-.nav__scroll { overflow-x: auto; scrollbar-width: thin; }
-.nav__inner { display: flex; flex-wrap: nowrap; width: max-content; min-width: 100%; gap: 2px; }
+.nav__scroll { overflow: visible; }
+.nav__inner { display: flex; flex-wrap: nowrap; width: 100%; gap: 2px; }
 .nav__link {
   display: inline-flex;
   align-items: center;
@@ -212,6 +212,25 @@ a:hover { text-decoration: underline; }
 }
 .nav__link:hover { color: #fff; text-decoration: none; background: rgba(255,255,255,.1); }
 .nav__link--active { background: rgba(255,255,255,.1); color: #fff; border-bottom-color: #65d3e7; }
+.nav__menu { position: relative; }
+.nav__menu > summary { list-style: none; cursor: pointer; }
+.nav__menu > summary::-webkit-details-marker { display: none; }
+.nav__menu > summary::after { content: "⌄"; margin-left: 6px; font-size: .8em; }
+.nav__menu[open] > summary::after { transform: rotate(180deg); }
+.nav__menu-panel {
+  position: absolute;
+  right: 0;
+  z-index: 110;
+  display: grid;
+  min-width: 210px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 0 0 12px 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-lg);
+}
+.nav__menu-link { padding: 9px 11px; border-radius: 8px; color: var(--ink); font-size: .88rem; white-space: nowrap; }
+.nav__menu-link:hover, .nav__menu-link--active { background: var(--chip-blue); color: var(--primary); text-decoration: none; }
 
 /* ---------- Кнопки ---------- */
 .btn {
@@ -883,6 +902,9 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
   .header__user-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .filters .field { flex: 1 1 45%; }
   .nav__sep { display: none; }
+  .nav__scroll { overflow-x: auto; scrollbar-width: thin; }
+  .nav__inner { width: max-content; min-width: 100%; }
+  .nav__menu-panel { position: fixed; top: calc(var(--header-h) + 40px); right: 12px; }
   .record-heading { align-items: flex-start; flex-direction: column; }
   .record-actions { justify-content: flex-start; }
 }

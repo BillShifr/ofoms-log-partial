@@ -478,13 +478,25 @@ tbody tr.js-event-row { cursor: pointer; }
   cursor: pointer;
 }
 .checkbox:hover input[type="checkbox"] { outline: 2px solid rgba(11, 83, 148, .35); outline-offset: 2px; border-radius: 4px; }
-.paper { background: #fff; color: #222; border: 1px solid var(--line); border-radius: 4px; padding: 40px 48px; max-width: 820px; margin: 0 auto; }
+.paper, .print-sheet { background: #fff; color: #222; border: 1px solid #d7dde2; border-radius: 4px; padding: 44px 52px; max-width: 900px; margin: 0 auto; box-shadow: 0 14px 38px rgba(14,36,51,.12); }
 .paper .data th, .paper .data td { text-align: left; }
+.print-sheet--wide { max-width: 1400px; }
+.print-toolbar { display: flex; justify-content: center; gap: 10px; margin: 0 auto 18px; }
+.print-preview-note { margin: -20px 0 28px; padding-bottom: 10px; border-bottom: 1px solid #d7dde2; color: #5e6c77; font-size: .78rem; text-align: center; text-transform: uppercase; letter-spacing: .08em; }
+.letter-recipient { max-width: 55%; margin: 0 0 36px auto; text-align: right; }
+.letter-title { margin: 30px 0; font-family: var(--font-main); font-size: 1.35rem; text-align: center; }
+.letter-table { min-width: 0 !important; margin: 22px 0; }
+.letter-signature { margin-top: 52px; padding-top: 16px; border-top: 1px solid #d7dde2; }
+.print-signature { margin-top: 24px; color: #5e6c77; font-size: .75rem; }
 @media print {
+  @page { margin: 14mm; }
   body { background: #fff; }
-  .no-print, .no-print * { display: none !important; }
-  .paper { border: none; box-shadow: none; max-width: none; margin: 0; padding: 20px; }
+  .no-print, .no-print *, .header, .nav, .footer, .toast-container { display: none !important; }
+  .main { max-width: none; padding: 0; }
+  .paper, .print-sheet { border: none; box-shadow: none; max-width: none; margin: 0; padding: 0; }
   .card, .content { box-shadow: none; }
+  .card { break-inside: avoid; }
+  table.data th { position: static; }
 }
 
 /* ---------- Этап 5: отчётность ---------- */
@@ -784,6 +796,8 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
   .scope-note { margin-top: 0; }
   .module-heading h1 { font-size: 1.45rem; }
   .login-card { margin: 18px 0; padding: 26px 20px; }
+  .paper, .print-sheet { padding: 28px 20px; }
+  .letter-recipient { max-width: 80%; }
   .record-heading { margin-bottom: 16px; }
   .record-heading h1 { font-size: 1.45rem; }
   .record-actions { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Реестр обращений — печать</title>
-  <link rel="stylesheet" href="{% static 'css/portal.css' %}">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260911-8">
   <style>
     body { background:#fff !important; padding:20px; }
     .print-meta { margin-bottom:16px; }
@@ -17,10 +17,11 @@
   </style>
 </head>
 <body>
-  <div class="no-print flex mb-2">
+  <div class="no-print print-toolbar">
     <a class="btn btn--ghost" href="{% url 'journal:list' %}">← К реестру</a>
     <button class="btn btn--primary" type="button" onclick="window.print()">Печать</button>
   </div>
+  <main class="print-sheet print-sheet--wide">
   <h1>Единый электронный журнал обращений граждан</h1>
   <p class="print-meta">Выбрано записей: {{ page.paginator.count }}. В печатную форму выводятся первые {{ page.object_list|length }} (лимит 500).</p>
   <div class="table-wrap">
@@ -52,6 +53,7 @@
       </tbody>
     </table>
   </div>
-  <p>Сформировано {% now "d.m.Y H:i" %}; пользователь: {{ user.full_name|default:user.username }}.</p>
+  <p class="print-signature">Сформировано {% now "d.m.Y H:i" %}; пользователь: {{ user.full_name|default:user.username }}.</p>
+  </main>
 </body>
 </html>

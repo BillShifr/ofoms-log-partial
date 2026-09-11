@@ -4,26 +4,27 @@
 <head>
   <meta charset="UTF-8">
   <title>Обращение № {{ irp.n_irp }} (печать)</title>
-  <link rel="stylesheet" href="{% static 'css/portal.css' %}">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260911-8">
   <style>
-    body{ background:#fff !important; padding:24px; }
+    body{ background:var(--bg); padding:24px; }
     .print-header{ display:flex; justify-content:space-between; align-items:flex-start;
       border-bottom:2px solid var(--ink); padding-bottom:12px; margin-bottom:16px; }
     .print-header h1{ margin:0; font-family:var(--font-display, 'Unbounded'); font-size:18px; }
     @media print{
       .no-print{ display:none !important; }
-      body{ padding:0; }
+      body{ padding:0; background:#fff; }
       .print-header{ border-bottom:2px solid #000; }
       .card{ box-shadow:none !important; border:1px solid #000; break-inside:avoid; }
     }
   </style>
 </head>
 <body>
-  <div class="no-print flex mb-2">
+  <div class="no-print print-toolbar">
     <a class="btn btn--ghost" href="{% url 'journal:detail' irp.pk %}">← Назад к карточке</a>
     <button class="btn btn--primary" onclick="window.print()">Печать</button>
   </div>
 
+  <main class="print-sheet">
   <div class="print-header">
     <div>
       <h1>Единый электронный журнал обращений граждан</h1>
@@ -42,7 +43,7 @@
 
   <div class="card">
     <h2>Основные сведения</h2>
-    <dl class="dl">
+    <dl class="detail-list">
       <dt>Вид обращения</dt><dd>{{ irp.get_irp_type_display }}</dd>
       <dt>Дата / время поступления</dt><dd>{{ irp.date_create|date:"d.m.Y" }}{% if irp.time_create %} {{ irp.time_create|time:"H:i" }}{% endif %}</dd>
       <dt>Источник</dt><dd>{{ irp.get_way_display }}{% if irp.way_n %} — {{ irp.way_n }}{% endif %}</dd>
@@ -58,7 +59,7 @@
 
   <div class="card">
     <h2>Обратившийся</h2>
-    <dl class="dl">
+    <dl class="detail-list">
       <dt>ФИО</dt><dd>{{ irp.z_f }} {{ irp.z_i|default:"" }} {{ irp.z_o|default:"" }}</dd>
       <dt>Дата рождения</dt><dd>{{ irp.z_dr|date:"d.m.Y"|default:"—" }}</dd>
       <dt>ЕНП</dt><dd>{{ irp.z_enp|default:"—" }}</dd>
@@ -72,7 +73,7 @@
 
   <div class="card">
     <h2>Застрахованный</h2>
-    <dl class="dl">
+    <dl class="detail-list">
       <dt>ФИО</dt><dd>{{ irp.in_f|default:"—" }} {{ irp.in_i|default:"" }} {{ irp.in_o|default:"" }}</dd>
       <dt>Дата рождения</dt><dd>{{ irp.in_dr|date:"d.m.Y"|default:"—" }}</dd>
       <dt>ЕНП</dt><dd>{{ irp.in_enp|default:"—" }}</dd>
@@ -83,7 +84,7 @@
 
   <div class="card">
     <h2>Исполнение</h2>
-    <dl class="dl">
+    <dl class="detail-list">
       <dt>Ответственная организация</dt><dd>{{ irp.get_otv_t_display }} / {{ irp.get_otv_kon_display }}</dd>
       <dt>Принял (линия)</dt><dd>{{ irp.employee_one.full_name }}{% if irp.line_one %} ({{ irp.get_line_one_display }}){% endif %}</dd>
       <dt>Ответственный (линия)</dt><dd>{{ irp.employee_it.full_name|default:"—" }}{% if irp.line_it %} ({{ irp.get_line_it_display }}){% endif %}</dd>
@@ -113,6 +114,7 @@
   </div>
   {% endif %}
 
-  <p class="text-muted">Печатная форма сформирована {% now "d.m.Y H:i" %} пользователем {{ user.full_name|default:user.username }}.</p>
+  <p class="print-signature">Печатная форма сформирована {% now "d.m.Y H:i" %} пользователем {{ user.full_name|default:user.username }}.</p>
+  </main>
 </body>
 </html>

@@ -29,9 +29,10 @@ class EmployeeRepository:
         return get_user_model().objects.filter(guid=normalized_guid).first()
 
 
-def issue_token(user, *, ttl: int | None = None, audience: str = "ejournal") -> str:
+def issue_token(user, *, ttl: int | None = None, audience: str | None = None) -> str:
     """Выпуск временного JWT для вошедшего пользователя."""
     ttl = settings.JWT_TTL if ttl is None else ttl
+    audience = settings.JWT_AUDIENCE if audience is None else audience
     now = _dt.datetime.now(tz=_dt.UTC)
     payload = {
         "sub": str(user.guid),
@@ -44,8 +45,9 @@ def issue_token(user, *, ttl: int | None = None, audience: str = "ejournal") -> 
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
-def decode_token(token: str, *, audience: str = "ejournal"):
+def decode_token(token: str, *, audience: str | None = None):
     """Декодирование. Возвращает payload; кидает jwt-исключения при ошибках."""
+    audience = settings.JWT_AUDIENCE if audience is None else audience
     return jwt.decode(
         token,
         settings.JWT_SECRET,
@@ -75,7 +77,7 @@ def consume_token(payload: dict) -> bool:
 def resolve_user(
     token: str,
     *,
-    audience: str = "ejournal",
+    audience: str | None = None,
     repository: EmployeeRepository | None = None,
 ):
     """По токену возвращает Employee (или None)."""

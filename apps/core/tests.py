@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import ValidationError
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -151,6 +151,14 @@ class TokenTests(TestCase):
         self.assertEqual(payload["username"], "tokenuser")
         self.assertEqual(payload["sub"], str(self.user.guid))
         self.assertTrue(payload["jti"])
+
+    @override_settings(JWT_AUDIENCE="trusted-portal")
+    def test_configured_audience_is_used_for_issue_and_decode(self):
+        token = issue_token(self.user)
+
+        self.assertEqual(decode_token(token)["aud"], "trusted-portal")
+        with self.assertRaises(jwt.InvalidAudienceError):
+            decode_token(token, audience="another-system")
 
     def test_resolve_user(self):
         token = issue_token(self.user)

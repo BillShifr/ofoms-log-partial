@@ -21,7 +21,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from apps.core.fold import contains_folded
+from apps.core.fold import contains_folded, filter_contains_any
 from apps.core.models import EventLog, log_event
 from apps.core.policy import role_codes_for_user
 from apps.core.roles import Roles
@@ -909,14 +909,17 @@ def task_file_download(request, pk):
 @login_required
 def doc_list(request):
     """Главная документации (wiki-стиль): карточки категорий + без категории."""
-    categories = DocCategory.objects.prefetch_related("docs").all()
+    categories = DocCategory.objects.annotate(docs_total=Count("docs"))
     q = (request.GET.get("q") or "").strip()
     if q:
-        lower_q = q.lower()
-        docs = [d for d in SystemDocument.objects.all()
-                if lower_q in (d.title or "").lower() or lower_q in (d.description or "").lower()]
+        docs = filter_contains_any(
+            SystemDocument.objects.select_related("category"),
+            ("title", "description"),
+            q,
+            prefix="doc_search_",
+        )
     else:
-        docs = list(SystemDocument.objects.filter(category__isnull=True))
+        docs = SystemDocument.objects.filter(category__isnull=True)
     return render(
         request,
         "system/docs.html",
@@ -937,7 +940,7 @@ def doc_category(request, slug):
     category = get_object_or_404(
         DocCategory.objects.prefetch_related("docs"), slug=slug
     )
-    categories = DocCategory.objects.all()
+    categories = DocCategory.objects.annotate(docs_total=Count("docs"))
     return render(
         request,
         "system/docs.html",
@@ -1029,9 +1032,10 @@ def doc_suggest(request):
     q = (request.GET.get("q") or "").strip()
     if len(q) < 3:
         return JsonResponse({"suggestions": []})
-    lower_q = q.lower()
-    titles = [t for t in SystemDocument.objects.values_list("title", flat=True)
-              if lower_q in (t or "").lower()][:8]
+    qs = contains_folded(
+        SystemDocument.objects.all(), "title", q, "doc_title_search"
+    )
+    titles = list(qs.values_list("title", flat=True)[:8])
     return JsonResponse({"suggestions": titles})
 
 
@@ -1088,13 +1092,12 @@ def news_list(request):
             pass
 
     if q:
-        lower_q = q.lower()
-        ids = [
-            i
-            for i, t, s, x in qs.values_list("id", "title", "summary", "text")
-            if lower_q in f"{t} {s} {x}".lower()
-        ]
-        qs = qs.filter(id__in=ids)
+        qs = filter_contains_any(
+            qs,
+            ("title", "summary", "text"),
+            q,
+            prefix="news_search_",
+        )
 
     page = _paginate(request, qs)
     return render(
@@ -1214,15 +1217,11 @@ def news_suggest(request):
     q = (request.GET.get("q") or "").strip()
     if len(q) < 3:
         return JsonResponse({"suggestions": []})
-    lower_q = q.lower()
     qs = NewsItem.objects.all()
     if not _is_admin(request.user):
         qs = qs.filter(is_active=True)
-    titles = [
-        t
-        for t in qs.values_list("title", flat=True)
-        if lower_q in (t or "").lower()
-    ][:8]
+    qs = contains_folded(qs, "title", q, "news_title_search")
+    titles = list(qs.values_list("title", flat=True)[:8])
     return JsonResponse({"suggestions": titles})
 
 

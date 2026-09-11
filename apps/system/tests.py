@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import Client, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from apps.core.models import EventLog, log_event
@@ -574,6 +575,26 @@ class DocTests(BaseSystemTestCase):
         short = self.client.get(reverse("system:doc_suggest"), {"q": "ин"})
         self.assertEqual(short.json()["suggestions"], [])
 
+    def test_document_search_runs_in_database_and_folds_cyrillic(self):
+        SystemDocument.objects.create(
+            title="Регламент оператора",
+            description="ПРОВЕРКА ДОСТУПНОСТИ",
+            file=SimpleUploadedFile("database-search.pdf", b"%PDF-1.4"),
+            uploaded_by=self.admin,
+        )
+        self.client.force_login(self.operator)
+
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.get(reverse("system:docs"), {"q": "проверка"})
+
+        self.assertContains(response, "Регламент оператора")
+        document_queries = [
+            query["sql"].lower()
+            for query in captured.captured_queries
+            if "system_systemdocument" in query["sql"].lower()
+        ]
+        self.assertTrue(any("translate" in sql for sql in document_queries))
+
 
 class NewsTests(BaseSystemTestCase):
     def test_news_visible_for_users(self):
@@ -757,6 +778,26 @@ class NewsTests(BaseSystemTestCase):
         resp = self.client.get(reverse("system:news_suggest"), {"q": "изм"})
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Изменение регламента", resp.json()["suggestions"])
+
+    def test_news_search_runs_in_database_and_folds_cyrillic(self):
+        NewsItem.objects.create(
+            title="Служебное объявление",
+            summary="ПЛАНОВЫЕ РАБОТЫ",
+            author=self.admin,
+            is_active=True,
+        )
+        self.client.force_login(self.smo)
+
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.get(reverse("system:news"), {"q": "плановые"})
+
+        self.assertContains(response, "Служебное объявление")
+        news_queries = [
+            query["sql"].lower()
+            for query in captured.captured_queries
+            if "system_newsitem" in query["sql"].lower()
+        ]
+        self.assertTrue(any("translate" in sql for sql in news_queries))
 
     def test_category_seed_and_filter(self):
         cat = NewsCategory.objects.create(name="Эксплуатация", slug="operations")

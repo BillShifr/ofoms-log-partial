@@ -10,7 +10,7 @@ PostgreSQL в локали C/POSIX не сворачивает регистр н
 §2.10 (журнал событий).
 """
 
-from django.db.models import F, Func, Q, Value
+from django.db.models import F, Func, IntegerField, Q, TextField, Value
 
 _UPPER = (
     "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
@@ -32,7 +32,13 @@ def fold(value):
 
 def _fold_sql(expr):
     """SQL-выражение `translate(<expr>, ВЕРХ, низ)`."""
-    return Func(expr, Value(_UPPER), Value(_LOWER), function="translate")
+    return Func(
+        expr,
+        Value(_UPPER),
+        Value(_LOWER),
+        function="translate",
+        output_field=TextField(),
+    )
 
 
 def contains_folded(qs, field, value, alias):
@@ -48,7 +54,14 @@ def contains_folded(qs, field, value, alias):
     if not v:
         return qs
     qs = qs.annotate(
-        **{alias: Func(_fold_sql(F(field)), Value(v), function="strpos")}
+        **{
+            alias: Func(
+                _fold_sql(F(field)),
+                Value(v),
+                function="strpos",
+                output_field=IntegerField(),
+            )
+        }
     )
     return qs.filter(**{f"{alias}__gt": 0})
 
@@ -67,6 +80,11 @@ def filter_contains_any(qs, fields, value, prefix="fold"):
     ann, q = {}, Q()
     for i, field in enumerate(fields):
         alias = f"{prefix}{i}"
-        ann[alias] = Func(_fold_sql(F(field)), Value(v), function="strpos")
+        ann[alias] = Func(
+            _fold_sql(F(field)),
+            Value(v),
+            function="strpos",
+            output_field=IntegerField(),
+        )
         q |= Q(**{f"{alias}__gt": 0})
     return qs.annotate(**ann).filter(q)

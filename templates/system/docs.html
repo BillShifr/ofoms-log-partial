@@ -56,7 +56,7 @@
     <div class="cat-icon" aria-hidden="true">{{ cat.icon|default:"DOC" }}</div>
     <h3 class="mt-1 mb-1">{{ cat.name }}</h3>
     {% if cat.description %}<p class="text-muted">{{ cat.description }}</p>{% endif %}
-    <span class="badge badge--role">Документов: {{ cat.docs_count }}</span>
+    <span class="badge badge--role">Документов: {{ cat.docs_total }}</span>
   </a>
   {% empty %}
   <div class="empty-state span-2">Разделы документации пока не созданы</div>

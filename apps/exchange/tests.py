@@ -280,6 +280,14 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
         self.client.force_login(user)
         self.assertEqual(self.client.get(reverse("exchange:upload")).status_code, 403)
 
+    def test_upload_guidance_matches_server_contract(self):
+        self.client.force_login(self.tfoms)
+        response = self.client.get(reverse("exchange:upload"))
+
+        self.assertContains(response, 'data-max-file-size="20971520"')
+        self.assertContains(response, "XLSX, не более 20 МБ")
+        self.assertNotContains(response, "не более 10 МБ")
+
     def test_user_without_role_cannot_read_exchange(self):
         user = Employee.objects.create_user(
             username="exchange_reader_no_role", password="GoodPass!1", org=81000

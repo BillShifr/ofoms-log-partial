@@ -66,21 +66,3 @@
 </div>
 {% endif %}
 {% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  var form = document.getElementById('report-filter-form');
-  if (!form) return;
-  form.addEventListener('submit', function (e) {
-    var from = form.querySelector('[name="date_from"]');
-    var to = form.querySelector('[name="date_to"]');
-    if (from && to && !from.value && !to.value) {
-      e.preventDefault();
-      [from, to].forEach(function (el) { el.classList.add('is-invalid'); });
-      if (window.toast) toast.error('Укажите хотя бы дату начала или окончания периода');
-    }
-  });
-})();
-</script>
-{% endblock %}

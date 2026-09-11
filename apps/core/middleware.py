@@ -6,12 +6,28 @@
 
 import time
 
+from django.conf import settings
 from django.http import HttpResponse
 
 from apps.core.models import EventLog, log_event
 
 _IGNORED_PREFIXES = ("/static/", "/media/", "/healthz", "/favicon.ico")
 _IGNORED_ADMIN_SEGMENTS = ("/admin/jsi18n",)
+
+
+class ContentSecurityPolicyMiddleware:
+    """Запрещает inline/external scripts на пользовательских экранах портала."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if not request.path.startswith("/admin/"):
+            response.headers.setdefault(
+                "Content-Security-Policy", settings.CONTENT_SECURITY_POLICY
+            )
+        return response
 
 
 class AuditMiddleware:

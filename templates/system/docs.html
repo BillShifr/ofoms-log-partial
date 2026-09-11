@@ -80,19 +80,3 @@
 {% endif %}
 {% endif %}
 {% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  var fileInput = document.querySelector('#id_file');
-  var titleInput = document.querySelector('#id_title');
-  if (fileInput && titleInput) {
-    fileInput.addEventListener('change', function () {
-      if (!titleInput.value && fileInput.files.length) {
-        titleInput.value = (fileInput.files[0].name || '').replace(/\.[^.]+$/, '').slice(0, 200);
-      }
-    });
-  }
-})();
-</script>
-{% endblock %}

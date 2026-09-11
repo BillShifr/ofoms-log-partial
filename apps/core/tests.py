@@ -1,6 +1,7 @@
 """Тесты core: парольная политика, блокировка, токены, журнал событий."""
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -305,5 +306,15 @@ class TemplateHygieneTests(TestCase):
         for template in templates_root.rglob("*.html"):
             text = template.read_text(encoding="utf-8-sig")
             if any(marker in text.lower() for marker in forbidden):
+                violations.append(str(template.relative_to(templates_root)))
+        self.assertEqual(violations, [])
+
+    def test_templates_do_not_embed_executable_inline_scripts(self):
+        templates_root = Path(settings.BASE_DIR) / "templates"
+        violations = []
+        inline_script = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>", re.IGNORECASE)
+        for template in templates_root.rglob("*.html"):
+            text = template.read_text(encoding="utf-8-sig")
+            if inline_script.search(text):
                 violations.append(str(template.relative_to(templates_root)))
         self.assertEqual(violations, [])

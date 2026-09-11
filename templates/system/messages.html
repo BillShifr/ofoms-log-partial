@@ -27,6 +27,7 @@
             <div class="field field--wide">
               <label for="participant-search">Участники</label>
               <input id="participant-search" type="text"
+                     data-suggest-url="{% url 'system:users_suggest' %}"
                      placeholder="Введите ФИО (от 3 символов) — совпадения отмечаются автоматически"
                      autocomplete="off">
               <div class="participant-pick">{{ form.participants }}</div>
@@ -46,40 +47,4 @@
     </div>
   </section>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  var search = document.getElementById('participant-search');
-  if (!search) return;
-  var list = document.querySelector('.participant-pick');
-  if (!list) return;
-
-  // Ввод имени отмечает подходящий чекбокс участника (PRD v3 §2.0.6)
-  var labels = Array.prototype.map.call(list.querySelectorAll('label'), function (l) {
-    return l.textContent.trim();
-  });
-  var boxes = Array.prototype.slice.call(list.querySelectorAll('input'));
-
-  search.addEventListener('input', function () {
-    var q = search.value.trim();
-    if (q.length < 3) return;
-    fetch('/system/messages/users/suggest/?q=' + encodeURIComponent(q))
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        (data.suggestions || []).forEach(function (label) {
-          var idx = labels.indexOf(label);
-          if (idx === -1) return;
-          var box = boxes[idx];
-          if (box && !box.checked) {
-            box.checked = true;
-            search.value = '';
-          }
-        });
-      })
-      .catch(function () {});
-  });
-})();
-</script>
 {% endblock %}

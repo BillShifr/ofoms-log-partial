@@ -34,6 +34,7 @@
         <div class="field" id="assignee-wrap">
           <label for="assignee_search">Исполнитель</label>
           <input id="assignee_search" type="text" data-assignee-search
+                 data-suggest-url="{% url 'system:task_assignee_suggest' %}"
                  value="{% if form.instance.assigned_to %}{{ form.instance.assigned_to.full_name }}{% endif %}"
                  placeholder="Введите ФИО (от 3 символов)" autocomplete="off">
           <div id="assignee-select">{{ form.assigned_to }}</div>
@@ -165,75 +166,4 @@
   </div>
 </div>
 {% endif %}
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  document.querySelectorAll('.tab').forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      var target = tab.getAttribute('data-tab');
-      document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('is-active', t === tab); });
-      document.querySelectorAll('.tab-panel').forEach(function (p) {
-        p.classList.toggle('is-active', p.getAttribute('data-panel') === target);
-      });
-    });
-  });
-
-  var search = document.querySelector('[data-assignee-search]');
-  var selectBox = document.querySelector('#assignee-select');
-  if (search && selectBox) {
-    var select = selectBox.querySelector('select');
-    var panel = null;
-    selectBox.style.display = 'none';
-
-    function removePanel() {
-      if (panel) { panel.remove(); panel = null; }
-    }
-
-    function pick(item) {
-      select.value = item.getAttribute('data-id');
-      search.value = item.textContent;
-      removePanel();
-    }
-
-    search.addEventListener('input', function () {
-      var q = search.value.trim();
-      if (q.length < 3) { removePanel(); return; }
-      var url = "/system/tasks/assignees/suggest/?q=" + encodeURIComponent(q);
-      fetch(url)
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          removePanel();
-          var items = (data.suggestions || []).filter(function (s) { return s && s.id; });
-          if (!items.length) return;
-          panel = document.createElement('div');
-          panel.className = 'autocomplete';
-          var rect = search.getBoundingClientRect();
-          panel.style.left = rect.left + 'px';
-          panel.style.top = (rect.bottom + 4) + 'px';
-          panel.style.width = rect.width + 'px';
-          items.forEach(function (s) {
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'autocomplete__item';
-            b.setAttribute('data-id', s.id);
-            b.textContent = s.label;
-            b.addEventListener('click', function () { pick(b); });
-            panel.appendChild(b);
-          });
-          document.body.appendChild(panel);
-        })
-        .catch(function () { removePanel(); });
-    });
-
-    document.addEventListener('click', function (e) {
-      if (panel && !panel.contains(e.target) && !(e.target.closest('#assignee-wrap'))) removePanel();
-    });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') removePanel();
-    });
-  }
-})();
-</script>
 {% endblock %}

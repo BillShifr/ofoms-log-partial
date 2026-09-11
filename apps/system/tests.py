@@ -1244,6 +1244,9 @@ class SecurityHeaderTests(BaseSystemTestCase):
         self.assertEqual(resp.headers["X-Frame-Options"], "DENY")
         self.assertEqual(resp.headers["X-Content-Type-Options"], "nosniff")
         self.assertEqual(resp.headers.get("Referrer-Policy"), "same-origin")
+        policy = resp.headers.get("Content-Security-Policy", "")
+        self.assertIn("script-src 'self'", policy)
+        self.assertNotIn("'unsafe-inline'", policy.split("style-src", 1)[0])
 
     def test_anonymous_redirected_to_login(self):
         resp = self.client.get(reverse("system:users"))

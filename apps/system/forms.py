@@ -19,7 +19,11 @@ from apps.system.models import (
     TaskReport,
 )
 from apps.system.tasks import TASK_COMMAND_CHOICES
-from apps.system.validators import ALLOWED_DOCUMENT_EXTENSIONS, validate_document_file
+from apps.system.validators import (
+    ALLOWED_ATTACHMENT_EXTENSIONS,
+    ALLOWED_DOCUMENT_EXTENSIONS,
+    validate_document_file,
+)
 
 # Модули, фиксируемые в журнале событий (для фильтра)
 EVENT_MODULE_CHOICES = (
@@ -317,7 +321,9 @@ class TaskFileForm(forms.ModelForm):
         model = TaskFile
         fields = ("file",)
         widgets = {
-            "file": forms.ClearableFileInput(attrs={"accept": ".pdf,.docx,.doc,.xlsx,.xls,.zip,txt,.csv"}),
+            "file": forms.ClearableFileInput(
+                attrs={"accept": ",".join(sorted(ALLOWED_ATTACHMENT_EXTENSIONS))}
+            ),
         }
 
 

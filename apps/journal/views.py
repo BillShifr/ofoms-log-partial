@@ -356,10 +356,10 @@ def irp_file_upload(request, pk):
     _require_mutable(irp)
     uploaded = request.FILES.get("file")
     if uploaded:
-        from apps.system.validators import validate_document_file
+        from apps.system.validators import validate_attachment_file
 
         try:
-            validate_document_file(uploaded)
+            validate_attachment_file(uploaded)
         except Exception:  # noqa: BLE001 -- return a stable user-facing error
             messages.error(
                 request,

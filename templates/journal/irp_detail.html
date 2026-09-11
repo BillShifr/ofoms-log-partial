@@ -118,7 +118,7 @@
   <form method="post" action="{% url 'journal:file' irp.pk %}" enctype="multipart/form-data" class="answer-form">
     {% csrf_token %}
     <div class="field"><label for="id_file">Прикрепить файл</label>
-      <input type="file" name="file" id="id_file">
+      <input type="file" name="file" id="id_file" accept=".doc,.docx,.odt,.ods,.pdf,.rtf,.txt,.xls,.xlsx,.zip">
       <select name="answer" id="id_answer">
         <option value="">к обращению</option>
         {% for answer in answers %}<option value="{{ answer.pk }}">к ответу от {{ answer.created_at|date:"d.m.Y H:i" }}</option>{% endfor %}

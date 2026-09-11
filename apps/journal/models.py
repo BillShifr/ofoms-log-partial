@@ -13,7 +13,7 @@ from django.dispatch import receiver
 
 from apps.core.storage import delete_field_file_after_commit
 from apps.employee.models import ORGS, Employee
-from apps.system.validators import validate_document_file
+from apps.system.validators import validate_attachment_file
 
 # ---------------------------------------------------------------------------
 # Справочники (коды закреплены форматом обмена, МИС/реестрами)
@@ -457,7 +457,7 @@ class IrpFile(models.Model):
     )
     file = models.FileField(
         upload_to=irp_file_path,
-        validators=[validate_document_file],
+        validators=[validate_attachment_file],
         verbose_name="Файл",
     )
     uploader = models.ForeignKey(

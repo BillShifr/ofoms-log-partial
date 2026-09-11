@@ -34,9 +34,11 @@ from apps.system.models import (
     UserTableViewPref,
 )
 from apps.system.validators import (
+    ALLOWED_ATTACHMENT_EXTENSIONS,
     DOC_MAX_SIZE_BYTES,
     IMAGE_MAX_SIZE_BYTES,
     VIDEO_MAX_SIZE_BYTES,
+    validate_attachment_file,
     validate_document_file,
 )
 
@@ -1006,6 +1008,25 @@ class TaskTests(BaseSystemTestCase):
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(b"".join(allowed.streaming_content), b"result")
 
+    def test_task_rejects_video_attachment_with_visible_error(self):
+        task = self._make_task()
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:task_update", args=[task.pk]),
+            {
+                "action": "file",
+                "file": SimpleUploadedFile(
+                    "oversized-scope.mp4", b"video", content_type="video/mp4"
+                ),
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(task.files.exists())
+        self.assertContains(response, "допустимы документы и архивы до 20 МБ")
+
     @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
     def test_deleting_task_removes_cascaded_attachment_file(self):
         task = self._make_task()
@@ -1315,6 +1336,24 @@ class DocUploadSecurityTests(BaseSystemTestCase):
             validate_document_file(_FakeUpload("big.pdf", DOC_MAX_SIZE_BYTES + 1))
         with self.assertRaises(ValidationError):
             validate_document_file(_FakeUpload("big.webm", VIDEO_MAX_SIZE_BYTES + 1))
+
+    def test_working_attachments_exclude_video_and_keep_20_mb_limit(self):
+        validate_attachment_file(_FakeUpload("evidence.pdf", DOC_MAX_SIZE_BYTES))
+        with self.assertRaises(ValidationError):
+            validate_attachment_file(_FakeUpload("training.mp4", 1024))
+        with self.assertRaises(ValidationError):
+            validate_attachment_file(
+                _FakeUpload("oversized.pdf", DOC_MAX_SIZE_BYTES + 1)
+            )
+
+    def test_task_attachment_picker_matches_server_allowlist(self):
+        from apps.system.forms import TaskFileForm
+
+        accept = TaskFileForm().fields["file"].widget.attrs["accept"]
+
+        self.assertEqual(accept, ",".join(sorted(ALLOWED_ATTACHMENT_EXTENSIONS)))
+        self.assertNotIn(".mp4", accept)
+        self.assertNotIn(".csv", accept)
 
     @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
     def test_upload_video_is_available_in_documentation(self):

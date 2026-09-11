@@ -12,7 +12,11 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from apps.core.storage import delete_field_file_after_commit
-from apps.system.validators import validate_document_file, validate_image_file
+from apps.system.validators import (
+    validate_attachment_file,
+    validate_document_file,
+    validate_image_file,
+)
 
 logger = logging.getLogger("apps.system")
 
@@ -167,7 +171,11 @@ class SystemDocument(models.Model):
         related_name="docs",
         verbose_name="Категория",
     )
-    file = models.FileField(upload_to=doc_upload_to, verbose_name="Файл")
+    file = models.FileField(
+        upload_to=doc_upload_to,
+        validators=[validate_document_file],
+        verbose_name="Файл",
+    )
     file_size = models.PositiveIntegerField(default=0, verbose_name="Размер (байт)")
     file_type = models.CharField(max_length=16, blank=True, default="", verbose_name="Тип файла")
     version = models.CharField(max_length=16, default="1.0", verbose_name="Версия")
@@ -344,7 +352,7 @@ class MessageAttachment(models.Model):
     )
     file = models.FileField(
         upload_to=attachment_upload_to,
-        validators=[validate_document_file],
+        validators=[validate_attachment_file],
         verbose_name="Файл",
     )
     uploaded_by = models.ForeignKey(
@@ -657,7 +665,7 @@ class TaskFile(models.Model):
     )
     file = models.FileField(
         upload_to=task_upload_to,
-        validators=[validate_document_file],
+        validators=[validate_attachment_file],
         verbose_name="Файл",
     )
     uploaded_by = models.ForeignKey(

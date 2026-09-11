@@ -613,10 +613,10 @@ def thread_reply(request, pk):
         reply.save()
         uploaded = request.FILES.get("attachment")
         if uploaded is not None:
-            from apps.system.validators import validate_document_file
+            from apps.system.validators import validate_attachment_file
 
             try:
-                validate_document_file(uploaded)
+                validate_attachment_file(uploaded)
             except Exception:  # noqa: BLE001 — не прошедший валидацию файл
                 messages.error(request, "Вложение не прикреплено: недопустимый тип или размер файла.")
             else:
@@ -844,6 +844,11 @@ def task_update(request, pk):
                       user=request.user, target=f"task:{task.pk}:file",
                       ip=request.META.get("REMOTE_ADDR"))
             messages.success(request, "Файл прикреплён.")
+        else:
+            messages.error(
+                request,
+                "Файл не прикреплён: допустимы документы и архивы до 20 МБ.",
+            )
         return redirect("system:task_update", pk=task.pk)
     if action == "report":
         report_form = TaskReportForm(request.POST)

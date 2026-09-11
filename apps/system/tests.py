@@ -4,7 +4,10 @@ import base64
 import datetime
 import io
 import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 from unittest.mock import patch
 
 from django.contrib import messages
@@ -14,6 +17,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import CommandError, call_command
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
+from django.db.models import QuerySet
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -2254,6 +2258,38 @@ class TaskTests(BaseSystemTestCase):
         call_command("run_tasks", stdout=out)
         self.assertEqual(TaskRun.objects.count(), 0)
         self.assertIn("Нет заданий", out.getvalue())
+
+
+class NewsSlugConcurrencyTests(TransactionTestCase):
+    def test_concurrent_equal_titles_receive_distinct_bounded_slugs(self):
+        barrier = Barrier(2)
+        thread_state = threading.local()
+        original_exists = QuerySet.exists
+
+        def synchronize_first_news_slug_check(queryset):
+            exists = original_exists(queryset)
+            if queryset.model is NewsItem and not getattr(thread_state, "checked", False):
+                thread_state.checked = True
+                barrier.wait(timeout=5)
+            return exists
+
+        def create_news():
+            connection.close()
+            try:
+                item = NewsItem.objects.create(title="Long title " * 18, text="Текст")
+                return item.slug
+            finally:
+                connection.close()
+
+        with (
+            patch.object(QuerySet, "exists", synchronize_first_news_slug_check),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            slugs = list(executor.map(lambda _: create_news(), range(2)))
+
+        self.assertEqual(len(set(slugs)), 2)
+        self.assertTrue(all(len(slug) <= 50 for slug in slugs))
+        self.assertEqual(NewsItem.objects.count(), 2)
 
 
 class TaskEnabledStateMigrationTests(TransactionTestCase):

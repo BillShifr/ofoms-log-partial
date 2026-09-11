@@ -5,7 +5,7 @@ from datetime import timedelta
 from pathlib import PurePosixPath
 
 from django.conf import settings
-from django.db import models, transaction
+from django.db import IntegrityError, models, transaction
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -97,14 +97,27 @@ class NewsItem(models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
-        if not self.slug:
-            base = slugify(self.title) or "news"
-            slug, n = base, 1
-            while NewsItem.objects.filter(slug=slug).exclude(pk=self.pk).exists():
-                slug = f"{base}-{n}"
-                n += 1
-            self.slug = slug
-        return super().save(*args, **kwargs)
+        if self.slug:
+            return super().save(*args, **kwargs)
+
+        max_length = self._meta.get_field("slug").max_length
+        base = (slugify(self.title) or "news")[:max_length]
+        suffix_number = 0
+        while True:
+            suffix = f"-{suffix_number}" if suffix_number else ""
+            candidate = f"{base[: max_length - len(suffix)]}{suffix}"
+            if NewsItem.objects.filter(slug=candidate).exclude(pk=self.pk).exists():
+                suffix_number += 1
+                continue
+            self.slug = candidate
+            try:
+                with transaction.atomic():
+                    return super().save(*args, **kwargs)
+            except IntegrityError:
+                if not NewsItem.objects.filter(slug=candidate).exists():
+                    raise
+                self.slug = ""
+                suffix_number += 1
 
 
 @receiver(pre_save, sender=NewsItem)

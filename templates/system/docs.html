@@ -8,8 +8,8 @@
 </header>
 
 <div class="card mb-2">
-  <form method="get" class="filters" style="align-items:center">
-    <div class="field" style="flex:1">
+  <form method="get" class="filters filters--center">
+    <div class="field field--grow">
       <label for="search-docs">Поиск по документам</label>
       <input id="search-docs" type="text" name="q" value="{{ request.GET.q }}" data-autocomplete="doc" data-autocomplete-url="{% url 'system:doc_suggest' %}" placeholder="Введите название (от 3 символов)">
     </div>
@@ -36,7 +36,7 @@
         <div class="field field--wide"><label for="{{ form.description.id_for_label }}">Описание</label>{{ form.description }}{% for error in form.description.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field field--wide"><label for="{{ form.file.id_for_label }}">Файл</label>{{ form.file }}{% for error in form.file.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
       </div>
-      <div class="form-actions" style="justify-content:flex-start">
+      <div class="form-actions form-actions--start">
         <button class="btn btn--primary" type="submit">Загрузить</button>
       </div>
     </form>
@@ -65,8 +65,8 @@
 
 {% if category or docs %}
 <div class="card mt-2">
-  <div class="flex-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-    <h2 style="flex:1;font-size:1.2rem" class="mt-1 mb-1">
+  <div class="section-bar">
+    <h2 class="section-bar__title mt-1 mb-1">
       {% if category %}{{ category.name }}{% else %}Без категории{% endif %}
     </h2>
     {% if category %}<a class="btn btn--ghost btn--sm" href="{% url 'system:docs' %}">← Все разделы</a>{% endif %}

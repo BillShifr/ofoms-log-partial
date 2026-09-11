@@ -43,7 +43,7 @@
         </select>
       </div>
       {% endif %}
-      <div class="field field--narrow" style="align-self:flex-end">
+      <div class="field field--narrow field--submit">
         <button class="btn btn--primary" type="submit">Применить</button>
         {% if request.GET %}<a class="btn btn--ghost" href="{% url 'system:news' %}">Сброс</a>{% endif %}
       </div>
@@ -78,12 +78,12 @@
           <label for="{{ form.cover_image.id_for_label }}">Обложка</label>{{ form.cover_image }}
           {% for error in form.cover_image.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
         </div>
-        <div class="field field--narrow" style="display:flex;flex-direction:column;gap:8px">
+        <div class="field field--narrow field--checks">
           <label class="checkbox">{{ form.is_active }}{{ form.is_active.label }}</label>
           <label class="checkbox">{{ form.is_pinned }}{{ form.is_pinned.label }}</label>
         </div>
       </div>
-      <div class="form-actions" style="justify-content:flex-start">
+      <div class="form-actions form-actions--start">
         <button class="btn btn--primary" type="submit">Опубликовать</button>
       </div>
     </form>

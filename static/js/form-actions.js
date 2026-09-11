@@ -29,4 +29,13 @@
       delete button.dataset.originalLabel;
     });
   });
+
+  document.addEventListener("click", function (event) {
+    var trigger = event.target.closest("[data-ui-action]");
+    if (!trigger) return;
+    var action = trigger.getAttribute("data-ui-action");
+    if (action === "back") history.back();
+    if (action === "reload") location.reload();
+    if (action === "print") window.print();
+  });
 })();

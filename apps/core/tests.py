@@ -1,5 +1,7 @@
 """Тесты core: парольная политика, блокировка, токены, журнал событий."""
 
+from pathlib import Path
+
 import jwt
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
@@ -258,3 +260,15 @@ class ErrorPageTests(TestCase):
         response = self.client.get("/definitely-missing-page/")
         self.assertEqual(response.status_code, 404)
         self.assertContains(response, "Страница не найдена", status_code=404)
+
+
+class TemplateHygieneTests(TestCase):
+    def test_templates_do_not_embed_style_or_event_attributes(self):
+        templates_root = Path(settings.BASE_DIR) / "templates"
+        violations = []
+        forbidden = ('style="', "style='", 'onclick="', 'onchange="', 'onsubmit="')
+        for template in templates_root.rglob("*.html"):
+            text = template.read_text(encoding="utf-8-sig")
+            if any(marker in text.lower() for marker in forbidden):
+                violations.append(str(template.relative_to(templates_root)))
+        self.assertEqual(violations, [])

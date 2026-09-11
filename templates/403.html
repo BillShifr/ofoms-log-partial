@@ -10,7 +10,7 @@
     <p class="error-page__text">Этот раздел недоступен для вашей роли. Вернитесь в журнал или выберите доступный раздел в меню.</p>
     <div class="error-page__actions">
       <a class="btn btn--primary" href="{% url 'journal:list' %}">Перейти в журнал</a>
-      <button class="btn btn--ghost" type="button" onclick="history.back()">Вернуться назад</button>
+      <button class="btn btn--ghost" type="button" data-ui-action="back">Вернуться назад</button>
     </div>
   </div>
 </section>

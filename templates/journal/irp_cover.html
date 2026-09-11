@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Сопроводительное письмо № {{ irp.n_irp }}{% endblock %}
 {% block content %}
-<div class="print-toolbar no-print"><a class="btn btn--ghost" href="{% url 'journal:detail' irp.pk %}">← К обращению</a><button class="btn btn--primary" onclick="window.print()">Печать</button></div>
+<div class="print-toolbar no-print"><a class="btn btn--ghost" href="{% url 'journal:detail' irp.pk %}">← К обращению</a><button class="btn btn--primary" type="button" data-ui-action="print">Печать</button></div>
 
 <div class="paper">
   <p class="print-preview-note no-print">Предварительный просмотр · формат А4</p>

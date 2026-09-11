@@ -21,7 +21,7 @@
 <body>
   <div class="no-print print-toolbar">
     <a class="btn btn--ghost" href="{% url 'journal:detail' irp.pk %}">← Назад к карточке</a>
-    <button class="btn btn--primary" onclick="window.print()">Печать</button>
+    <button class="btn btn--primary" type="button" data-ui-action="print">Печать</button>
   </div>
 
   <main class="print-sheet">

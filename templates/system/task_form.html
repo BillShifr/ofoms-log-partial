@@ -94,7 +94,7 @@
   <div class="tab-panel" data-panel="notes">
     {% for n in notes %}
     <div class="message">
-      <div class="flex" style="justify-content:space-between;gap:8px">
+      <div class="flex flex--between gap-8">
         <span>
           <strong>{{ n.author.full_name }}</strong>
           <span class="text-muted"> · {{ n.created_at|date:"d.m.Y H:i" }}</span>
@@ -113,7 +113,7 @@
           <input type="hidden" name="action" value="note_edit">
           <input type="hidden" name="note_id" value="{{ n.pk }}">
           <div class="field"><textarea name="text" rows="2" data-validate>{{ n.text }}</textarea></div>
-          <div class="form-actions" style="justify-content:flex-start">
+          <div class="form-actions form-actions--start">
             <button class="btn btn--sm btn--primary" type="submit">Сохранить</button>
           </div>
         </form>
@@ -122,10 +122,10 @@
     {% empty %}
     <p class="text-muted">Заметок нет.</p>
     {% endfor %}
-    <form method="post" class="answer-form" data-validate style="border-top:none;margin-top:12px">
+    <form method="post" class="answer-form answer-form--embedded" data-validate>
       {% csrf_token %}
       <input type="hidden" name="action" value="note">
-      <div class="field" style="flex:1">{{ note_form.text }}</div>
+      <div class="field field--grow">{{ note_form.text }}</div>
       <button class="btn btn--primary" type="submit">Добавить</button>
     </form>
   </div>
@@ -139,10 +139,10 @@
     {% empty %}
     <p class="text-muted">Файлов нет.</p>
     {% endfor %}
-    <form method="post" enctype="multipart/form-data" class="answer-form" style="border-top:none;margin-top:12px">
+    <form method="post" enctype="multipart/form-data" class="answer-form answer-form--embedded">
       {% csrf_token %}
       <input type="hidden" name="action" value="file">
-      <div class="field" style="flex:1">{{ file_form.file }}</div>
+      <div class="field field--grow">{{ file_form.file }}</div>
       <button class="btn btn--primary" type="submit">Прикрепить</button>
     </form>
   </div>
@@ -156,10 +156,10 @@
     {% empty %}
     <p class="text-muted">Отчётов нет.</p>
     {% endfor %}
-    <form method="post" class="answer-form" data-validate style="border-top:none;margin-top:12px">
+    <form method="post" class="answer-form answer-form--embedded" data-validate>
       {% csrf_token %}
       <input type="hidden" name="action" value="report">
-      <div class="field" style="flex:1"><label for="{{ report_form.title.id_for_label }}">Заголовок</label>{{ report_form.title }}{{ report_form.content }}</div>
+      <div class="field field--grow"><label for="{{ report_form.title.id_for_label }}">Заголовок</label>{{ report_form.title }}{{ report_form.content }}</div>
       <button class="btn btn--primary" type="submit">Сохранить отчёт</button>
     </form>
   </div>

@@ -355,6 +355,7 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .field .errorlist { margin: 0; padding: 0; list-style: none; color: var(--danger); font-size: .85rem; }
 .helptext { font-size: .82rem; opacity: .75; }
 .form-actions { display: flex; gap: 12px; margin-top: 22px; }
+.form-actions--start { justify-content: flex-start; }
 .journal-actions { justify-content: space-between; align-items: center; }
 .journal-actions__primary, .journal-actions__secondary { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
@@ -402,6 +403,7 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 
 /* ---------- Фильтры ---------- */
 .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.filters--center { align-items: center; }
 .filters .field { flex: 1 1 180px; }
 .filters .field--narrow { flex: 0 1 auto; }
 .filters .field--date { flex: 0 1 168px; }
@@ -413,6 +415,9 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .field--roles label:has(input:checked) { background: var(--chip-green); border-color: var(--accent); }
 .field--roles input[type="checkbox"] { accent-color: var(--accent); }
 .field--wide { flex-basis: 100% !important; }
+.field--grow, .flex-grow { flex: 1; min-width: 0; }
+.field--submit { align-self: flex-end; }
+.field--checks { display: flex; flex-direction: column; gap: 8px; }
 
 /* ---------- Вкладки (карточка задачи, 2.11) ---------- */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap: wrap; }
@@ -462,6 +467,18 @@ tbody tr.js-event-row { cursor: pointer; }
 .text-muted { color: inherit; opacity: .75; }
 .text-right { text-align: right; }
 .flex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.flex--start { align-items: flex-start; }
+.flex--baseline { align-items: baseline; }
+.flex--between { justify-content: space-between; }
+.flex--wrap { flex-wrap: wrap; }
+.gap-6 { gap: 6px; }
+.gap-8 { gap: 8px; }
+.gap-10 { gap: 10px; }
+.section-title-sm { margin: 0 0 10px; font-size: 1.1rem; }
+.section-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.section-bar__title { flex: 1; font-size: 1.2rem; }
+.input-order { width: 4rem; }
+.answer-form--embedded { margin-top: 12px; border-top: 0; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 30px; }
 .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .95em; }
 .field.span-2 { grid-column: 1 / -1; }

@@ -30,7 +30,7 @@
           </div>
           <p class="msg__body">{{ r.body }}</p>
           {% if r.attachments.all %}
-            <div class="flex" style="gap:6px;flex-wrap:wrap">
+            <div class="flex flex--wrap gap-6">
               {% for a in r.attachments.all %}
                 <a class="attachment-chip" href="{% url 'system:message_attachment_download' a.pk %}">Загрузить: {{ a.file.name|cut:"messages/" }}</a>
               {% endfor %}

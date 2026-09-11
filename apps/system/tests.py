@@ -605,6 +605,24 @@ class MessageTests(BaseSystemTestCase):
             ).exists()
         )
 
+    def test_reply_rolls_back_when_semantic_audit_fails(self):
+        conv = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=conv, created_by=self.admin, title="Атомарная тема"
+        )
+        self.client.force_login(self.operator)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:reply", args=[thread.pk]),
+                {"body": "Не должно сохраниться"},
+            )
+
+        self.assertFalse(thread.replies.exists())
+
     def test_reply_unsafe_attachment_rejected(self):
         conv = self._conv()
         thread = MessageThread.objects.create(

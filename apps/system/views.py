@@ -634,41 +634,57 @@ def thread_toggle(request, pk):
 @require_http_methods(["POST"])
 def thread_reply(request, pk):
     """Ответ в теме (с необязательным вложением-файлом)."""
-    thread = get_object_or_404(MessageThread, pk=pk)
-    _participant_or_404(request.user, thread.conversation)
-    if thread.is_closed:
-        raise PermissionDenied
     form = ReplyForm(request.POST)
     if form.is_valid():
-        reply = form.save(commit=False)
-        reply.thread = thread
-        reply.author = request.user
-        parent_id = (request.POST.get("parent") or "").strip()
-        if parent_id and parent_id.isdigit():
-            parent = MessageReply.objects.filter(pk=parent_id, thread=thread).first()
-            reply.parent = parent
-        reply.save()
-        uploaded = request.FILES.get("attachment")
-        if uploaded is not None:
-            from apps.system.validators import validate_attachment_file
+        with transaction.atomic():
+            thread = get_object_or_404(
+                MessageThread.objects.select_for_update().select_related("conversation"),
+                pk=pk,
+            )
+            _participant_or_404(request.user, thread.conversation)
+            if thread.is_closed:
+                raise PermissionDenied
 
-            try:
-                validate_attachment_file(uploaded)
-            except Exception:  # noqa: BLE001 — не прошедший валидацию файл
-                messages.error(request, "Вложение не прикреплено: недопустимый тип или размер файла.")
-            else:
-                MessageAttachment.objects.create(
-                    reply=reply, file=uploaded, uploaded_by=request.user
-                )
-        log_event(
-            module="system",
-            event_type=EventLog.EventType.SEND,
-            user=request.user,
-            target=f"thread:{thread.pk}:reply:{reply.pk}",
-            ip=request.META.get("REMOTE_ADDR"),
-        )
-        messages.success(request, "Сообщение отправлено.")
+            reply = form.save(commit=False)
+            reply.thread = thread
+            reply.author = request.user
+            parent_id = (request.POST.get("parent") or "").strip()
+            if parent_id and parent_id.isdigit():
+                parent = MessageReply.objects.filter(
+                    pk=parent_id, thread=thread
+                ).first()
+                reply.parent = parent
+            reply.save()
+            uploaded = request.FILES.get("attachment")
+            if uploaded is not None:
+                from apps.system.validators import validate_attachment_file
+
+                try:
+                    validate_attachment_file(uploaded)
+                except Exception:  # noqa: BLE001 — не прошедший валидацию файл
+                    messages.error(
+                        request,
+                        "Вложение не прикреплено: недопустимый тип или размер файла.",
+                    )
+                else:
+                    MessageAttachment.objects.create(
+                        reply=reply, file=uploaded, uploaded_by=request.user
+                    )
+            log_event(
+                module="system",
+                event_type=EventLog.EventType.SEND,
+                user=request.user,
+                target=f"thread:{thread.pk}:reply:{reply.pk}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
+            messages.success(request, "Сообщение отправлено.")
     else:
+        thread = get_object_or_404(
+            MessageThread.objects.select_related("conversation"), pk=pk
+        )
+        _participant_or_404(request.user, thread.conversation)
+        if thread.is_closed:
+            raise PermissionDenied
         messages.error(request, "Не удалось отправить сообщение: проверьте форму.")
     return redirect("system:thread", thread.pk)
 

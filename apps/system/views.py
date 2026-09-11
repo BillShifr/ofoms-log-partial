@@ -1039,7 +1039,11 @@ def task_toggle(request, pk):
     with transaction.atomic():
         task = get_object_or_404(TaskJob.objects.select_for_update(), pk=pk)
         task.enabled = not task.enabled
-        task.save(update_fields=["enabled"])
+        update_fields = ["enabled"]
+        if task.enabled and task.status == TaskJob.Status.CANCELLED:
+            task.status = TaskJob.Status.CREATED
+            update_fields.append("status")
+        task.save(update_fields=update_fields)
         state_code = "enabled" if task.enabled else "disabled"
         log_event(
             module="system",

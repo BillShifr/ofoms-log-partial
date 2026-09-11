@@ -492,6 +492,13 @@ class TaskJob(models.Model):
                 ),
                 name="system_task_running_started",
             ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(enabled=False)
+                    | ~models.Q(status="cancelled")
+                ),
+                name="system_task_enabled_not_cancelled",
+            ),
         ]
         indexes = [
             models.Index(

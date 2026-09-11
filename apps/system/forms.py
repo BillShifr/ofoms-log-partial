@@ -331,6 +331,12 @@ class TaskForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         if (
+            self.instance.pk
+            and self.instance.status == TaskJob.Status.CANCELLED
+            and cleaned.get("enabled")
+        ):
+            cleaned["status"] = TaskJob.Status.CREATED
+        if (
             cleaned.get("run_mode") == TaskJob.RunMode.SCHEDULED
             and not cleaned.get("interval_minutes")
         ):

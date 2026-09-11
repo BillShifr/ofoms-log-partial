@@ -13,7 +13,8 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import CommandError, call_command
 from django.db import IntegrityError, connection, transaction
-from django.test import Client, TestCase, override_settings
+from django.db.migrations.executor import MigrationExecutor
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -1757,6 +1758,40 @@ class TaskTests(BaseSystemTestCase):
         card = self.client.get(reverse("system:task_update", args=[task.pk]))
         self.assertContains(card, 'disabled title="Сначала включите задание"')
 
+    def test_cancelled_task_cannot_be_enabled_without_state_reset(self):
+        task = self._make_task(enabled=False, status=TaskJob.Status.CANCELLED)
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            TaskJob.objects.filter(pk=task.pk).update(enabled=True)
+
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse("system:task_toggle", args=[task.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        task.refresh_from_db()
+        self.assertTrue(task.enabled)
+        self.assertEqual(task.status, TaskJob.Status.CREATED)
+
+    def test_saving_cancelled_task_as_enabled_resets_state(self):
+        task = self._make_task(enabled=False, status=TaskJob.Status.CANCELLED)
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:task_update", args=[task.pk]),
+            {
+                "name": task.name,
+                "command": task.command,
+                "run_mode": TaskJob.RunMode.MANUAL,
+                "priority": TaskJob.Priority.LOW,
+                "enabled": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        task.refresh_from_db()
+        self.assertTrue(task.enabled)
+        self.assertEqual(task.status, TaskJob.Status.CREATED)
+
     def test_task_claim_rolls_back_when_pending_audit_fails(self):
         task = self._make_task()
 
@@ -2139,6 +2174,31 @@ class TaskTests(BaseSystemTestCase):
         call_command("run_tasks", stdout=out)
         self.assertEqual(TaskRun.objects.count(), 0)
         self.assertIn("Нет заданий", out.getvalue())
+
+
+class TaskEnabledStateMigrationTests(TransactionTestCase):
+    migrate_from = [("system", "0010_require_message_attachment_reply")]
+    migrate_to = [("system", "0011_enforce_task_enabled_state")]
+
+    def test_migration_normalizes_existing_enabled_cancelled_task(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        OldTaskJob = old_apps.get_model("system", "TaskJob")
+        task = OldTaskJob.objects.create(
+            name="Legacy active cancelled",
+            command="noop",
+            status="cancelled",
+            enabled=True,
+            run_mode="manual",
+        )
+
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        new_apps = executor.loader.project_state(self.migrate_to).apps
+        NewTaskJob = new_apps.get_model("system", "TaskJob")
+
+        self.assertEqual(NewTaskJob.objects.get(pk=task.pk).status, "created")
 
 
 class PrefTests(BaseSystemTestCase):

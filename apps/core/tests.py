@@ -98,6 +98,9 @@ class ProductionSettingsTests(TestCase):
             {"TRUST_PROXY_SSL_HEADER": "sometimes"},
             {"SECURE_HSTS_SECONDS": "-1"},
             {"SECURE_HSTS_SECONDS": "not-a-number"},
+            {"SESSION_COOKIE_AGE": "299"},
+            {"SESSION_COOKIE_AGE": "43201"},
+            {"SESSION_COOKIE_AGE": "not-a-number"},
         )
         for environment in invalid_environments:
             with self.subTest(environment=environment):
@@ -107,6 +110,22 @@ class ProductionSettingsTests(TestCase):
                 )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(next(iter(environment)), result.stderr)
+
+    def test_production_uses_bounded_sliding_browser_session(self):
+        result = self._import_settings(
+            "database-secret-4827-strong",
+            code=(
+                "from config.settings.prod import "
+                "SESSION_COOKIE_AGE, SESSION_EXPIRE_AT_BROWSER_CLOSE, "
+                "SESSION_SAVE_EVERY_REQUEST; "
+                "print(SESSION_COOKIE_AGE, SESSION_EXPIRE_AT_BROWSER_CLOSE, "
+                "SESSION_SAVE_EVERY_REQUEST)"
+            ),
+            extra_environment={"SESSION_COOKIE_AGE": "1800"},
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("1800 True True", result.stdout)
 
     def test_production_validates_token_login_trusted_origins(self):
         for origins in (

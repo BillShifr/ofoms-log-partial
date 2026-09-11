@@ -744,3 +744,10 @@
 - [x] Сохранять field-level diff при повторном импорте.
 - [x] Включить смену source `input_file` в историю.
 - [x] Держать данные и историю внутри одного savepoint/транзакции файла.
+
+## 2026-09-12 — parity Excel-импорта
+
+- [x] Перевести Excel на общий row-locked upsert обращений.
+- [x] Писать source path Excel в системную историю.
+- [x] Очищать stale XML `input_file` при успешном Excel-обновлении.
+- [x] Сохранить field-level diff и атомарный rollback.

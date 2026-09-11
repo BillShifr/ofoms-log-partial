@@ -497,6 +497,7 @@ class IrpXMLFile(XsdExchangeFile):
                 employee_it=employee_it,
                 theme=theme,
                 input_file=input_file,
+                source_label=input_file.real_filename,
             )
         except ValidationError as e:
             for key, msgs in e.message_dict.items():
@@ -507,7 +508,9 @@ class IrpXMLFile(XsdExchangeFile):
         self.rows += 1
 
 
-def _upsert_imported_irp(*, values, employee_one, employee_it, theme, input_file):
+def _upsert_imported_irp(
+    *, values, employee_one, employee_it, theme, input_file, source_label
+):
     """Сериализует update и разрешает конкурентный insert по `n_irp`."""
     n_irp = values["n_irp"]
     for _ in range(2):
@@ -543,9 +546,14 @@ def _upsert_imported_irp(*, values, employee_one, employee_it, theme, input_file
                     IrpHistory.objects.create(
                         irp=irp,
                         field_name="__imported__",
-                        new_value=input_file.real_filename,
+                        new_value=source_label,
                     )
                 else:
+                    IrpHistory.objects.create(
+                        irp=irp,
+                        field_name="__reimported__",
+                        new_value=source_label,
+                    )
                     for field, old_value in previous.items():
                         new_value = getattr(irp, field)
                         if old_value != new_value:
@@ -794,18 +802,15 @@ class ExcelIrpFile:
         del rec["employee_1"]
         rec.pop("employee_it", None)
         rec = {k: v for k, v in rec.items() if k != "theme"}
-        irp = Irp.objects.filter(n_irp=n_irp).first()
-        if irp is None:
-            irp = Irp(employee_one=employee_one, employee_it=employee_it, theme=theme)
-        for key, value in rec.items():
-            setattr(irp, key, value)
-        irp.employee_one = employee_one
-        irp.employee_it = employee_it
-        irp.theme = theme
         try:
-            irp.synchronize_imported_status()
-            irp.full_clean()
-            irp.save()
+            _upsert_imported_irp(
+                values=rec,
+                employee_one=employee_one,
+                employee_it=employee_it,
+                theme=theme,
+                input_file=None,
+                source_label=str(self.real_file),
+            )
         except ValidationError as e:
             for key, msgs in e.message_dict.items():
                 self.errors.append(flc.error_result(str(key).upper(), str(msgs), n_irp))

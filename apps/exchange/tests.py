@@ -3,6 +3,7 @@ XSD-валидация, импорт users*.xml / G1*.xml, Excel, протоко
 upsert по guid/n_irp, ограничение доступа к протоколам по организации.
 """
 
+import datetime
 import errno
 import os
 import stat
@@ -587,6 +588,73 @@ class ExcelImportTests(ExchangeTestMixin, TestCase):
         self.assertTrue(out.ok, out.errors)
         self.assertEqual(out.rows, 1)
         self.assertTrue(Irp.objects.filter(z_f="Петров").exists())
+        irp = Irp.objects.get(z_f="Петров")
+        self.assertIsNone(irp.input_file_id)
+        self.assertTrue(
+            IrpHistory.objects.filter(
+                irp=irp,
+                field_name="__imported__",
+                new_value=str(path),
+            ).exists()
+        )
+
+    def test_excel_reimport_clears_stale_xml_source_and_records_history(self):
+        source = XmlFiles.objects.create(
+            year="2026",
+            month="09",
+            day="12",
+            smo=81000,
+            filename="G1R_previous.xml",
+            real_filename="/exchange/G1R_previous.xml",
+        )
+        irp = Irp.objects.create(
+            input_file=source,
+            n_irp=str(uuid.uuid4()),
+            irp_type=1,
+            date_create=datetime.date(2026, 9, 12),
+            way=1,
+            how=2,
+            theme=self.theme,
+            otv_t=1,
+            otv_kon=81000,
+            employee_one=self.emp1,
+            data_plan=datetime.date(2026, 10, 12),
+            z_f="До Excel",
+        )
+        path = Path(self.in_dir) / "reimport.xlsx"
+        importer = ExcelIrpFile(81000, path, **self._imp_kwargs())
+
+        importer._import_one(
+            {
+                "n_irp": irp.n_irp,
+                "irp_type": 1,
+                "date_create": datetime.date(2026, 9, 12),
+                "way": 1,
+                "how": 2,
+                "theme": self.theme.code_name,
+                "otv_t": 1,
+                "otv_kon": 81000,
+                "employee_1": str(self.emp1.guid),
+                "data_plan": datetime.date(2026, 10, 12),
+                "z_f": "После Excel",
+            }
+        )
+
+        self.assertEqual(importer.errors, [])
+        self.assertEqual(importer.rows, 1)
+        irp.refresh_from_db()
+        self.assertIsNone(irp.input_file_id)
+        self.assertEqual(irp.z_f, "После Excel")
+        self.assertTrue(
+            IrpHistory.objects.filter(
+                irp=irp,
+                field_name="__reimported__",
+                new_value=str(path),
+            ).exists()
+        )
+        source_change = IrpHistory.objects.get(irp=irp, field_name="input_file")
+        self.assertEqual(source_change.old_value, f"journal.XmlFiles:{source.pk}")
+        self.assertEqual(source_change.new_value, "—")
 
     def test_xlsx_container_rejects_excessive_uncompressed_size(self):
         path = Path(self.in_dir) / "oversized-content.xlsx"

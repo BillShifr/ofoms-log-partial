@@ -384,13 +384,13 @@ table.data tbody tr[data-href]:focus-within {
 }
 table.data tr.row--overdue { background: color-mix(in srgb, var(--chip-red) 60%, var(--card)); box-shadow: inset 4px 0 var(--danger); }
 table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%, var(--card)); box-shadow: inset 4px 0 var(--warn); }
-.data--journal { font-size: .79rem; }
-.data--journal th, .data--journal td { padding: 10px 12px; }
+.data--journal { min-width: 1120px !important; font-size: .78rem; }
+.data--journal th, .data--journal td { padding: 8px 10px; }
 .data--journal thead tr:not(.group-row) th {
-  background: color-mix(in srgb, var(--bg) 16%, var(--card));
+  background: color-mix(in srgb, var(--bg) 10%, var(--card));
   color: color-mix(in srgb, var(--ink) 76%, transparent);
-  font-size: .7rem;
-  letter-spacing: .04em;
+  font-size: .69rem;
+  letter-spacing: .025em;
   border-top: 0;
 }
 .data--journal tbody tr:nth-child(even):not(.row-detail),
@@ -399,14 +399,14 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .data--journal tbody tr.row--overdue td:first-child { border-left: 2px solid color-mix(in srgb, var(--danger) 72%, var(--line)); }
 .data--journal tbody tr.row--open td:first-child { border-left: 2px solid color-mix(in srgb, var(--warn) 72%, var(--line)); }
 .data--journal tbody tr:hover { background: color-mix(in srgb, var(--primary) 4%, var(--card)); box-shadow: none; }
-.data--journal .col-theme { min-width: 180px; }
-.data--journal .col-n_irp { width: 172px; max-width: 172px; }
-.data--journal .col-z_f { min-width: 190px; }
+.data--journal .col-theme { min-width: 160px; }
+.data--journal .col-n_irp { width: 158px; max-width: 158px; }
+.data--journal .col-z_f { min-width: 170px; }
 .data--journal .col-status {
   position: sticky;
   right: 0;
   z-index: 3;
-  min-width: 148px;
+  min-width: 132px;
   background: var(--card);
   box-shadow: -12px 0 18px -18px color-mix(in srgb, var(--ink) 55%, transparent);
 }
@@ -731,19 +731,17 @@ table.data .group-row th {
 }
 table.data .group-row th.group-row__empty { background: transparent; border: none; border-radius: 0; }
 .data--journal .group-row th {
-  height: 42px;
-  padding: 9px 10px 7px;
+  height: 30px;
+  padding: 7px 10px 4px;
   background: var(--card);
   border: 0;
 }
 .group-row__label {
   display: inline-flex;
   width: fit-content;
-  padding: 4px 9px;
-  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--line));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--primary) 5%, var(--card));
-  color: color-mix(in srgb, var(--ink) 58%, transparent);
+  padding: 1px 0 1px 7px;
+  border-left: 2px solid color-mix(in srgb, var(--primary) 48%, var(--line));
+  color: color-mix(in srgb, var(--ink) 52%, transparent);
 }
 table.data th { border-top: 1px solid var(--line); }
 table.data.th-sticky th:first-child,

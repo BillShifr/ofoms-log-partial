@@ -135,7 +135,7 @@ class FailedLoginLockTests(TestCase):
 class TokenTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="tokenuser", password="GoodPass!1", org=81004
+            username="tokenuser", password="GoodPass!1", org=81008
         )
 
     def test_issue_decode_roundtrip(self):
@@ -172,7 +172,7 @@ class TokenTests(TestCase):
 class TokenLoginTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="sso-user", password="GoodPass!1", org=81004
+            username="sso-user", password="GoodPass!1", org=81008
         )
         self.url = reverse("core:token_login")
 

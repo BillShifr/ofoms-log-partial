@@ -2,6 +2,7 @@
 
 from apps.employee.models import Employee, GroupProxy
 from django.contrib.auth import authenticate, get_user_model
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 User = get_user_model()
@@ -56,6 +57,14 @@ class EmployeeModelTests(TestCase):
 
         user.refresh_from_db()
         self.assertEqual(user.failed_attempts, 2)
+
+    def test_database_rejects_unknown_organization(self):
+        user = Employee.objects.create_user(
+            username="invalid_org", password="Passw0rd!", org=81000
+        )
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Employee.objects.filter(pk=user.pk).update(org=99999)
 
 
 class GroupProxyTests(TestCase):

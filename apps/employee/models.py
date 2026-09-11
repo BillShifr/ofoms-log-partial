@@ -48,6 +48,12 @@ class Employee(AbstractUser):
         verbose_name = "Сотрудник"
         verbose_name_plural = "Сотрудники"
         ordering = ["last_name", "first_name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(org__in=tuple(code for code, _ in ORGS)),
+                name="employee_org_valid",
+            )
+        ]
 
     def full_name(self) -> str:
         return " ".join(part for part in (self.last_name, self.first_name) if part).strip()

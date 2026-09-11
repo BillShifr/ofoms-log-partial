@@ -11,8 +11,9 @@ import errno
 import glob
 import os
 import shutil
+import zipfile
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -26,6 +27,31 @@ from apps.journal.models import Irp, IrpTheme, XmlFiles
 
 XSD_DIR = Path(__file__).resolve().parent / "xsd"
 MAX_EXCHANGE_FILE_SIZE = 20 * 1024 * 1024
+MAX_XLSX_UNCOMPRESSED_SIZE = 100 * 1024 * 1024
+MAX_XLSX_MEMBERS = 1000
+
+
+def validate_xlsx_container(path: Path) -> None:
+    """Отклоняет опасный ZIP-контейнер до передачи XLSX в openpyxl."""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            members = archive.infolist()
+    except zipfile.BadZipFile as error:
+        raise ValueError("Повреждённый XLSX-контейнер") from error
+
+    if len(members) > MAX_XLSX_MEMBERS:
+        raise ValueError("XLSX содержит слишком много внутренних файлов")
+
+    uncompressed_size = 0
+    for member in members:
+        member_path = PurePosixPath(member.filename.replace("\\", "/"))
+        if member_path.is_absolute() or ".." in member_path.parts:
+            raise ValueError("XLSX содержит небезопасный внутренний путь")
+        if member.flag_bits & 0x1:
+            raise ValueError("Зашифрованные XLSX не поддерживаются")
+        uncompressed_size += member.file_size
+        if uncompressed_size > MAX_XLSX_UNCOMPRESSED_SIZE:
+            raise ValueError("Распакованный XLSX превышает 100 МБ")
 
 
 def available_artifact_path(path: Path) -> Path:
@@ -502,6 +528,7 @@ class ExcelIrpFile:
         try:
             if self.real_file.stat().st_size > MAX_EXCHANGE_FILE_SIZE:
                 raise ValueError("Размер файла превышает 20 МБ")
+            validate_xlsx_container(self.real_file)
             with transaction.atomic():
                 wb = load_workbook(self.real_file, read_only=True, data_only=True)
                 ws = wb.active

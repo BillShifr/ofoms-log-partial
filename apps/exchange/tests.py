@@ -5,9 +5,11 @@ upsert по guid/n_irp, ограничение доступа к протоко�
 
 import errno
 import uuid
+import zipfile
 from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -24,6 +26,7 @@ from apps.exchange.importers import (
     ExcelIrpFile,
     IrpXMLFile,
     archive_artifact,
+    validate_xlsx_container,
 )
 from apps.exchange.models import ImportLog
 from apps.journal.models import Irp, IrpTheme
@@ -296,6 +299,71 @@ class ExcelImportTests(ExchangeTestMixin, TestCase):
         self.assertTrue(out.ok, out.errors)
         self.assertEqual(out.rows, 1)
         self.assertTrue(Irp.objects.filter(z_f="Петров").exists())
+
+    def test_xlsx_container_rejects_excessive_uncompressed_size(self):
+        path = Path(self.in_dir) / "oversized-content.xlsx"
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("xl/worksheets/sheet1.xml", b"x" * 33)
+
+        with patch(
+            "apps.exchange.importers.MAX_XLSX_UNCOMPRESSED_SIZE", 32
+        ), self.assertRaisesMessage(ValueError, "Распакованный XLSX"):
+            validate_xlsx_container(path)
+
+    def test_xlsx_container_rejects_excessive_member_count(self):
+        path = Path(self.in_dir) / "many-members.xlsx"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("one.xml", b"1")
+            archive.writestr("two.xml", b"2")
+
+        with patch(
+            "apps.exchange.importers.MAX_XLSX_MEMBERS", 1
+        ), self.assertRaisesMessage(ValueError, "слишком много"):
+            validate_xlsx_container(path)
+
+    def test_xlsx_container_rejects_unsafe_internal_path(self):
+        path = Path(self.in_dir) / "unsafe-path.xlsx"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("../outside.xml", b"x")
+
+        with self.assertRaisesMessage(ValueError, "небезопасный внутренний путь"):
+            validate_xlsx_container(path)
+
+    def test_xlsx_container_rejects_invalid_zip(self):
+        path = Path(self.in_dir) / "broken.xlsx"
+        path.write_bytes(b"not-a-zip")
+
+        with self.assertRaisesMessage(ValueError, "Повреждённый XLSX"):
+            validate_xlsx_container(path)
+
+    def test_xlsx_container_rejects_encrypted_member(self):
+        archive = MagicMock()
+        archive.__enter__.return_value.infolist.return_value = [
+            SimpleNamespace(filename="xl/workbook.xml", flag_bits=0x1, file_size=10)
+        ]
+
+        with patch(
+            "apps.exchange.importers.zipfile.ZipFile", return_value=archive
+        ), self.assertRaisesMessage(ValueError, "Зашифрованные XLSX"):
+            validate_xlsx_container(Path("encrypted.xlsx"))
+
+    def test_excel_import_reports_container_limit_without_database_changes(self):
+        from openpyxl import Workbook
+
+        workbook = Workbook()
+        workbook.active.append(["УНр"])
+        path = Path(self.in_dir) / "limited.xlsx"
+        workbook.save(path)
+        importer = ExcelIrpFile(81000, path, **self._imp_kwargs())
+
+        with patch("apps.exchange.importers.MAX_XLSX_UNCOMPRESSED_SIZE", 1):
+            result = importer.process()
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.rows, 0)
+        self.assertTrue(any("Распакованный XLSX" in str(error) for error in result.errors))
+        self.assertFalse(Irp.objects.exists())
+        self.assertFalse(path.exists())
 
 
 class UploadScreenTests(ExchangeTestMixin, TestCase):

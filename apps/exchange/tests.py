@@ -3,8 +3,11 @@ XSD-валидация, импорт users*.xml / G1*.xml, Excel, протоко
 upsert по guid/n_irp, ограничение доступа к протоколам по организации.
 """
 
+import errno
 import uuid
+from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -15,7 +18,12 @@ from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
 from apps.exchange.flc import FLCP_ERROR, build_flcp, error_result, ok_result
 from apps.exchange.forms import UploadFileForm
-from apps.exchange.importers import EmployeeXMLFile, ExcelIrpFile, IrpXMLFile
+from apps.exchange.importers import (
+    EmployeeXMLFile,
+    ExcelIrpFile,
+    IrpXMLFile,
+    archive_artifact,
+)
 from apps.exchange.models import ImportLog
 from apps.journal.models import Irp, IrpTheme
 
@@ -434,6 +442,53 @@ class ImportCommandTests(ExchangeTestMixin, TestCase):
         self.assertTrue((out_dir / "81000" / "users260514002.xml").exists())
         self.assertTrue((arch_dir / "81000" / "users260514002.xml").exists())
         self.assertEqual(Employee.objects.count(), 4)
+
+    def test_cross_filesystem_archive_removes_source_and_prevents_reimport(self):
+        from django.core.management import call_command
+
+        in_dir = Path(self.in_dir)
+        out_dir = Path(self.out_dir)
+        arch_dir = Path(self.arch_dir)
+        source = in_dir / "81000" / "users260514003.xml"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(SAMPLE_USERS)
+
+        exchange_settings = {
+            "EXCHANGE_IN": in_dir,
+            "EXCHANGE_OUT": out_dir,
+            "EXCHANGE_ARCHIVE": arch_dir,
+        }
+        with override_settings(**exchange_settings), patch(
+            "apps.exchange.importers.os.replace",
+            side_effect=OSError(errno.EXDEV, "cross-device link"),
+        ):
+            call_command("import_exchange", orgs=[81000], verbosity=0)
+
+        self.assertFalse(source.exists())
+        archived = arch_dir / "81000" / source.name
+        self.assertEqual(archived.read_bytes(), SAMPLE_USERS)
+        self.assertEqual(ImportLog.objects.filter(filename=source.name).count(), 1)
+
+        output = StringIO()
+        with override_settings(**exchange_settings):
+            call_command("import_exchange", orgs=[81000], stdout=output)
+        self.assertIn("Файлов для обработки не найдено", output.getvalue())
+        self.assertEqual(ImportLog.objects.filter(filename=source.name).count(), 1)
+
+    def test_archive_does_not_mask_non_cross_filesystem_error(self):
+        source = Path(self.in_dir) / "protected.xml"
+        source.write_bytes(b"source")
+
+        with patch(
+            "apps.exchange.importers.os.replace",
+            side_effect=PermissionError(errno.EACCES, "permission denied"),
+        ), patch("apps.exchange.importers.shutil.copy2") as copy_file, self.assertRaises(
+            PermissionError
+        ):
+            archive_artifact(source, Path(self.arch_dir), 81000)
+
+        copy_file.assert_not_called()
+        self.assertTrue(source.exists())
 
 
 class XsdValidationTests(ExchangeTestMixin, TestCase):

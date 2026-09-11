@@ -7,6 +7,7 @@
 - записи протокола (ImportLog) сохраняются в БД.
 """
 
+import errno
 import glob
 import os
 import shutil
@@ -25,6 +26,30 @@ from apps.journal.models import Irp, IrpTheme, XmlFiles
 
 XSD_DIR = Path(__file__).resolve().parent / "xsd"
 MAX_EXCHANGE_FILE_SIZE = 20 * 1024 * 1024
+
+
+def available_artifact_path(path: Path) -> Path:
+    """Preserve the original name once and never overwrite an existing artifact."""
+    if not path.exists():
+        return path
+    import uuid
+
+    return path.with_name(f"{path.stem}-{uuid.uuid4().hex[:8]}{path.suffix}")
+
+
+def archive_artifact(source: Path, archive_dir: Path, org: int) -> Path:
+    """Move a processed input exactly once, including across filesystems."""
+    org_dir = archive_dir / str(org)
+    org_dir.mkdir(parents=True, exist_ok=True)
+    destination = available_artifact_path(org_dir / source.name)
+    try:
+        os.replace(source, destination)
+    except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            raise
+        shutil.copy2(source, destination)
+        source.unlink()
+    return destination
 
 
 @dataclass
@@ -149,13 +174,7 @@ class XsdExchangeFile:
     # -- каталоги -----------------------------------------------------------
 
     def _archive(self):
-        org_dir = self._archive_dir / str(self.org)
-        org_dir.mkdir(parents=True, exist_ok=True)
-        dest = available_artifact_path(org_dir / self.basename)
-        try:
-            os.replace(self.real_file, dest)
-        except OSError:
-            shutil.copy2(self.real_file, dest)
+        archive_artifact(self.real_file, self._archive_dir, self.org)
 
     def write_flcp(self, result: ImportResult) -> Path:
         org_dir = self._out_dir / str(self.org)
@@ -590,9 +609,7 @@ class ExcelIrpFile:
         self.rows += 1
 
     def _archive(self):
-        org_dir = self._archive_dir / str(self.org)
-        org_dir.mkdir(parents=True, exist_ok=True)
-        os.replace(self.real_file, available_artifact_path(org_dir / self.basename))
+        archive_artifact(self.real_file, self._archive_dir, self.org)
 
     def write_flcp(self, result: ImportResult) -> Path:
         org_dir = self._out_dir / str(self.org)
@@ -619,15 +636,6 @@ def discover_files(in_dir, org, masks) -> list[Path]:
             if os.path.isfile(p)
         )
     return sorted(set(files), key=lambda p: p.name)
-
-
-def available_artifact_path(path: Path) -> Path:
-    """Preserve the original name once and never overwrite an existing artifact."""
-    if not path.exists():
-        return path
-    import uuid
-
-    return path.with_name(f"{path.stem}-{uuid.uuid4().hex[:8]}{path.suffix}")
 
 
 def import_all(orgs=None):

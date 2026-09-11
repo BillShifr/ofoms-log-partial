@@ -509,12 +509,49 @@ class MessageTests(BaseSystemTestCase):
         self.assertEqual(resp.status_code, 302)
         reply.refresh_from_db()
         self.assertIn(self.operator.pk, reply.reactions.get("👍", []))
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.UPDATE,
+                user=self.operator,
+                target=f"reply:{reply.pk}:reaction:added",
+                detail="👍",
+            ).exists()
+        )
         resp = self.client.post(
             reverse("system:react", args=[reply.pk]), {"emoji": "👍"}
         )
         self.assertEqual(resp.status_code, 302)
         reply.refresh_from_db()
         self.assertNotIn("👍", reply.reactions)
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.UPDATE,
+                user=self.operator,
+                target=f"reply:{reply.pk}:reaction:removed",
+                detail="👍",
+            ).exists()
+        )
+
+    def test_reaction_rolls_back_when_semantic_audit_fails(self):
+        conv = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=conv, created_by=self.admin, title="Тема"
+        )
+        reply = MessageReply.objects.create(
+            thread=thread, author=self.admin, body="Проверьте"
+        )
+        self.client.force_login(self.operator)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:react", args=[reply.pk]), {"emoji": "👍"}
+            )
+
+        reply.refresh_from_db()
+        self.assertEqual(reply.reactions, {})
 
     def test_foreign_user_forbidden_from_conversation(self):
         conv = self._conv()
@@ -925,6 +962,28 @@ class NewsTests(BaseSystemTestCase):
         self.assertEqual(resp.status_code, 302)
         item.refresh_from_db()
         self.assertFalse(item.is_active)
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.UPDATE,
+                user=self.admin,
+                target=f"news:{item.pk}:hidden",
+            ).exists()
+        )
+
+    def test_news_toggle_rolls_back_when_semantic_audit_fails(self):
+        item = NewsItem.objects.create(
+            title="Публикация", text="Текст", author=self.admin, is_active=True
+        )
+        self.client.force_login(self.admin)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(reverse("system:news_toggle", args=[item.pk]))
+
+        item.refresh_from_db()
+        self.assertTrue(item.is_active)
 
     def test_non_admin_cannot_create(self):
         self.client.force_login(self.operator)
@@ -1267,6 +1326,26 @@ class TaskTests(BaseSystemTestCase):
         self.client.post(reverse("system:task_toggle", args=[task.pk]))
         task.refresh_from_db()
         self.assertFalse(task.enabled)
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.UPDATE,
+                user=self.admin,
+                target=f"task:{task.pk}:disabled",
+            ).exists()
+        )
+
+    def test_task_toggle_rolls_back_when_semantic_audit_fails(self):
+        self.client.force_login(self.admin)
+        task = self._make_task()
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(reverse("system:task_toggle", args=[task.pk]))
+
+        task.refresh_from_db()
+        self.assertTrue(task.enabled)
 
     def test_non_admin_cannot_run(self):
         self.client.force_login(self.operator)

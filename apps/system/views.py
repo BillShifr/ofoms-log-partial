@@ -14,6 +14,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import CharField, Count, F, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce, Concat
 from django.http import FileResponse, Http404, HttpResponse
@@ -601,23 +602,27 @@ def thread_detail(request, pk):
 @require_http_methods(["POST"])
 def thread_toggle(request, pk):
     """Закрывает или повторно открывает тему её автором либо администратором."""
-    thread = get_object_or_404(
-        MessageThread.objects.select_related("conversation", "created_by"), pk=pk
-    )
-    _participant_or_404(request.user, thread.conversation)
-    if request.user != thread.created_by and not _is_admin(request.user):
-        raise PermissionDenied
+    with transaction.atomic():
+        thread = get_object_or_404(
+            MessageThread.objects.select_for_update().select_related(
+                "conversation", "created_by"
+            ),
+            pk=pk,
+        )
+        _participant_or_404(request.user, thread.conversation)
+        if request.user != thread.created_by and not _is_admin(request.user):
+            raise PermissionDenied
 
-    thread.is_closed = not thread.is_closed
-    thread.save(update_fields=["is_closed"])
-    state = "closed" if thread.is_closed else "open"
-    log_event(
-        module="system",
-        event_type=EventLog.EventType.UPDATE,
-        user=request.user,
-        target=f"thread:{thread.pk}:{state}",
-        ip=request.META.get("REMOTE_ADDR"),
-    )
+        thread.is_closed = not thread.is_closed
+        thread.save(update_fields=["is_closed"])
+        state = "closed" if thread.is_closed else "open"
+        log_event(
+            module="system",
+            event_type=EventLog.EventType.UPDATE,
+            user=request.user,
+            target=f"thread:{thread.pk}:{state}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
     messages.success(
         request,
         "Тема закрыта." if thread.is_closed else "Тема снова открыта.",
@@ -696,26 +701,44 @@ def message_attachment_download(request, pk):
 @require_http_methods(["POST"])
 def thread_react(request, pk):
     """Переключение реакции пользователя на сообщение."""
-    reply = get_object_or_404(
-        MessageReply.objects.select_related("thread__conversation"), pk=pk
-    )
-    _participant_or_404(request.user, reply.thread.conversation)
     emoji = request.POST.get("emoji", "")
     if emoji not in EMOJI_SET:
+        reply = get_object_or_404(
+            MessageReply.objects.select_related("thread__conversation"), pk=pk
+        )
+        _participant_or_404(request.user, reply.thread.conversation)
         return redirect("system:thread", reply.thread_id)
-    reactions = dict(reply.reactions or {})
-    users = list(reactions.get(emoji, []))
-    if request.user.pk in users:
-        users.remove(request.user.pk)
-        if not users:
-            reactions.pop(emoji, None)
+    with transaction.atomic():
+        reply = get_object_or_404(
+            MessageReply.objects.select_for_update().select_related(
+                "thread__conversation"
+            ),
+            pk=pk,
+        )
+        _participant_or_404(request.user, reply.thread.conversation)
+        reactions = dict(reply.reactions or {})
+        users = list(reactions.get(emoji, []))
+        if request.user.pk in users:
+            users.remove(request.user.pk)
+            if not users:
+                reactions.pop(emoji, None)
+            else:
+                reactions[emoji] = users
+            action = "removed"
         else:
+            users.append(request.user.pk)
             reactions[emoji] = users
-    else:
-        users.append(request.user.pk)
-        reactions[emoji] = users
-    reply.reactions = reactions
-    reply.save(update_fields=["reactions"])
+            action = "added"
+        reply.reactions = reactions
+        reply.save(update_fields=["reactions"])
+        log_event(
+            module="system",
+            event_type=EventLog.EventType.UPDATE,
+            user=request.user,
+            target=f"reply:{reply.pk}:reaction:{action}",
+            ip=request.META.get("REMOTE_ADDR"),
+            detail=emoji,
+        )
     return redirect("system:thread", reply.thread_id)
 
 
@@ -957,9 +980,18 @@ def task_run(request, pk):
 @admin_required
 @require_http_methods(["POST"])
 def task_toggle(request, pk):
-    task = get_object_or_404(TaskJob, pk=pk)
-    task.enabled = not task.enabled
-    task.save(update_fields=["enabled"])
+    with transaction.atomic():
+        task = get_object_or_404(TaskJob.objects.select_for_update(), pk=pk)
+        task.enabled = not task.enabled
+        task.save(update_fields=["enabled"])
+        state_code = "enabled" if task.enabled else "disabled"
+        log_event(
+            module="system",
+            event_type=EventLog.EventType.UPDATE,
+            user=request.user,
+            target=f"task:{task.pk}:{state_code}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
     state = "включено" if task.enabled else "выключено"
     messages.success(request, f"Задание «{task.name}» {state}.")
     return redirect("system:tasks")
@@ -1318,9 +1350,18 @@ def news_suggest(request):
 @admin_required
 @require_http_methods(["POST"])
 def news_toggle(request, pk):
-    item = get_object_or_404(NewsItem, pk=pk)
-    item.is_active = not item.is_active
-    item.save(update_fields=["is_active"])
+    with transaction.atomic():
+        item = get_object_or_404(NewsItem.objects.select_for_update(), pk=pk)
+        item.is_active = not item.is_active
+        item.save(update_fields=["is_active"])
+        state_code = "published" if item.is_active else "hidden"
+        log_event(
+            module="system",
+            event_type=EventLog.EventType.UPDATE,
+            user=request.user,
+            target=f"news:{item.pk}:{state_code}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
     state = "опубликована" if item.is_active else "скрыта"
     messages.success(request, f"Новость «{item.title}» {state}.")
     return redirect("system:news")

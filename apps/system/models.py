@@ -409,6 +409,10 @@ class TaskJob(models.Model):
         MANUAL = "manual", "Только вручную"
         SCHEDULED = "scheduled", "По расписанию"
 
+    class Result(models.TextChoices):
+        OK = "ok", "Успешно"
+        FAILED = "failed", "Ошибка"
+
     name = models.CharField(max_length=120, verbose_name="Наименование")
     command = models.CharField(max_length=64, verbose_name="Команда")
     description = models.TextField(blank=True, default="", verbose_name="Описание")
@@ -451,7 +455,11 @@ class TaskJob(models.Model):
     last_started_at = models.DateTimeField(null=True, blank=True, verbose_name="Последний запуск")
     last_finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Последнее завершение")
     last_result = models.CharField(
-        max_length=16, blank=True, default="", verbose_name="Результат последнего запуска"
+        max_length=16,
+        choices=Result.choices,
+        blank=True,
+        default="",
+        verbose_name="Результат последнего запуска",
     )
     last_log = models.TextField(blank=True, default="", verbose_name="Лог последнего запуска")
 
@@ -498,6 +506,24 @@ class TaskJob(models.Model):
                     | ~models.Q(status="cancelled")
                 ),
                 name="system_task_enabled_not_cancelled",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(last_finished_at__isnull=True, last_result="")
+                    | models.Q(
+                        last_finished_at__isnull=False,
+                        last_result__in=("ok", "failed"),
+                    )
+                ),
+                name="system_task_last_result_state",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(status__in=("completed", "failed"))
+                    | models.Q(status="completed", last_result="ok")
+                    | models.Q(status="failed", last_result="failed")
+                ),
+                name="system_task_terminal_result",
             ),
         ]
         indexes = [

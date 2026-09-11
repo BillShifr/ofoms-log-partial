@@ -1913,6 +1913,32 @@ class TaskTests(BaseSystemTestCase):
                 result="",
             )
 
+    def test_database_rejects_invalid_task_job_result_lifecycle(self):
+        task = self._make_task()
+
+        invalid_states = (
+            {"last_result": "unknown"},
+            {"last_result": TaskJob.Result.OK},
+            {"last_finished_at": timezone.now()},
+            {
+                "status": TaskJob.Status.COMPLETED,
+                "last_finished_at": timezone.now(),
+                "last_result": TaskJob.Result.FAILED,
+            },
+            {
+                "status": TaskJob.Status.FAILED,
+                "last_finished_at": timezone.now(),
+                "last_result": TaskJob.Result.OK,
+            },
+        )
+        for invalid_state in invalid_states:
+            with (
+                self.subTest(invalid_state=invalid_state),
+                self.assertRaises(IntegrityError),
+                transaction.atomic(),
+            ):
+                TaskJob.objects.filter(pk=task.pk).update(**invalid_state)
+
     def test_toggle(self):
         self.client.force_login(self.admin)
         task = self._make_task()
@@ -2116,6 +2142,7 @@ class TaskTests(BaseSystemTestCase):
             interval_minutes=10,
             last_started_at=timezone.now() - datetime.timedelta(minutes=30),
             last_finished_at=timezone.now() - datetime.timedelta(minutes=30),
+            last_result=TaskJob.Result.OK,
             enabled=True,
         )
         out = StringIO()
@@ -2194,6 +2221,7 @@ class TaskTests(BaseSystemTestCase):
             interval_minutes=70,
             last_started_at=timezone.now(),
             last_finished_at=timezone.now(),
+            last_result=TaskJob.Result.OK,
             enabled=True,
         )
         out = StringIO()
@@ -2270,6 +2298,61 @@ class TaskRunLifecycleMigrationTests(TransactionTestCase):
         self.assertEqual(pending.result, "")
         self.assertEqual(finished.triggered_by, "auto")
         self.assertEqual(finished.result, "failed")
+
+
+class TaskLastResultMigrationTests(TransactionTestCase):
+    migrate_from = [("system", "0012_enforce_taskrun_lifecycle")]
+    migrate_to = [("system", "0013_enforce_task_last_result_state")]
+
+    def test_migration_normalizes_inconsistent_task_aggregates(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        OldTaskJob = old_apps.get_model("system", "TaskJob")
+        started_at = timezone.now() - datetime.timedelta(minutes=5)
+        missing_finish = OldTaskJob.objects.create(
+            name="Legacy terminal without finish",
+            command="noop",
+            status="completed",
+            enabled=True,
+            run_mode="manual",
+            last_started_at=started_at,
+            last_result="unknown",
+        )
+        pending_with_result = OldTaskJob.objects.create(
+            name="Legacy pending with result",
+            command="noop",
+            status="created",
+            enabled=True,
+            run_mode="manual",
+            last_result="ok",
+        )
+        completed_as_failed = OldTaskJob.objects.create(
+            name="Legacy completed mismatch",
+            command="noop",
+            status="completed",
+            enabled=True,
+            run_mode="manual",
+            last_started_at=started_at,
+            last_finished_at=timezone.now(),
+            last_result="failed",
+        )
+
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        new_apps = executor.loader.project_state(self.migrate_to).apps
+        NewTaskJob = new_apps.get_model("system", "TaskJob")
+
+        missing_finish = NewTaskJob.objects.get(pk=missing_finish.pk)
+        pending_with_result = NewTaskJob.objects.get(pk=pending_with_result.pk)
+        completed_as_failed = NewTaskJob.objects.get(pk=completed_as_failed.pk)
+        self.assertEqual(missing_finish.status, "failed")
+        self.assertEqual(missing_finish.last_finished_at, started_at)
+        self.assertEqual(missing_finish.last_result, "failed")
+        self.assertEqual(pending_with_result.last_result, "")
+        self.assertIsNone(pending_with_result.last_finished_at)
+        self.assertEqual(completed_as_failed.status, "failed")
+        self.assertEqual(completed_as_failed.last_result, "failed")
 
 
 class PrefTests(BaseSystemTestCase):

@@ -21,6 +21,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from apps.core.models import EventLog
 from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
 from apps.exchange.flc import FLCP_ERROR, build_flcp, error_result, ok_result
@@ -655,6 +656,56 @@ class ImportCommandTests(ExchangeTestMixin, TestCase):
         self.assertTrue((out_dir / "81000" / "users260514002.xml").exists())
         self.assertTrue((arch_dir / "81000" / "users260514002.xml").exists())
         self.assertEqual(Employee.objects.count(), 4)
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.CREATE,
+                target=f"import:{log.pk}:{log.filename}:auto",
+            ).exists()
+        )
+
+    def test_batch_failure_preserves_committed_protocol_for_previous_file(self):
+        from django.core.management import call_command
+
+        in_dir = Path(self.in_dir)
+        out_dir = Path(self.out_dir)
+        arch_dir = Path(self.arch_dir)
+        org_dir = in_dir / "81000"
+        org_dir.mkdir(parents=True, exist_ok=True)
+        first = org_dir / "users-a.xml"
+        second = org_dir / "users-b.xml"
+        first.write_bytes(SAMPLE_USERS)
+        second.write_bytes(SAMPLE_USERS)
+        real_archive = archive_artifact
+
+        def fail_second_archive(source, archive_dir, org):
+            if source.name == second.name:
+                raise PermissionError("archive unavailable")
+            return real_archive(source, archive_dir, org)
+
+        with (
+            override_settings(
+                EXCHANGE_IN=in_dir,
+                EXCHANGE_OUT=out_dir,
+                EXCHANGE_ARCHIVE=arch_dir,
+            ),
+            patch(
+                "apps.exchange.importers.archive_artifact",
+                side_effect=fail_second_archive,
+            ),
+            self.assertRaises(PermissionError),
+        ):
+            call_command("import_exchange", orgs=[81000], verbosity=0)
+
+        first_log = ImportLog.objects.get(filename=first.name)
+        self.assertFalse(ImportLog.objects.filter(filename=second.name).exists())
+        self.assertTrue((arch_dir / "81000" / first.name).exists())
+        self.assertTrue((out_dir / "81000" / first.name).exists())
+        self.assertTrue(second.exists())
+        self.assertTrue(
+            EventLog.objects.filter(
+                target=f"import:{first_log.pk}:{first.name}:auto"
+            ).exists()
+        )
 
     def test_cross_filesystem_archive_removes_source_and_prevents_reimport(self):
         from django.core.management import call_command

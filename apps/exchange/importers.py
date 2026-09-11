@@ -22,8 +22,10 @@ from django.core.validators import validate_email
 from django.db import transaction
 from lxml import etree
 
+from apps.core.models import EventLog, log_event
 from apps.employee.models import Employee
 from apps.exchange import flc
+from apps.exchange.models import ImportLog
 from apps.journal.models import Irp, IrpTheme, XmlFiles
 
 XSD_DIR = Path(__file__).resolve().parent / "xsd"
@@ -764,7 +766,28 @@ def import_all(orgs=None):
                 importer = IrpXMLFile(org, path)
             else:
                 importer = ExcelIrpFile(org, path)
-            result = importer.process()
-            importer.write_flcp(result)
+            with transaction.atomic():
+                result = importer.process()
+                importer.write_flcp(result)
+                status = (
+                    ImportLog.Status.ERROR
+                    if not result.ok
+                    else ImportLog.Status.OK
+                )
+                import_log = ImportLog.objects.create(
+                    org=result.org,
+                    kind=result.kind,
+                    filename=result.filename,
+                    status=status,
+                    rows=result.rows,
+                    flcp=result.flcp_bytes().decode(
+                        "windows-1251", errors="replace"
+                    ),
+                )
+                log_event(
+                    module="exchange",
+                    event_type=EventLog.EventType.CREATE,
+                    target=f"import:{import_log.pk}:{import_log.filename}:auto",
+                )
             results.append(result)
     return results

@@ -9,7 +9,6 @@ exchange/out/<org>, переносит файлы в exchange/archive/<org>.
 from django.core.management.base import BaseCommand
 
 from apps.exchange.importers import import_all
-from apps.exchange.models import ImportLog
 
 
 class Command(BaseCommand):
@@ -30,15 +29,6 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("Файлов для обработки не найдено."))
             return
         for res in results:
-            status = ImportLog.Status.ERROR if not res.ok else ImportLog.Status.OK
-            ImportLog.objects.create(
-                org=res.org,
-                kind=res.kind,
-                filename=res.filename,
-                status=status,
-                rows=res.rows,
-                flcp=res.flcp_bytes().decode("windows-1251", errors="replace"),
-            )
             if res.ok:
                 self.stdout.write(
                     self.style.SUCCESS(

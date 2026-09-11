@@ -32,7 +32,12 @@ User = get_user_model()
 
 
 class ProductionSettingsTests(TestCase):
-    def _import_settings(self, database_password, code="import config.settings.prod"):
+    def _import_settings(
+        self,
+        database_password,
+        code="import config.settings.prod",
+        extra_environment=None,
+    ):
         environment = os.environ.copy()
         environment.pop("TRUST_PROXY_SSL_HEADER", None)
         environment.update(
@@ -43,6 +48,7 @@ class ProductionSettingsTests(TestCase):
                 "DB_PASSWORD": database_password,
             }
         )
+        environment.update(extra_environment or {})
         return subprocess.run(
             [sys.executable, "-c", code],
             cwd=settings.BASE_DIR,
@@ -62,6 +68,36 @@ class ProductionSettingsTests(TestCase):
     def test_production_accepts_strong_database_password(self):
         result = self._import_settings("database-secret-4827-strong")
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_production_uses_bounded_health_checked_database_pool(self):
+        result = self._import_settings(
+            "database-secret-4827-strong",
+            "from config.settings.prod import DATABASES; "
+            "db=DATABASES['default']; "
+            "print(db['CONN_MAX_AGE'], db['CONN_HEALTH_CHECKS'], db['OPTIONS'])",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("0 True", result.stdout)
+        self.assertIn("'connect_timeout': 3", result.stdout)
+        self.assertIn("'min_size': 1", result.stdout)
+        self.assertIn("'max_size': 4", result.stdout)
+        self.assertIn("'timeout': 3", result.stdout)
+
+    def test_production_rejects_invalid_database_pool_configuration(self):
+        invalid_environments = (
+            {"DB_POOL_MIN_SIZE": "5", "DB_POOL_MAX_SIZE": "4"},
+            {"DB_POOL_TIMEOUT": "0"},
+            {"DB_CONNECT_TIMEOUT": "not-a-number"},
+        )
+        for environment in invalid_environments:
+            with self.subTest(environment=environment):
+                result = self._import_settings(
+                    "database-secret-4827-strong",
+                    extra_environment=environment,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("DB_", result.stderr)
 
     def test_production_trusts_tls_terminator_scheme_by_default(self):
         result = self._import_settings(

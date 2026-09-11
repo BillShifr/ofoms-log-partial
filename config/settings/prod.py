@@ -29,6 +29,19 @@ def _required_secret(name, *, min_length=50, forbidden_prefixes=()):
     return value
 
 
+def _bounded_int(name, default, *, minimum, maximum):
+    raw_value = os.getenv(name, str(default)).strip()
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise ImproperlyConfigured(f"{name} must be an integer.") from error
+    if not minimum <= value <= maximum:
+        raise ImproperlyConfigured(
+            f"{name} must be between {minimum} and {maximum}."
+        )
+    return value
+
+
 SECRET_KEY = _required_secret("SECRET_KEY")
 JWT_SECRET = _required_secret("JWT_SECRET")
 DB_PASSWORD = _required_secret(
@@ -36,6 +49,12 @@ DB_PASSWORD = _required_secret(
     min_length=16,
     forbidden_prefixes=("ejournal", "postgres", "password"),
 )
+DB_POOL_MIN_SIZE = _bounded_int("DB_POOL_MIN_SIZE", 1, minimum=0, maximum=20)
+DB_POOL_MAX_SIZE = _bounded_int("DB_POOL_MAX_SIZE", 4, minimum=1, maximum=50)
+DB_POOL_TIMEOUT = _bounded_int("DB_POOL_TIMEOUT", 3, minimum=1, maximum=60)
+DB_CONNECT_TIMEOUT = _bounded_int("DB_CONNECT_TIMEOUT", 3, minimum=1, maximum=60)
+if DB_POOL_MIN_SIZE > DB_POOL_MAX_SIZE:
+    raise ImproperlyConfigured("DB_POOL_MIN_SIZE must not exceed DB_POOL_MAX_SIZE.")
 
 SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True").lower() in (
     "1",
@@ -72,6 +91,18 @@ DATABASES["default"].update(  # noqa: F405
         "PASSWORD": DB_PASSWORD,
         "HOST": os.getenv("DB_HOST", "db"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "CONN_MAX_AGE": 0,
+        "CONN_HEALTH_CHECKS": True,
+        "OPTIONS": {
+            "connect_timeout": DB_CONNECT_TIMEOUT,
+            "pool": {
+                "min_size": DB_POOL_MIN_SIZE,
+                "max_size": DB_POOL_MAX_SIZE,
+                "timeout": DB_POOL_TIMEOUT,
+                "max_idle": 300,
+                "max_lifetime": 1800,
+            },
+        },
     }
 )
 

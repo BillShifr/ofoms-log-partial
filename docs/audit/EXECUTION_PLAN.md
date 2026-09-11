@@ -333,3 +333,9 @@
 - PostgreSQL service container в GitHub Actions закреплён тем же проверенным digest, что и production Compose; плавающий `postgres:16` удалён из исполняемой цепочки.
 - Workflow задаёт только `contents: read`, а checkout не сохраняет credential в git config рабочего каталога job.
 - Обе job ограничены 30 минутами; concurrency отменяет устаревший run того же ref, предотвращая накопление зависших или уже неактуальных проверок.
+
+### 2026-09-11 — production pool PostgreSQL
+
+- Обязательный `psycopg-pool` теперь реально используется через нативный backend Django: `CONN_MAX_AGE=0` возвращает соединение после запроса, `CONN_HEALTH_CHECKS=True` проверяет его перед повторной выдачей.
+- Размер pool по умолчанию ограничен 1–4 соединениями на процесс; connect/pool wait ограничены тремя секундами, idle/lifetime — 300/1800 секундами.
+- Все настраиваемые числовые параметры проверяются при startup; отрицательные, нечисловые значения и `min > max` останавливают production до приёма трафика.

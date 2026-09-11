@@ -233,3 +233,9 @@
 - Workflow не изменяет репозиторий и публикует image в Docker Hub по отдельным credentials, поэтому встроенному `GITHUB_TOKEN` достаточно `contents: read`.
 - `persist-credentials: false` исключает сохранение token checkout в локальной конфигурации git, где его мог бы прочитать последующий build step.
 - Service images считаются частью исполняемой цепочки CI и обязаны быть закреплены digest так же, как production images и Actions SHA.
+
+## 2026-09-11 PostgreSQL connection pool
+
+- Pool включён только в production; development и тесты сохраняют простой persistent connection для предсказуемости транзакционных тестов.
+- При pool `CONN_MAX_AGE` обязан быть нулём: Django закрывает request connection, фактически возвращая физическое соединение psycopg в pool. Health check выполняется самим pool перед выдачей.
+- Максимум 4 соединения на процесс даёт верхнюю границу 16 для штатных трёх Gunicorn workers и scheduler; изменение лимита требует сверки с PostgreSQL `max_connections`.

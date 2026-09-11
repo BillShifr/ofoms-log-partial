@@ -849,16 +849,17 @@ def task_create(request):
     if request.method == "POST":
         form = TaskForm(request.POST)
         if form.is_valid():
-            task = form.save(commit=False)
-            task.created_by = request.user
-            task.save()
-            log_event(
-                module="system",
-                event_type=EventLog.EventType.CREATE,
-                user=request.user,
-                target=f"task:{task.pk}:{task.command}",
-                ip=request.META.get("REMOTE_ADDR"),
-            )
+            with transaction.atomic():
+                task = form.save(commit=False)
+                task.created_by = request.user
+                task.save()
+                log_event(
+                    module="system",
+                    event_type=EventLog.EventType.CREATE,
+                    user=request.user,
+                    target=f"task:{task.pk}:{task.command}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
             messages.success(request, "Задание создано.")
             return redirect("system:tasks")
     else:
@@ -869,9 +870,17 @@ def task_create(request):
 @admin_required
 @require_http_methods(["GET", "POST"])
 def task_update(request, pk):
-    task = get_object_or_404(
-        TaskJob.objects.select_related("assigned_to", "created_by"), pk=pk
-    )
+    if request.method == "POST":
+        with transaction.atomic():
+            return _task_update(request, pk, for_update=True)
+    return _task_update(request, pk)
+
+
+def _task_update(request, pk, *, for_update=False):
+    queryset = TaskJob.objects.select_related("assigned_to", "created_by")
+    if for_update:
+        queryset = queryset.select_for_update(of=("self",))
+    task = get_object_or_404(queryset, pk=pk)
     from apps.system.tasks import TASK_COMMAND_LABELS
 
     action = request.POST.get("action") if request.method == "POST" else None

@@ -1339,6 +1339,65 @@ class TaskTests(BaseSystemTestCase):
         task = TaskJob.objects.get(name="Импорт")
         self.assertEqual(task.created_by, self.admin)
 
+    def test_task_create_rolls_back_when_audit_fails(self):
+        self.client.force_login(self.admin)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:task_create"),
+                {
+                    "name": "Откат создания задачи",
+                    "command": "noop",
+                    "run_mode": TaskJob.RunMode.MANUAL,
+                    "enabled": "on",
+                },
+            )
+
+        self.assertFalse(
+            TaskJob.objects.filter(name="Откат создания задачи").exists()
+        )
+
+    def test_task_update_rolls_back_when_audit_fails(self):
+        task = self._make_task(name="Исходная задача")
+        self.client.force_login(self.admin)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:task_update", args=[task.pk]),
+                {
+                    "name": "Не сохранится",
+                    "command": task.command,
+                    "run_mode": TaskJob.RunMode.MANUAL,
+                    "priority": TaskJob.Priority.HIGH,
+                    "enabled": "on",
+                },
+            )
+
+        task.refresh_from_db()
+        self.assertEqual(task.name, "Исходная задача")
+        self.assertEqual(task.priority, TaskJob.Priority.LOW)
+
+    def test_task_note_rolls_back_when_audit_fails(self):
+        task = self._make_task()
+        self.client.force_login(self.admin)
+
+        with (
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("system:task_update", args=[task.pk]),
+                {"action": "note", "text": "Не сохранится"},
+            )
+
+        self.assertFalse(task.notes.exists())
+
     def test_task_status_cannot_be_forged_through_form(self):
         self.client.force_login(self.admin)
 

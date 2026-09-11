@@ -91,6 +91,20 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("SESSION_COOKIE_SECURE=True", example)
         self.assertIn("SECURE_SSL_REDIRECT=True", example)
 
+    def test_build_executables_are_pinned_to_immutable_revisions(self):
+        dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()
+        workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()
+
+        self.assertIn("FROM python:3.13-slim@sha256:", dockerfile)
+        self.assertIn("--from=ghcr.io/astral-sh/uv@sha256:", dockerfile)
+        self.assertNotIn("uv:latest", dockerfile)
+        action_refs = re.findall(r"^\s*-?\s*uses:\s+([^\s#]+)", workflow, re.MULTILINE)
+        self.assertTrue(action_refs)
+        self.assertEqual(
+            [ref for ref in action_refs if not re.fullmatch(r"[^@]+@[0-9a-f]{40}", ref)],
+            [],
+        )
+
 
 class ComplexityPasswordValidatorTests(TestCase):
     def setUp(self):

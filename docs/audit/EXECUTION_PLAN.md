@@ -284,3 +284,9 @@
 
 - CSP пользовательского портала ужесточена до `style-src 'self'`; оставшееся разрешение `unsafe-inline` удалено после подтверждения отсутствия inline style/event attributes.
 - Header-регрессия теперь запрещает `unsafe-inline` во всей политике, а существующий template hygiene test контролирует исходники всех HTML-шаблонов.
+
+### 2026-09-11 — pinning цепочки поставки
+
+- `python:3.13-slim` и образ uv закреплены проверенными multi-arch digest’ами; `uv:latest` удалён из production Dockerfile.
+- Checkout, Python/uv setup, Docker login и build/push Actions закреплены полными commit SHA соответствующих major-релизов.
+- Регрессия проверяет отсутствие плавающих executable references, а production Docker build подтверждает работоспособность закреплённых образов.

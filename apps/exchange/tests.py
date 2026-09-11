@@ -40,7 +40,7 @@ from apps.exchange.importers import (
     write_unique_artifact,
 )
 from apps.exchange.models import ImportLog
-from apps.journal.models import Irp, IrpTheme, XmlFiles
+from apps.journal.models import Irp, IrpHistory, IrpTheme, XmlFiles
 
 SAMPLE_USERS = """<?xml version="1.0" encoding="windows-1251"?>
 <USER_COLLECTION>
@@ -215,6 +215,14 @@ class IrpImportConcurrencyTests(TransactionTestCase):
                 ("Фамилия-0", "Имя-0", sources[0].pk),
                 ("Фамилия-1", "Имя-1", sources[1].pk),
             },
+        )
+        self.assertEqual(
+            IrpHistory.objects.filter(irp=irp, field_name="__imported__").count(),
+            1,
+        )
+        self.assertEqual(
+            IrpHistory.objects.filter(irp=irp, field_name="input_file").count(),
+            1,
         )
 
 
@@ -391,6 +399,13 @@ class IrpImportTests(ExchangeTestMixin, TestCase):
 
         self.assertEqual(XmlFiles.objects.count(), 1)
         self.assertEqual(irp.input_file_id, XmlFiles.objects.get().pk)
+        self.assertTrue(
+            IrpHistory.objects.filter(
+                irp=irp,
+                user__isnull=True,
+                field_name="__imported__",
+            ).exists()
+        )
 
     def test_reimport_updates_irp_source_file_provenance(self):
         n_irp = str(uuid.uuid4())
@@ -414,6 +429,19 @@ class IrpImportTests(ExchangeTestMixin, TestCase):
         self.assertNotEqual(irp.input_file_id, first_source_id)
         self.assertEqual(irp.input_file.filename, "G1R_MMYYDDNNNN.xml")
         self.assertTrue(irp.input_file.real_filename.endswith("G1R_source_second.xml"))
+        provenance_change = IrpHistory.objects.get(
+            irp=irp,
+            user__isnull=True,
+            field_name="input_file",
+        )
+        self.assertEqual(
+            provenance_change.old_value,
+            f"journal.XmlFiles:{first_source_id}",
+        )
+        self.assertEqual(
+            provenance_change.new_value,
+            f"journal.XmlFiles:{irp.input_file_id}",
+        )
 
     def test_unknown_employee_rejected(self):
         from pathlib import Path

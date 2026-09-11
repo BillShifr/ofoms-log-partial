@@ -26,7 +26,7 @@ from apps.core.models import EventLog, log_event
 from apps.employee.models import Employee
 from apps.exchange import flc
 from apps.exchange.models import ImportLog
-from apps.journal.models import Irp, IrpTheme, XmlFiles
+from apps.journal.models import Irp, IrpHistory, IrpTheme, XmlFiles
 
 XSD_DIR = Path(__file__).resolve().parent / "xsd"
 MAX_EXCHANGE_FILE_SIZE = 20 * 1024 * 1024
@@ -518,6 +518,18 @@ def _upsert_imported_irp(*, values, employee_one, employee_it, theme, input_file
                 creating = irp is None
                 if creating:
                     irp = Irp()
+                    previous = {}
+                else:
+                    tracked_fields = set(values) | {
+                        "employee_one",
+                        "employee_it",
+                        "theme",
+                        "input_file",
+                        "status",
+                    }
+                    previous = {
+                        field: getattr(irp, field) for field in tracked_fields
+                    }
                 for key, value in values.items():
                     setattr(irp, key, value)
                 irp.employee_one = employee_one
@@ -527,11 +539,35 @@ def _upsert_imported_irp(*, values, employee_one, employee_it, theme, input_file
                 irp.synchronize_imported_status()
                 irp.full_clean()
                 irp.save(force_insert=creating)
+                if creating:
+                    IrpHistory.objects.create(
+                        irp=irp,
+                        field_name="__imported__",
+                        new_value=input_file.real_filename,
+                    )
+                else:
+                    for field, old_value in previous.items():
+                        new_value = getattr(irp, field)
+                        if old_value != new_value:
+                            IrpHistory.objects.create(
+                                irp=irp,
+                                field_name=field,
+                                old_value=_history_value(old_value),
+                                new_value=_history_value(new_value),
+                            )
                 return irp
         except IntegrityError:
             if not creating or not Irp.objects.filter(n_irp=n_irp).exists():
                 raise
     raise RuntimeError("Не удалось сериализовать импорт обращения")
+
+
+def _history_value(value):
+    if value is None:
+        return "—"
+    if hasattr(value, "_meta") and hasattr(value, "pk"):
+        return f"{value._meta.label}:{value.pk}"
+    return str(value)
 
 
 def _normalize_irp_fields(d: dict) -> dict:

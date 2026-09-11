@@ -337,13 +337,29 @@ class ComplexityPasswordValidatorTests(TestCase):
 
 
 class UploadLimitTests(TestCase):
+    def test_oversized_request_is_rejected_before_multipart_parsing(self):
+        request = mock.Mock()
+        handler = BoundedUploadHandler(request)
+
+        result = handler.handle_raw_input(
+            input_data=mock.Mock(),
+            META={},
+            content_length=201 * 1024 * 1024 + 1,
+            boundary=b"boundary",
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result[0]), 0)
+        self.assertEqual(len(result[1]), 0)
+        self.assertTrue(request.upload_size_limit_exceeded)
+
     def test_declared_oversized_file_stops_before_first_chunk(self):
         request = mock.Mock()
         handler = BoundedUploadHandler(request)
 
         with mock.patch("apps.core.uploads.MAX_UPLOAD_SIZE_BYTES", 4), self.assertRaises(
             StopUpload
-        ):
+        ) as raised:
             handler.new_file(
                 "file",
                 "oversized.bin",
@@ -352,6 +368,7 @@ class UploadLimitTests(TestCase):
             )
 
         self.assertTrue(request.upload_size_limit_exceeded)
+        self.assertTrue(raised.exception.connection_reset)
 
     def test_chunked_oversized_file_stops_at_boundary(self):
         request = mock.Mock()
@@ -362,10 +379,11 @@ class UploadLimitTests(TestCase):
             self.assertEqual(handler.receive_data_chunk(b"1234", 0), b"1234")
         with mock.patch("apps.core.uploads.MAX_UPLOAD_SIZE_BYTES", 4), self.assertRaises(
             StopUpload
-        ):
+        ) as raised:
             handler.receive_data_chunk(b"5", 4)
 
         self.assertTrue(request.upload_size_limit_exceeded)
+        self.assertTrue(raised.exception.connection_reset)
 
 
 class FailedLoginLockTests(TestCase):

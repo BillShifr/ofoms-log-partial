@@ -444,6 +444,6 @@
 
 ### 2026-09-12 — потоковый предел multipart upload
 
-- Первый Django upload handler проверяет заявленный part length и фактический offset каждого chunk; после 200 МБ он вызывает штатный `StopUpload`, закрывающий и удаляющий temporary file.
+- Первый Django upload handler отклоняет общий `Content-Length` свыше 201 МБ до multipart parser, затем проверяет заявленный part length и фактический offset каждого chunk; после 200 МБ он вызывает `StopUpload(connection_reset=True)`, закрывающий temporary file без дочитывания остатка.
 - Middleware принудительно завершает multipart parsing до прикладного view и возвращает HTTP 413; AuditMiddleware фиксирует неуспешный POST, а модель/БД не изменяются.
 - MemoryUploadHandler исключён: допустимые файлы сразу пишутся в ограниченный `/tmp`, количество файлов в одном request ограничено одним. Малый-limit integration test и полные upload-регрессии подтверждают контракт.

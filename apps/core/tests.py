@@ -293,6 +293,16 @@ class ProductionSettingsTests(TestCase):
         self.assertIn('compress: "true"', compose)
         self.assertEqual(compose.count("logging: *default-logging"), 4)
 
+    def test_compose_hardens_long_running_application_services(self):
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+
+        self.assertIn("x-app-security: &app-security", compose)
+        self.assertEqual(compose.count("<<: *app-security"), 2)
+        self.assertIn("read_only: true", compose)
+        self.assertIn("no-new-privileges:true", compose)
+        self.assertIn("cap_drop:\n    - ALL", compose)
+        self.assertIn("/tmp:size=64m,mode=1777", compose)
+
     def test_uv_sync_treats_application_as_virtual_project(self):
         project = (settings.BASE_DIR / "pyproject.toml").read_text()
         lockfile = (settings.BASE_DIR / "uv.lock").read_text()

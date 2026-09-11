@@ -5,6 +5,15 @@ x-logging: &default-logging
     max-file: "5"
     compress: "true"
 
+x-app-security: &app-security
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+
 services:
   db:
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
@@ -33,6 +42,7 @@ services:
     logging: *default-logging
 
   web:
+    <<: *app-security
     build: .
     init: true
     command: >
@@ -91,6 +101,7 @@ services:
     logging: *default-logging
 
   scheduler:
+    <<: *app-security
     build: .
     init: true
     command: [".venv/bin/python", "manage.py", "run_scheduler", "--interval", "60"]

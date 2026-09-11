@@ -3,15 +3,17 @@
 import datetime
 import io
 import tempfile
+from unittest.mock import patch
 
 from django.contrib import messages
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 from django.test import Client, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 from openpyxl import load_workbook
 
 from apps.core.models import EventLog, log_event
@@ -1066,7 +1068,10 @@ class TaskTests(BaseSystemTestCase):
         self.assertContains(response, "data-no-sort")
 
     def test_running_task_cannot_be_started_twice(self):
-        task = self._make_task(status=TaskJob.Status.RUNNING)
+        task = self._make_task(
+            status=TaskJob.Status.RUNNING,
+            last_started_at=timezone.now(),
+        )
         with self.assertRaises(TaskAlreadyRunning):
             task.run(user=self.admin)
         self.assertFalse(TaskRun.objects.exists())
@@ -1080,13 +1085,28 @@ class TaskTests(BaseSystemTestCase):
         self.assertFalse(TaskRun.objects.exists())
 
     def test_failed_command_logged(self):
-        task = self._make_task(command="missing_cmd")
-        run = task.run()
+        task = self._make_task()
+        with patch("apps.system.tasks.run_command", side_effect=RuntimeError("boom")):
+            run = task.run()
         self.assertEqual(run.result, EventLog.Result.FAILED)
         task.refresh_from_db()
         self.assertEqual(task.last_result, EventLog.Result.FAILED)
         run = TaskRun.objects.get(task=task)
         self.assertEqual(run.triggered_by, "auto")
+
+    def test_database_rejects_invalid_task_command_and_schedule(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self._make_task(command="missing_cmd")
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self._make_task(
+                run_mode=TaskJob.RunMode.SCHEDULED,
+                interval_minutes=None,
+            )
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self._make_task(
+                status=TaskJob.Status.RUNNING,
+                last_started_at=None,
+            )
 
     def test_toggle(self):
         self.client.force_login(self.admin)

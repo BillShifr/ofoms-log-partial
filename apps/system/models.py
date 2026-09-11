@@ -453,6 +453,40 @@ class TaskJob(models.Model):
         verbose_name = "Задание"
         verbose_name_plural = "Задачи"
         ordering = ["name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(command__in=("noop", "exchange_import")),
+                name="system_task_command_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=("created", "running", "completed", "failed", "cancelled")
+                ),
+                name="system_task_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(priority__in=(0, 1, 2)),
+                name="system_task_priority_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(run_mode="manual", interval_minutes__isnull=True)
+                    | models.Q(
+                        run_mode="scheduled",
+                        interval_minutes__isnull=False,
+                        interval_minutes__gte=1,
+                    )
+                ),
+                name="system_task_schedule_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(status="running")
+                    | models.Q(last_started_at__isnull=False)
+                ),
+                name="system_task_running_started",
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=["enabled", "run_mode", "status"],

@@ -127,14 +127,16 @@ class AuditMiddleware:
         if event_type is not None or (
             request.method not in ("GET", "HEAD") and not request.path.startswith("/admin/")
         ):
+            if status in (401, 403):
+                result = EventLog.Result.DENIED
+            elif event_type == EventLog.EventType.LOGIN_FAILED or status >= 400:
+                result = EventLog.Result.FAILED
+            else:
+                result = EventLog.Result.OK
             log_event(
                 module="http",
                 event_type=event_type or EventLog.EventType.OTHER,
-                result=(
-                    EventLog.Result.FAILED
-                    if event_type == EventLog.EventType.LOGIN_FAILED or status >= 400
-                    else EventLog.Result.OK
-                ),
+                result=result,
                 user=actor if actor and actor.is_authenticated else None,
                 target=f"{request.method} {request.path}",
                 ip=request.META.get("REMOTE_ADDR"),

@@ -1609,3 +1609,12 @@ class SecurityHeaderTests(BaseSystemTestCase):
         self.client.force_login(self.operator)
         resp = self.client.get(reverse("system:users"))
         self.assertEqual(resp.status_code, 403)
+        event = EventLog.objects.get(target="GET /system/users/")
+        self.assertEqual(event.result, EventLog.Result.DENIED)
+
+    def test_not_found_is_recorded_as_failure_not_access_denial(self):
+        resp = self.client.get("/missing-sensitive-page/")
+
+        self.assertEqual(resp.status_code, 404)
+        event = EventLog.objects.get(target="GET /missing-sensitive-page/")
+        self.assertEqual(event.result, EventLog.Result.FAILED)

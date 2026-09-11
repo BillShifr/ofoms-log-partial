@@ -1,8 +1,13 @@
 """Тесты employee: модель Employee и GroupProxy."""
 
+from types import SimpleNamespace
+
+from apps.core.roles import ensure_role_groups
+from apps.employee.admin import EmployeeAdmin, EmployeeChangeForm
 from apps.employee.models import Employee, GroupProxy
 from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.models import Group
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
@@ -71,6 +76,72 @@ class EmployeeModelTests(TestCase):
         model_admin = admin.site._registry[Employee]
 
         self.assertFalse(model_admin.has_delete_permission(request=None))
+
+
+class EmployeeAdminPolicyTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        ensure_role_groups()
+
+    def setUp(self):
+        self.user = Employee.objects.create_user(
+            username="admin_form_user",
+            password="GoodPass!1",
+            org=81000,
+            is_staff=True,
+        )
+        self.admin_group = Group.objects.get(name="Администратор")
+        self.user.groups.add(self.admin_group)
+
+    def test_admin_form_only_offers_known_application_roles(self):
+        Group.objects.create(name="Произвольная группа")
+
+        form = EmployeeChangeForm(instance=self.user)
+
+        self.assertEqual(
+            set(form.fields["groups"].queryset.values_list("name", flat=True)),
+            {
+                "ОП1",
+                "ОП2",
+                "СП1",
+                "СП2",
+                "СП3",
+                "Администратор",
+                "Администратор контакт-центра",
+            },
+        )
+
+    def test_admin_form_rejects_role_from_another_organization(self):
+        smo_user = Employee.objects.create_user(
+            username="smo_admin_form",
+            password="GoodPass!1",
+            org=81001,
+        )
+        form = EmployeeChangeForm(
+            data={
+                "username": smo_user.username,
+                "org": str(smo_user.org),
+                "groups": [self.admin_group.pk],
+                "is_active": "on",
+            },
+            instance=smo_user,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("Роли не соответствуют", form.errors["groups"][0])
+
+    def test_admin_makes_own_access_fields_read_only(self):
+        model_admin = admin.site._registry[Employee]
+        self.assertIsInstance(model_admin, EmployeeAdmin)
+        request = SimpleNamespace(user=self.user)
+
+        fields = model_admin.get_readonly_fields(request, self.user)
+
+        self.assertTrue(
+            {"is_active", "is_staff", "is_superuser", "groups", "user_permissions"}
+            <= set(fields)
+        )
 
 
 class GroupProxyTests(TestCase):

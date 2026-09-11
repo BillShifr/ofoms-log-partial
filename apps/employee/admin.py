@@ -1,16 +1,45 @@
 """Администрирование сотрудников (пользователей) — перенос из v1."""
 
 from apps.core.models import EventLog
-from apps.employee.models import Employee, GroupProxy
+from apps.core.roles import GROUP_ROLE_MAP, ROLE_GROUP_MAP, SMO_ROLES, TFOMS_ROLES
+from apps.employee.models import TFOMS, Employee, GroupProxy
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 
 
 class EmployeeChangeForm(UserChangeForm):
     class Meta(UserChangeForm.Meta):
         model = Employee
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["groups"].queryset = Group.objects.filter(
+            name__in=ROLE_GROUP_MAP.values()
+        ).order_by("name")
+
+    def clean(self):
+        cleaned = super().clean()
+        groups = cleaned.get("groups")
+        org = cleaned.get("org")
+        if not groups or org is None:
+            return cleaned
+        allowed_codes = TFOMS_ROLES if org == TFOMS else SMO_ROLES
+        invalid = [
+            group.name
+            for group in groups
+            if GROUP_ROLE_MAP.get(group.name) not in allowed_codes
+        ]
+        if invalid:
+            self.add_error(
+                "groups",
+                ValidationError(
+                "Роли не соответствуют выбранной организации: " + ", ".join(invalid)
+                ),
+            )
+        return cleaned
 
 
 class EmployeeCreationForm(UserCreationForm):
@@ -59,6 +88,19 @@ class EmployeeAdmin(UserAdmin):
         ),
     )
     readonly_fields = ("guid", "failed_attempts", "lock_until")
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = super().get_readonly_fields(request, obj)
+        if obj is not None and obj.pk == request.user.pk:
+            return (
+                *fields,
+                "is_active",
+                "is_staff",
+                "is_superuser",
+                "groups",
+                "user_permissions",
+            )
+        return fields
 
     def has_delete_permission(self, request, obj=None):
         """Учётные записи деактивируются, но не удаляются из audit trail."""

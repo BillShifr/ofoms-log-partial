@@ -139,6 +139,8 @@ class JournalScreenTests(TestCase):
         self.assertContains(resp, 'class="data data--wide data--journal')
         self.assertContains(resp, 'class="group-row__label"')
         self.assertContains(resp, 'class="col-status"')
+        self.assertContains(resp, f'title="{irp.n_irp}"')
+        self.assertContains(resp, f'…{irp.n_irp[-12:]}')
 
     def test_print_list_preserves_filters_and_org_scope(self):
         own = self._make_irp(owner=self.smo_user)

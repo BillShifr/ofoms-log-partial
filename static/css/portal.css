@@ -334,9 +334,11 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .data--journal tbody tr.row--open td:first-child { border-left: 3px solid var(--warn); }
 .data--journal tbody tr:hover { background: color-mix(in srgb, var(--chip-blue) 40%, var(--card)); box-shadow: none; }
 .data--journal .col-theme { min-width: 180px; }
+.data--journal .col-n_irp { width: 172px; max-width: 172px; }
 .data--journal .col-z_f { min-width: 190px; }
 .data--journal .col-status { min-width: 132px; }
 .cell-id { white-space: nowrap; letter-spacing: -.02em; }
+.compact-id { display: block; overflow: hidden; color: color-mix(in srgb, var(--ink) 78%, transparent); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
 .table-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
 .table-actions .btn { min-height: 34px; }
 .table-empty { padding: 40px 20px !important; text-align: center !important; }

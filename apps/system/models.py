@@ -6,6 +6,8 @@ from pathlib import PurePosixPath
 
 from django.conf import settings
 from django.db import models, transaction
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -90,6 +92,15 @@ class NewsItem(models.Model):
                 n += 1
             self.slug = slug
         return super().save(*args, **kwargs)
+
+
+@receiver(post_delete, sender=NewsItem)
+def delete_news_cover_after_commit(sender, instance, **kwargs):
+    """Удаляет обложку только после успешного удаления новости из БД."""
+    if instance.cover_image and instance.cover_image.name:
+        storage = instance.cover_image.storage
+        name = instance.cover_image.name
+        transaction.on_commit(lambda: storage.delete(name))
 
 
 class DocCategory(models.Model):
@@ -186,6 +197,15 @@ class SystemDocument(models.Model):
     @property
     def is_video(self) -> bool:
         return PurePosixPath(self.file.name).suffix.lower() in {".mp4", ".ogv", ".webm"}
+
+
+@receiver(post_delete, sender=SystemDocument)
+def delete_document_file_after_commit(sender, instance, **kwargs):
+    """Удаляет файл только после успешного удаления документа из БД."""
+    if instance.file and instance.file.name:
+        storage = instance.file.storage
+        name = instance.file.name
+        transaction.on_commit(lambda: storage.delete(name))
 
 
 class Conversation(models.Model):

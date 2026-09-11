@@ -462,6 +462,23 @@ class DocTests(BaseSystemTestCase):
         resp = self.client.post(reverse("system:doc_delete", args=[doc.pk]))
         self.assertEqual(resp.status_code, 403)
 
+    def test_deleting_document_removes_stored_file_after_commit(self):
+        doc = SystemDocument.objects.create(
+            title="Удаляемый документ",
+            file=SimpleUploadedFile("delete-me.pdf", b"%PDF-1.4"),
+            uploaded_by=self.admin,
+        )
+        storage = doc.file.storage
+        name = doc.file.name
+        self.assertTrue(storage.exists(name))
+        self.client.force_login(self.admin)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(reverse("system:doc_delete", args=[doc.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(storage.exists(name))
+
     def test_doc_download_increments_counter(self):
         doc = SystemDocument.objects.create(
             title="Руководство",
@@ -587,6 +604,25 @@ class NewsTests(BaseSystemTestCase):
         self.client.force_login(self.operator)
         resp = self.client.post(reverse("system:news_create"), {"title": "x"})
         self.assertEqual(resp.status_code, 403)
+
+    @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
+    def test_deleting_news_removes_cover_after_commit(self):
+        item = NewsItem.objects.create(
+            title="Удаляемая новость",
+            text="Текст",
+            author=self.admin,
+            cover_image=SimpleUploadedFile("delete-cover.png", b"image"),
+        )
+        storage = item.cover_image.storage
+        name = item.cover_image.name
+        self.assertTrue(storage.exists(name))
+        self.client.force_login(self.admin)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(reverse("system:news_delete", args=[item.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(storage.exists(name))
 
     def test_detail_increments_views(self):
         item = NewsItem.objects.create(

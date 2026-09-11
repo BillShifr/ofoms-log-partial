@@ -1887,6 +1887,32 @@ class TaskTests(BaseSystemTestCase):
                 last_started_at=None,
             )
 
+    def test_database_rejects_invalid_task_run_lifecycle(self):
+        task = self._make_task()
+        started_at = timezone.now()
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            TaskRun.objects.create(
+                task=task,
+                triggered_by="unknown",
+                started_at=started_at,
+            )
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            TaskRun.objects.create(
+                task=task,
+                triggered_by=TaskRun.TriggeredBy.AUTO,
+                started_at=started_at,
+                result=TaskRun.Result.OK,
+            )
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            TaskRun.objects.create(
+                task=task,
+                triggered_by=TaskRun.TriggeredBy.AUTO,
+                started_at=started_at,
+                finished_at=started_at,
+                result="",
+            )
+
     def test_toggle(self):
         self.client.force_login(self.admin)
         task = self._make_task()
@@ -2199,6 +2225,51 @@ class TaskEnabledStateMigrationTests(TransactionTestCase):
         NewTaskJob = new_apps.get_model("system", "TaskJob")
 
         self.assertEqual(NewTaskJob.objects.get(pk=task.pk).status, "created")
+
+
+class TaskRunLifecycleMigrationTests(TransactionTestCase):
+    migrate_from = [("system", "0011_enforce_task_enabled_state")]
+    migrate_to = [("system", "0012_enforce_taskrun_lifecycle")]
+
+    def test_migration_normalizes_legacy_task_run_states(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        OldTaskJob = old_apps.get_model("system", "TaskJob")
+        OldTaskRun = old_apps.get_model("system", "TaskRun")
+        task = OldTaskJob.objects.create(
+            name="Legacy runs",
+            command="noop",
+            status="created",
+            enabled=False,
+            run_mode="manual",
+        )
+        started_at = timezone.now()
+        pending = OldTaskRun.objects.create(
+            task=task,
+            triggered_by="unknown",
+            started_at=started_at,
+            result="ok",
+        )
+        finished = OldTaskRun.objects.create(
+            task=task,
+            triggered_by="auto",
+            started_at=started_at,
+            finished_at=started_at,
+            result="",
+        )
+
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        new_apps = executor.loader.project_state(self.migrate_to).apps
+        NewTaskRun = new_apps.get_model("system", "TaskRun")
+
+        pending = NewTaskRun.objects.get(pk=pending.pk)
+        finished = NewTaskRun.objects.get(pk=finished.pk)
+        self.assertEqual(pending.triggered_by, "legacy")
+        self.assertEqual(pending.result, "")
+        self.assertEqual(finished.triggered_by, "auto")
+        self.assertEqual(finished.result, "failed")
 
 
 class PrefTests(BaseSystemTestCase):

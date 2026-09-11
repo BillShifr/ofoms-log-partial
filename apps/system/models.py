@@ -674,16 +674,32 @@ class TaskJob(models.Model):
 class TaskRun(models.Model):
     """Запуск задания: время, инициатор, результат, лог."""
 
+    class TriggeredBy(models.TextChoices):
+        USER = "user", "Пользователь"
+        AUTO = "auto", "Автоматически"
+        LEGACY = "legacy", "Исторический запуск"
+
+    class Result(models.TextChoices):
+        OK = "ok", "Успешно"
+        FAILED = "failed", "Ошибка"
+
     task = models.ForeignKey(
         TaskJob, on_delete=models.CASCADE, related_name="runs", verbose_name="Задание"
     )
     triggered_by = models.CharField(
-        max_length=16, default="user", verbose_name="Инициатор"
+        max_length=16,
+        choices=TriggeredBy.choices,
+        default=TriggeredBy.USER,
+        verbose_name="Инициатор",
     )
     started_at = models.DateTimeField(verbose_name="Начало")
     finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Завершение")
     result = models.CharField(
-        max_length=16, blank=True, default="", verbose_name="Результат"
+        max_length=16,
+        choices=Result.choices,
+        blank=True,
+        default="",
+        verbose_name="Результат",
     )
     log = models.TextField(blank=True, default="", verbose_name="Лог")
 
@@ -691,6 +707,22 @@ class TaskRun(models.Model):
         verbose_name = "Запуск задания"
         verbose_name_plural = "Запуски заданий"
         ordering = ["-started_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(triggered_by__in=("user", "auto", "legacy")),
+                name="system_taskrun_trigger_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(finished_at__isnull=True, result="")
+                    | models.Q(
+                        finished_at__isnull=False,
+                        result__in=("ok", "failed"),
+                    )
+                ),
+                name="system_taskrun_result_state",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.task_id} @ {self.started_at:%Y-%m-%d %H:%M}"

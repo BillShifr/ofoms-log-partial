@@ -81,7 +81,7 @@
           <tr>
             <td>{{ r.started_at|date:"d.m.Y H:i:s" }}</td>
             <td>{{ r.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
-            <td>{% if r.triggered_by == "auto" %}Автоматически{% else %}Пользователь{% endif %}</td>
+            <td>{% if r.triggered_by == "auto" %}Автоматически{% elif r.triggered_by == "legacy" %}Исторический запуск{% else %}Пользователь{% endif %}</td>
             <td>{% if r.result == 'ok' %}<span class="badge badge--closed">успешно</span>{% elif r.result == 'failed' %}<span class="badge badge--overdue">ошибка</span>{% else %}<span class="badge badge--open">{{ r.result }}</span>{% endif %}</td>
             <td class="mono cell-long" title="{{ r.log }}">{{ r.log|truncatechars:160 }}</td>
           </tr>

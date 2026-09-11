@@ -289,7 +289,7 @@ table.data th, table.data td {
   vertical-align: middle;
 }
 table.data th {
-  background: color-mix(in srgb, var(--chip-blue) 78%, var(--card));
+  background: color-mix(in srgb, var(--bg) 72%, var(--card));
   font-size: .76rem;
   font-weight: 750;
   letter-spacing: .025em;
@@ -303,7 +303,7 @@ table.data thead tr:first-child th:first-child { border-top-left-radius: var(--r
 table.data thead tr:first-child th:last-child { border-top-right-radius: var(--r-lg); }
 table.data tbody tr:nth-child(even):not(.row-detail):not(.task-log-row) { background: color-mix(in srgb, var(--bg) 38%, transparent); }
 table.data tbody tr { transition: background-color .12s ease, box-shadow .12s ease; }
-table.data tbody tr:hover { background: color-mix(in srgb, var(--chip-green) 74%, var(--card)); box-shadow: inset 3px 0 var(--accent); }
+table.data tbody tr:hover { background: color-mix(in srgb, var(--chip-blue) 32%, var(--card)); box-shadow: inset 2px 0 color-mix(in srgb, var(--primary) 55%, transparent); }
 table.data tbody tr:last-child td { border-bottom: 0; }
 table.data tbody tr.clickable { cursor: pointer; }
 table.data tbody tr[data-href]:focus-within {
@@ -326,7 +326,7 @@ table.data tr.row--overdue { background: color-mix(in srgb, var(--chip-red) 60%,
 table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%, var(--card)); box-shadow: inset 4px 0 var(--warn); }
 .data--journal { font-size: .82rem; }
 .data--journal th, .data--journal td { padding: 10px 12px; }
-.data--journal thead tr:not(.group-row) th { background: color-mix(in srgb, var(--chip-blue) 42%, var(--card)); }
+.data--journal thead tr:not(.group-row) th { background: color-mix(in srgb, var(--bg) 62%, var(--card)); }
 .data--journal tbody tr:nth-child(even):not(.row-detail) { background: color-mix(in srgb, var(--bg) 22%, var(--card)); }
 .data--journal tbody tr.row--overdue { background: color-mix(in srgb, var(--danger) 4%, var(--card)); box-shadow: none; }
 .data--journal tbody tr.row--open { background: color-mix(in srgb, var(--warn) 4%, var(--card)); box-shadow: none; }
@@ -346,7 +346,7 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 }
 .data--journal thead .col-status {
   z-index: 5;
-  background: color-mix(in srgb, var(--chip-blue) 42%, var(--card));
+  background: color-mix(in srgb, var(--bg) 62%, var(--card));
 }
 .data--journal tbody tr:nth-child(even):not(.row-detail) .col-status {
   background: color-mix(in srgb, var(--bg) 22%, var(--card));
@@ -663,7 +663,14 @@ table.data .group-row th {
   padding: 8px 12px 5px;
 }
 table.data .group-row th.group-row__empty { background: transparent; border: none; border-radius: 0; }
-.group-row__label { display: inline-flex; padding: 4px 9px; border-radius: 999px; background: color-mix(in srgb, var(--chip-green) 42%, var(--card)); }
+.group-row__label {
+  display: inline-flex;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 4%, var(--card));
+  color: color-mix(in srgb, var(--ink) 72%, var(--accent));
+}
 table.data th { border-top: 1px solid var(--line); }
 table.data.th-sticky th:first-child,
 table.data.th-sticky td:first-child { position: sticky; left: 0; background: var(--card); z-index: 3; box-shadow: 1px 0 var(--line); }

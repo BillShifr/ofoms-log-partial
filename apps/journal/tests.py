@@ -153,6 +153,8 @@ class JournalScreenTests(TestCase):
         self.assertIn(".data--journal .col-status", css)
         self.assertIn("position: sticky", css)
         self.assertIn("right: 0", css)
+        self.assertIn("background: color-mix(in srgb, var(--accent) 4%, var(--card))", css)
+        self.assertNotIn("tbody tr:hover { background: color-mix(in srgb, var(--chip-green)", css)
 
     def test_suggest_runs_in_database_and_preserves_org_scope(self):
         own = self._make_irp(owner=self.smo_user)

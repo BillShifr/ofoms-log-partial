@@ -58,6 +58,10 @@ class ReportFilterForm(forms.Form):
         cleaned = super().clean()
         start = cleaned.get("date_from")
         end = cleaned.get("date_to")
+        if not start and not end:
+            raise forms.ValidationError(
+                "Укажите хотя бы дату начала или окончания периода."
+            )
         if start and end and start > end:
             raise forms.ValidationError("Дата начала периода не может быть позже даты окончания")
         return cleaned

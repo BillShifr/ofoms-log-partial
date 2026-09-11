@@ -11,7 +11,7 @@
 
 <div class="card">
   <form method="get" class="filter-form" id="report-filter-form">
-    <details class="collapsible" id="report-filters" data-key="report-filters">
+    <details class="collapsible" id="report-filters" data-key="report-filters"{% if form.errors %} open{% endif %}>
       <summary class="collapsible__toggle">Параметры отчёта</summary>
       <div class="filters">
         {% for field in form %}
@@ -28,6 +28,7 @@
         {% endif %}
         {% endfor %}
       </div>
+      {% for error in form.non_field_errors %}<div class="alert alert--error">{{ error }}</div>{% endfor %}
     </details>
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Сформировать</button>

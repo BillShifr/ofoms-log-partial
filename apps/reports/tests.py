@@ -204,6 +204,15 @@ class FilterFormTests(TestCase):
         )
         self.assertFalse(form.is_valid())
 
+    def test_period_boundary_is_required_server_side(self):
+        form = ReportFilterForm({"how": "1"}, user=self.tfoms_user)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn(
+            "Укажите хотя бы дату начала или окончания периода",
+            str(form.non_field_errors()),
+        )
+
     def test_to_filters(self):
         form = ReportFilterForm(
             {
@@ -253,7 +262,7 @@ class ReportScreenTests(BaseReportTestCase):
         self.client.force_login(self.tfoms_user)
         resp = self.client.get(
             reverse("reports:detail", args=["r4_complaints"]),
-            {"how": "1"},
+            {"how": "1", "date_from": datetime.date.today().isoformat()},
         )
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Качество услуг")
@@ -262,7 +271,8 @@ class ReportScreenTests(BaseReportTestCase):
         self._make(irp_type=2)
         self.client.force_login(self.tfoms_user)
         resp = self.client.get(
-            reverse("reports:export", args=["r4_complaints", "xlsx"]), {"how": "1"}
+            reverse("reports:export", args=["r4_complaints", "xlsx"]),
+            {"how": "1", "date_from": datetime.date.today().isoformat()},
         )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(
@@ -275,7 +285,8 @@ class ReportScreenTests(BaseReportTestCase):
         self._make(irp_type=2)
         self.client.force_login(self.tfoms_user)
         resp = self.client.get(
-            reverse("reports:export", args=["r4_complaints", "pdf"]), {"how": "1"}
+            reverse("reports:export", args=["r4_complaints", "pdf"]),
+            {"how": "1", "date_from": datetime.date.today().isoformat()},
         )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "application/pdf")
@@ -295,6 +306,26 @@ class ReportScreenTests(BaseReportTestCase):
             {"date_from": "2026-02-01", "date_to": "2026-01-01"},
         )
         self.assertEqual(resp.status_code, 400)
+
+    def test_direct_preview_and_export_without_period_are_rejected(self):
+        self._make(irp_type=2)
+        self.client.force_login(self.tfoms_user)
+
+        preview = self.client.get(
+            reverse("reports:detail", args=["r4_complaints"]), {"how": "1"}
+        )
+        export = self.client.get(
+            reverse("reports:export", args=["r4_complaints", "xlsx"]),
+            {"how": "1"},
+        )
+
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(
+            preview, "Укажите хотя бы дату начала или окончания периода"
+        )
+        self.assertContains(preview, 'data-key="report-filters" open')
+        self.assertIsNone(preview.context["rows"])
+        self.assertEqual(export.status_code, 400)
 
 
 class ExportBytesTests(BaseReportTestCase):

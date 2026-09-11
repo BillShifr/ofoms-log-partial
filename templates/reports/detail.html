@@ -2,9 +2,12 @@
 {% load report_filters %}
 {% block title %}{{ report.title }}{% endblock %}
 {% block content %}
-<a class="btn btn--ghost mb-2" href="{% url 'reports:index' %}">← Все отчёты</a>
-<h1>{{ report.title }}</h1>
-<p class="text-muted">{{ report.description }}</p>
+<header class="module-heading">
+  <a class="module-heading__back" href="{% url 'reports:index' %}">← Все отчёты</a>
+  <p class="page-heading__eyebrow">Приложение №{{ report.number }}</p>
+  <h1>{{ report.title }}</h1>
+  <p>{{ report.description }}</p>
+</header>
 
 <div class="card">
   <form method="get" class="filter-form" id="report-filter-form">
@@ -29,8 +32,8 @@
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Сформировать</button>
       {% if rows %}
-      <a class="btn btn--accent" href="{% url 'reports:export' report.slug 'xlsx' %}?{{ request.GET.urlencode }}">Скачать Excel</a>
-      <a class="btn btn--accent" href="{% url 'reports:export' report.slug 'pdf' %}?{{ request.GET.urlencode }}">Скачать PDF</a>
+      <a class="btn btn--ghost" href="{% url 'reports:export' report.slug 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a>
+      <a class="btn btn--ghost" href="{% url 'reports:export' report.slug 'pdf' %}?{{ request.GET.urlencode }}">PDF</a>
       {% endif %}
     </div>
   </form>
@@ -59,7 +62,7 @@
 </div>
 {% else %}
 <div class="card">
-  <p class="text-muted">Задайте параметры формы выше и нажмите «Сформировать».</p>
+  <div class="empty-state">Задайте параметры выше и нажмите «Сформировать»</div>
 </div>
 {% endif %}
 {% endblock %}

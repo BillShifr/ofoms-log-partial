@@ -2,8 +2,10 @@
 {% load system_filters %}
 {% block title %}Документация{% endblock %}
 {% block content %}
-<h1>Документация</h1>
-<p class="text-muted mb-2">Действующая эксплуатационная документация, сгруппированная по разделам (ТЗ разд. 3.7, PRD v3 §2.8).</p>
+<header class="page-heading">
+  <div><p class="page-heading__eyebrow">База знаний</p><h1>Документация</h1><p class="page-heading__lead">Инструкции, регламенты и эксплуатационные материалы</p></div>
+  <div class="page-heading__metric"><strong>{{ categories|length }}</strong><span>разделов</span></div>
+</header>
 
 <div class="card mb-2">
   <form method="get" class="filters" style="align-items:center">
@@ -57,7 +59,7 @@
     <span class="badge badge--role">Документов: {{ cat.docs_count }}</span>
   </a>
   {% empty %}
-  <p class="text-muted">Категорий пока нет.</p>
+  <div class="empty-state span-2">Разделы документации пока не созданы</div>
   {% endfor %}
 </div>
 
@@ -73,7 +75,7 @@
 </div>
 {% else %}
 <div class="card mt-2">
-  <p class="text-muted">Документация ещё не загружена.</p>
+  <div class="empty-state">Документация ещё не загружена</div>
 </div>
 {% endif %}
 {% endif %}

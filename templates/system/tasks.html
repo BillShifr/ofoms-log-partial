@@ -2,11 +2,10 @@
 {% load system_filters %}
 {% block title %}Задачи{% endblock %}
 {% block content %}
-<h1>Автоматизированные задания</h1>
-
-<div class="flex mb-2">
-  <a class="btn btn--accent" href="{% url 'system:task_create' %}">+ Новое задание</a>
-</div>
+<header class="page-heading page-heading--action">
+  <div><p class="page-heading__eyebrow">Системные операции</p><h1>Автоматизированные задания</h1><p class="page-heading__lead">Запуск, расписание и контроль служебных процессов</p></div>
+  <a class="btn btn--primary" href="{% url 'system:task_create' %}">+ Новое задание</a>
+</header>
 
 <div class="card table-card">
   <div class="table-wrap" tabindex="0" aria-label="Таблица заданий; прокручивается по горизонтали">

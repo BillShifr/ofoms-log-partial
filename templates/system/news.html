@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Новости{% endblock %}
 {% block content %}
-<h1>Новости</h1>
-<p class="text-muted mb-2">Лента новостей и уведомлений ТФОМС (PRD v3 §2.7).</p>
+<header class="page-heading">
+  <div><p class="page-heading__eyebrow">Информационный центр</p><h1>Новости</h1><p class="page-heading__lead">Объявления и важные уведомления для сотрудников</p></div>
+  <div class="page-heading__metric"><strong>{{ page.paginator.count }}</strong><span>публикаций</span></div>
+</header>
 
 <div class="card mb-2">
   <details class="collapsible" data-key="news-filters">
@@ -91,8 +93,8 @@
 
 <div class="grid-2">
   {% for n in page.object_list %}
-  <a class="card report-card news-card {% if n.is_pinned %}news-card--pinned{% endif %}"
-     data-href="{% url 'system:news_detail' n.pk %}">
+  <article class="card report-card news-card {% if n.is_pinned %}news-card--pinned{% endif %}"
+     data-href="{% url 'system:news_detail' n.pk %}" tabindex="0">
     {% if n.is_pinned %}<span class="badge badge--role news-card__pinned">Закреплено</span>{% endif %}
     {% if n.cover_image %}<img class="news-card__cover" src="{{ n.cover_image.url }}"
         alt="{% if n.category %}{{ n.category.name }}{% endif %}">{% endif %}
@@ -102,7 +104,7 @@
       <span class="text-muted">{{ n.author.full_name|default:"система" }}</span>
       <span class="text-muted">просмотров: {{ n.views_count }}</span>
     </span>
-    <h3 class="report-card__title">{{ n.title }}</h3>
+    <h3 class="report-card__title"><a href="{% url 'system:news_detail' n.pk %}">{{ n.title }}</a></h3>
     <p class="report-card__desc">{{ n.summary|default:n.text|truncatechars:180 }}</p>
     {% if can_manage %}
     <div class="news-card__actions">
@@ -117,9 +119,9 @@
       </form>
     </div>
     {% endif %}
-  </a>
+  </article>
   {% empty %}
-  <p class="text-muted">Новостей пока нет.</p>
+  <div class="empty-state span-2">Новостей по заданным условиям нет</div>
   {% endfor %}
 </div>
 

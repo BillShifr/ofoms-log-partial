@@ -1,23 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Отчётность{% endblock %}
 {% block content %}
-<h1>Отчётные формы</h1>
-<p class="text-muted">Приложения №1–9 к ТЗ. Параметры формируются по фильтрам: период
-  регистрации, способ обращения, исполнитель (ТФОМС/СМО), источник получения,
-  признак «учитывать только закрытые обращения». Выгрузка в Excel и PDF.</p>
+<header class="page-heading">
+  <div><p class="page-heading__eyebrow">Аналитика</p><h1>Отчётные формы</h1><p class="page-heading__lead">Сводные показатели по обращениям с выгрузкой в Excel и PDF</p></div>
+  <div class="page-heading__metric"><strong>{{ reports|length }}</strong><span>форм</span></div>
+</header>
 {% if user.org != 81000 %}
-<p class="text-muted">Внимание: страховой медицинской организации доступны только её собственные обращения.</p>
+<div class="scope-note">Показаны обращения только вашей страховой медицинской организации.</div>
 {% endif %}
 
 <div class="grid reports-grid">
   {% for report in reports %}
-  <div class="card report-card" data-href="{% url 'reports:detail' report.slug %}">
+  <article class="card report-card" data-href="{% url 'reports:detail' report.slug %}">
     <div class="report-card__head">
       <span class="badge badge--result">Приложение №{{ report.number }}</span>
     </div>
     <h3 class="report-card__title"><a href="{% url 'reports:detail' report.slug %}">{{ report.title }}</a></h3>
     <p class="text-muted report-card__desc">{{ report.description }}</p>
-  </div>
+  </article>
   {% endfor %}
 </div>
 {% endblock %}

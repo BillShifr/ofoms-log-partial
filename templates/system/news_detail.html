@@ -2,13 +2,13 @@
 {% load system_filters %}
 {% block title %}{{ item.title }}{% endblock %}
 {% block content %}
-<a class="btn btn--ghost mb-2" href="{% url 'system:news' %}">← Все новости</a>
+<a class="module-heading__back" href="{% url 'system:news' %}">← Все новости</a>
 
 {% if can_manage and not item.is_active %}
 <div class="alert alert--error mb-2">Новость скрыта — обычные пользователи её не видят.</div>
 {% endif %}
 
-<article class="card">
+<article class="card news-article">
   <div class="news-card__meta">
     {% if item.category %}<span class="badge badge--result">{{ item.category.name }}</span>{% endif %}
     <span class="text-muted">{{ item.created_at|date:"d.m.Y H:i" }}</span>

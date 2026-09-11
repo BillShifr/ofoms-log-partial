@@ -601,6 +601,8 @@ def thread_reply(request, pk):
     """Ответ в теме (с необязательным вложением-файлом)."""
     thread = get_object_or_404(MessageThread, pk=pk)
     _participant_or_404(request.user, thread.conversation)
+    if thread.is_closed:
+        raise PermissionDenied
     form = ReplyForm(request.POST)
     if form.is_valid():
         reply = form.save(commit=False)

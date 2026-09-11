@@ -428,6 +428,33 @@ class MessageTests(BaseSystemTestCase):
         reply = MessageReply.objects.get(thread=thread)
         self.assertEqual(reply.attachments.count(), 1)
 
+    def test_closed_thread_rejects_direct_reply_post_without_side_effects(self):
+        conv = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=conv,
+            created_by=self.admin,
+            title="Закрытая тема",
+            is_closed=True,
+        )
+        self.client.force_login(self.operator)
+
+        response = self.client.post(
+            reverse("system:reply", args=[thread.pk]),
+            {
+                "body": "Сообщение в обход интерфейса",
+                "attachment": SimpleUploadedFile("blocked.pdf", b"%PDF-1.4"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(thread.replies.exists())
+        self.assertFalse(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.SEND,
+                target__startswith=f"thread:{thread.pk}:reply:",
+            ).exists()
+        )
+
     def test_reply_unsafe_attachment_rejected(self):
         conv = self._conv()
         thread = MessageThread.objects.create(

@@ -12,6 +12,10 @@ import uuid
 import jwt
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
+from django.utils import timezone
+
+from apps.core.models import ConsumedToken
 
 
 class EmployeeRepository:
@@ -33,6 +37,7 @@ def issue_token(user, *, ttl: int | None = None, audience: str = "ejournal") -> 
         "sub": str(user.guid),
         "username": user.username,
         "aud": audience,
+        "jti": str(uuid.uuid4()),
         "iat": now,
         "exp": now + _dt.timedelta(seconds=ttl),
     }
@@ -46,7 +51,25 @@ def decode_token(token: str, *, audience: str = "ejournal"):
         settings.JWT_SECRET,
         algorithms=[settings.JWT_ALGORITHM],
         audience=audience,
+        options={"require": ["sub", "aud", "jti", "iat", "exp"]},
     )
+
+
+def consume_token(payload: dict) -> bool:
+    """Атомарно помечает JWT использованным; повторный jti отклоняет."""
+    try:
+        jti = uuid.UUID(str(payload["jti"]))
+        expires_at = _dt.datetime.fromtimestamp(float(payload["exp"]), tz=_dt.UTC)
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+
+    try:
+        with transaction.atomic():
+            ConsumedToken.objects.filter(expires_at__lt=timezone.now()).delete()
+            ConsumedToken.objects.create(jti=jti, expires_at=expires_at)
+    except IntegrityError:
+        return False
+    return True
 
 
 def resolve_user(

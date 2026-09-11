@@ -11,7 +11,7 @@
 | 9 отчётных форм и фильтры | ТЗ 2.5 | ТФОМС, СМО | reports | registry/export + SQL aggregation | result/query-count reports tests | Нет оригинальных Приложений 1–9 | неоднозначно |
 | Защищённая выдача вложений | ТЗ 3.1 | все | journal/system downloads | object-scoped FileResponse | regression tests | Web-сервер не должен публиковать media напрямую | реализовано |
 | Блокировка после 10 попыток и стойкие пароли | ТЗ 3.1 | все | core/auth | backend/signals/atomic counter/validator | core + employee tests | Временное окно намеренно не применяется: разблокировка только администратором | реализовано |
-| Временные токены и единый репозиторий | ТЗ 3.1 | все | core/tokens, core/token-login | JWT exchange + Employee repository adapter | unit/view tests | POST-only обмен временного JWT на сессию, inactive/locked deny, safe redirect | реализовано |
+| Временные токены и единый репозиторий | ТЗ 3.1 | все | core/tokens, core/token-login | Одноразовый JWT exchange + Employee repository adapter | unit/view/replay tests | POST-only обмен; обязательный уникальный `jti`; atomic consume; inactive/locked deny; safe redirect | реализовано |
 | Персональные настройки таблиц | ТЗ 3.2 | все | system/prefs, journal/list | UserTableViewPref | view tests | Видимость, сохранённый порядок, сортировка, фиксация и групповые заголовки применяются к реестру | реализовано |
 | Сообщения | ТЗ 3.3 | все | system/messages | conversations/threads/replies/read markers | view + permission tests | Нет realtime; базовый поток и unread корректны | реализовано |
 | События с start/end и фильтрами | ТЗ 3.4 | Admin | system/events | EventLog/middleware + point/pending lifecycle | model/view tests | — | реализовано |

@@ -14,6 +14,18 @@ from django.utils import timezone
 logger = logging.getLogger("apps.core")
 
 
+class ConsumedToken(models.Model):
+    """Одноразовый идентификатор уже обмененного временного JWT."""
+
+    jti = models.UUIDField(primary_key=True, editable=False)
+    expires_at = models.DateTimeField(db_index=True)
+    consumed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Использованный временный токен"
+        verbose_name_plural = "Использованные временные токены"
+
+
 class EventLog(models.Model):
     """Запись журнала событий функционирования Системы."""
 

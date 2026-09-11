@@ -1,5 +1,6 @@
 """Тесты core: парольная политика, блокировка, токены, журнал событий."""
 
+import datetime
 import os
 import re
 import subprocess
@@ -11,12 +12,18 @@ from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.core.models import EventLog, log_event
-from apps.core.tokens import EmployeeRepository, decode_token, issue_token, resolve_user
+from apps.core.models import ConsumedToken, EventLog, log_event
+from apps.core.tokens import (
+    EmployeeRepository,
+    consume_token,
+    decode_token,
+    issue_token,
+    resolve_user,
+)
 from apps.core.validators import ComplexityPasswordValidator
 
 User = get_user_model()
@@ -143,6 +150,7 @@ class TokenTests(TestCase):
         payload = decode_token(token)
         self.assertEqual(payload["username"], "tokenuser")
         self.assertEqual(payload["sub"], str(self.user.guid))
+        self.assertTrue(payload["jti"])
 
     def test_resolve_user(self):
         token = issue_token(self.user)
@@ -168,6 +176,13 @@ class TokenTests(TestCase):
         self.assertEqual(resolved, self.user)
         self.assertEqual(repository.guid, str(self.user.guid))
 
+    def test_token_identifier_is_consumed_once(self):
+        payload = decode_token(issue_token(self.user))
+
+        self.assertTrue(consume_token(payload))
+        self.assertFalse(consume_token(payload))
+        self.assertEqual(ConsumedToken.objects.count(), 1)
+
 
 class TokenLoginTests(TestCase):
     def setUp(self):
@@ -190,6 +205,34 @@ class TokenLoginTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.pk)
+
+    def test_token_replay_is_rejected(self):
+        token = issue_token(self.user)
+        first = self.client.post(self.url, {"token": token})
+        second_client = Client()
+        replay = second_client.post(self.url, {"token": token})
+
+        self.assertEqual(first.status_code, 302)
+        self.assertEqual(replay.status_code, 403)
+        self.assertNotIn("_auth_user_id", second_client.session)
+        self.assertEqual(ConsumedToken.objects.count(), 1)
+
+    def test_signed_token_without_required_jti_is_rejected(self):
+        now = datetime.datetime.now(tz=datetime.UTC)
+        token = jwt.encode(
+            {
+                "sub": str(self.user.guid),
+                "aud": "ejournal",
+                "iat": now,
+                "exp": now + datetime.timedelta(minutes=1),
+            },
+            settings.JWT_SECRET,
+            algorithm=settings.JWT_ALGORITHM,
+        )
+
+        response = self.client.post(self.url, {"token": token})
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_unsafe_next_is_ignored(self):
         response = self.client.post(

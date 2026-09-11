@@ -10,7 +10,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from apps.core.tokens import resolve_user
+from apps.core.tokens import EmployeeRepository, consume_token, decode_token
 
 _MAX_TOKEN_LENGTH = 4096
 
@@ -45,11 +45,19 @@ def token_login(request):
         return HttpResponseBadRequest("Некорректный запрос.")
 
     try:
-        user = resolve_user(token)
+        payload = decode_token(token)
+        user = EmployeeRepository().get_by_guid(payload["sub"])
     except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+        payload = None
         user = None
 
-    if user is None or not user.is_active or user.is_locked:
+    if (
+        user is None
+        or not user.is_active
+        or user.is_locked
+        or payload is None
+        or not consume_token(payload)
+    ):
         response = HttpResponseForbidden("Вход по токену отклонён.")
     else:
         login(request, user, backend="apps.core.auth.TFOMSAuthBackend")

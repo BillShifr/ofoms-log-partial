@@ -69,6 +69,26 @@ def available_artifact_path(path: Path) -> Path:
     return path.with_name(f"{path.stem}-{uuid.uuid4().hex[:8]}{path.suffix}")
 
 
+def write_unique_artifact(path: Path, chunks) -> Path:
+    """Атомарно создаёт новый artifact, не перезаписывая параллельный файл."""
+    import uuid
+
+    candidate = path
+    while True:
+        try:
+            with open(candidate, "xb") as artifact:
+                for chunk in chunks:
+                    artifact.write(chunk)
+            return candidate
+        except FileExistsError:
+            candidate = path.with_name(
+                f"{path.stem}-{uuid.uuid4().hex[:8]}{path.suffix}"
+            )
+        except BaseException:
+            candidate.unlink(missing_ok=True)
+            raise
+
+
 def archive_artifact(source: Path, archive_dir: Path, org: int) -> Path:
     """Move a processed input exactly once, including across filesystems."""
     org_dir = archive_dir / str(org)
@@ -225,10 +245,10 @@ class XsdExchangeFile:
     def write_flcp(self, result: ImportResult) -> Path:
         org_dir = self._out_dir / str(self.org)
         org_dir.mkdir(parents=True, exist_ok=True)
-        out = available_artifact_path(org_dir / self.basename)
-        with open(out, "wb") as f:
-            f.write(result.flcp_bytes())
-        return out
+        return write_unique_artifact(
+            org_dir / self.basename,
+            (result.flcp_bytes(),),
+        )
 
 
 class EmployeeXMLFile(XsdExchangeFile):

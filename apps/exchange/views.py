@@ -19,7 +19,7 @@ from apps.exchange.importers import (
     EmployeeXMLFile,
     ExcelIrpFile,
     IrpXMLFile,
-    available_artifact_path,
+    write_unique_artifact,
 )
 from apps.exchange.models import ImportLog
 
@@ -70,10 +70,7 @@ def _process_upload(user, org, uploaded) -> ImportLog:
     safe_name = os.path.basename(uploaded.name or "file")
     in_org = settings.EXCHANGE_IN / str(org)
     in_org.mkdir(parents=True, exist_ok=True)
-    dest = available_artifact_path(in_org / safe_name)
-    with open(dest, "wb") as f:
-        for chunk in uploaded.chunks():
-            f.write(chunk)
+    dest = write_unique_artifact(in_org / safe_name, uploaded.chunks())
 
     name_lower = safe_name.lower()
     if name_lower.startswith("users") and name_lower.endswith(".xml"):

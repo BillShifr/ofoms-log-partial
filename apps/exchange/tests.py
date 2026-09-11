@@ -6,8 +6,10 @@ upsert по guid/n_irp, ограничение доступа к протоко�
 import errno
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
 from pathlib import Path
+from threading import Barrier
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -28,6 +30,7 @@ from apps.exchange.importers import (
     IrpXMLFile,
     archive_artifact,
     validate_xlsx_container,
+    write_unique_artifact,
 )
 from apps.exchange.models import ImportLog
 from apps.journal.models import Irp, IrpTheme
@@ -125,6 +128,47 @@ class FlcTests(TestCase):
     def test_build_flcp_windows1251(self):
         data = build_flcp("f.xml", [error_result("T", "тест", "1")])
         self.assertIn(b"windows-1251", data)
+
+
+class ArtifactWriteTests(TestCase):
+    def test_parallel_writers_never_share_or_overwrite_a_path(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "G1R_same.xml"
+            barrier = Barrier(2)
+
+            def chunks(payload):
+                barrier.wait(timeout=5)
+                yield payload
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [
+                    executor.submit(write_unique_artifact, target, chunks(payload))
+                    for payload in (b"first", b"second")
+                ]
+                paths = [future.result(timeout=5) for future in futures]
+
+            self.assertEqual(len(set(paths)), 2)
+            self.assertEqual(
+                {path.read_bytes() for path in paths},
+                {b"first", b"second"},
+            )
+
+    def test_failed_writer_removes_its_partial_artifact(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "partial.xml"
+
+            def failing_chunks():
+                yield b"partial"
+                raise RuntimeError("upload interrupted")
+
+            with self.assertRaises(RuntimeError):
+                write_unique_artifact(target, failing_chunks())
+
+            self.assertFalse(target.exists())
 
 
 class ImportLogConstraintTests(TestCase):

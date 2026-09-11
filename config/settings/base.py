@@ -170,6 +170,11 @@ JWT_SECRET = os.getenv("JWT_SECRET", SECRET_KEY)
 JWT_ALGORITHM = "HS256"
 JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "ejournal").strip() or "ejournal"
 JWT_TTL = int(os.getenv("JWT_TTL", "300"))  # сек — жизнь временного токена
+TOKEN_LOGIN_TRUSTED_ORIGINS = tuple(
+    origin.strip()
+    for origin in os.getenv("TOKEN_LOGIN_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+)
 TASK_STALE_AFTER_SECONDS = int(os.getenv("TASK_STALE_AFTER_SECONDS", "3600"))
 
 # ---------------------------------------------------------------------------

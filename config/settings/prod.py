@@ -5,6 +5,7 @@
 """
 
 import os
+from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -71,6 +72,30 @@ def _production_hosts():
     return hosts
 
 
+def _trusted_token_origins():
+    origins = []
+    for raw_origin in os.getenv("TOKEN_LOGIN_TRUSTED_ORIGINS", "").split(","):
+        origin = raw_origin.strip()
+        if not origin:
+            continue
+        parsed = urlsplit(origin)
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.username
+            or parsed.password
+            or parsed.path not in ("", "/")
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ImproperlyConfigured(
+                "TOKEN_LOGIN_TRUSTED_ORIGINS must contain HTTPS origins without "
+                "credentials, paths, query strings, or fragments."
+            )
+        origins.append(f"https://{parsed.netloc.lower()}")
+    return tuple(dict.fromkeys(origins))
+
+
 SECRET_KEY = _required_secret("SECRET_KEY")
 JWT_SECRET = _required_secret("JWT_SECRET")
 DB_PASSWORD = _required_secret(
@@ -86,6 +111,7 @@ if DB_POOL_MIN_SIZE > DB_POOL_MAX_SIZE:
     raise ImproperlyConfigured("DB_POOL_MIN_SIZE must not exceed DB_POOL_MAX_SIZE.")
 
 ALLOWED_HOSTS = _production_hosts()
+TOKEN_LOGIN_TRUSTED_ORIGINS = _trusted_token_origins()
 SECURE_SSL_REDIRECT = _boolean_env("SECURE_SSL_REDIRECT", True)
 SESSION_COOKIE_SECURE = _boolean_env("SESSION_COOKIE_SECURE", True)
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE

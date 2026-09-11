@@ -108,6 +108,30 @@ class ProductionSettingsTests(TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(next(iter(environment)), result.stderr)
 
+    def test_production_validates_token_login_trusted_origins(self):
+        for origins in (
+            "http://sso.example",
+            "https://user:password@sso.example",
+            "https://sso.example/callback",
+            "https://sso.example?tenant=1",
+        ):
+            with self.subTest(origins=origins):
+                result = self._import_settings(
+                    "database-secret-4827-strong",
+                    extra_environment={"TOKEN_LOGIN_TRUSTED_ORIGINS": origins},
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("TOKEN_LOGIN_TRUSTED_ORIGINS", result.stderr)
+
+        accepted = self._import_settings(
+            "database-secret-4827-strong",
+            "from config.settings.prod import TOKEN_LOGIN_TRUSTED_ORIGINS; "
+            "print(TOKEN_LOGIN_TRUSTED_ORIGINS)",
+            {"TOKEN_LOGIN_TRUSTED_ORIGINS": "https://sso.example,https://SSO.example/"},
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertEqual(accepted.stdout.strip(), "('https://sso.example',)")
+
     def test_production_uses_bounded_health_checked_database_pool(self):
         result = self._import_settings(
             "database-secret-4827-strong",
@@ -372,6 +396,70 @@ class TokenLoginTests(TestCase):
         self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.pk)
         self.assertEqual(response.headers["Cache-Control"], "no-store")
         self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
+        self.assertIn("Origin", response.headers["Vary"])
+        self.assertIn("Sec-Fetch-Site", response.headers["Vary"])
+
+    def test_same_origin_browser_form_is_allowed(self):
+        response = self.client.post(
+            self.url,
+            {"token": issue_token(self.user)},
+            HTTP_ORIGIN="http://testserver",
+            HTTP_SEC_FETCH_SITE="same-origin",
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.pk)
+
+    def test_cross_site_browser_form_is_rejected_before_token_consumption(self):
+        token = issue_token(self.user)
+        response = self.client.post(
+            self.url,
+            {"token": token},
+            HTTP_ORIGIN="https://attacker.invalid",
+            HTTP_SEC_FETCH_SITE="cross-site",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertFalse(ConsumedToken.objects.exists())
+        self.assertEqual(
+            self.client.post(self.url, {"token": token}).status_code,
+            302,
+        )
+
+    def test_cross_site_fetch_without_origin_is_rejected(self):
+        response = self.client.post(
+            self.url,
+            {"token": issue_token(self.user)},
+            HTTP_SEC_FETCH_SITE="cross-site",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(ConsumedToken.objects.exists())
+
+    @override_settings(TOKEN_LOGIN_TRUSTED_ORIGINS=("https://sso.example",))
+    def test_explicit_trusted_sso_origin_is_allowed(self):
+        response = self.client.post(
+            self.url,
+            {"token": issue_token(self.user)},
+            secure=True,
+            HTTP_HOST="journal.example",
+            HTTP_ORIGIN="https://sso.example",
+            HTTP_SEC_FETCH_SITE="cross-site",
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.pk)
+
+    def test_malformed_browser_origin_is_rejected(self):
+        response = self.client.post(
+            self.url,
+            {"token": issue_token(self.user)},
+            HTTP_ORIGIN="null",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(ConsumedToken.objects.exists())
 
     def test_valid_bearer_token_creates_session(self):
         response = self.client.post(
@@ -428,6 +516,13 @@ class TokenLoginTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertNotContains(response, "not-a-jwt", status_code=403)
+
+    def test_missing_token_response_is_also_never_cached(self):
+        response = self.client.post(self.url)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
 
     def test_signed_token_with_invalid_subject_is_rejected(self):
         token = jwt.encode(

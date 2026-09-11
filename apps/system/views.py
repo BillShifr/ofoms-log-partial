@@ -1172,14 +1172,21 @@ def doc_download(request, pk):
     """Скачивание документа с учётом счётчика загрузок (PRD v3 §2.8)."""
     doc = get_object_or_404(SystemDocument, pk=pk)
     file_handle = open_field_file_or_404(doc.file)
-    SystemDocument.objects.filter(pk=pk).update(downloads_count=F("downloads_count") + 1)
-    log_event(
-        module="system",
-        event_type=EventLog.EventType.EXPORT,
-        user=request.user,
-        target=f"doc:{doc.pk}:{doc.title}",
-        ip=request.META.get("REMOTE_ADDR"),
-    )
+    try:
+        with transaction.atomic():
+            SystemDocument.objects.filter(pk=pk).update(
+                downloads_count=F("downloads_count") + 1
+            )
+            log_event(
+                module="system",
+                event_type=EventLog.EventType.EXPORT,
+                user=request.user,
+                target=f"doc:{doc.pk}:{doc.title}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
+    except Exception:
+        file_handle.close()
+        raise
     return FileResponse(file_handle, filename=doc.file.name.split("/")[-1], as_attachment=True)
 
 

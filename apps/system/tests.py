@@ -1068,6 +1068,32 @@ class DocTests(BaseSystemTestCase):
             EventLog.objects.filter(target=f"doc:{doc.pk}:{doc.title}").exists()
         )
 
+    def test_document_download_counter_rolls_back_when_audit_fails(self):
+        doc = SystemDocument.objects.create(
+            title="Документ без ложного счётчика",
+            file=SimpleUploadedFile("audit-failure.pdf", b"%PDF-1.4"),
+            uploaded_by=self.admin,
+        )
+        self.client.force_login(self.operator)
+        file_handle = io.BytesIO(b"%PDF-1.4")
+
+        with (
+            patch(
+                "apps.system.views.open_field_file_or_404",
+                return_value=file_handle,
+            ),
+            patch("apps.system.views.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.get(reverse("system:doc_download", args=[doc.pk]))
+
+        self.assertTrue(file_handle.closed)
+        doc.refresh_from_db()
+        self.assertEqual(doc.downloads_count, 0)
+        self.assertFalse(
+            EventLog.objects.filter(target=f"doc:{doc.pk}:{doc.title}").exists()
+        )
+
     def test_video_can_be_viewed_inline_by_authenticated_user(self):
         doc = SystemDocument.objects.create(
             title="Обучение",

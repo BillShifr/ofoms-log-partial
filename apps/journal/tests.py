@@ -180,6 +180,7 @@ class JournalScreenTests(TestCase):
         self.assertContains(resp, 'class="data data--wide data--journal')
         self.assertContains(resp, 'class="group-row__label"')
         self.assertContains(resp, 'class="col-status"')
+        self.assertContains(resp, 'data-label="Статус"')
         self.assertContains(resp, f'title="{irp.n_irp}"')
         self.assertContains(resp, f'…{irp.n_irp[-12:]}')
 
@@ -187,9 +188,10 @@ class JournalScreenTests(TestCase):
         self.assertIn(".data--journal .col-status", css)
         self.assertIn("position: sticky", css)
         self.assertIn("right: 0", css)
-        self.assertIn("border-left: 2px solid color-mix(in srgb, var(--accent) 62%, var(--line))", css)
+        self.assertIn("border-left: 2px solid color-mix(in srgb, var(--primary) 45%, var(--line))", css)
         self.assertIn("table.data .group-row th", css)
-        self.assertIn("background: transparent", css)
+        self.assertIn(".data--journal thead { display: none; }", css)
+        self.assertIn("content: attr(data-label)", css)
         self.assertNotIn("tbody tr:hover { background: color-mix(in srgb, var(--chip-green)", css)
 
     def test_suggest_runs_in_database_and_preserves_org_scope(self):

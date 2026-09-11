@@ -44,7 +44,7 @@
 </div>
 
 <div class="card table-card">
-  <div class="table-wrap" tabindex="0" aria-label="Таблица обращений; прокручивается по горизонтали">
+  <div class="table-wrap table-wrap--journal" tabindex="0" aria-label="Таблица обращений; на узком экране показана карточками">
     <table class="data data--wide data--journal {% if fixed_first %}th-sticky{% endif %}">
       <thead>
         <tr class="group-row">
@@ -69,7 +69,7 @@
         <tr class="clickable {% if not irp.is_closed and irp.is_overdue %}row--overdue{% elif not irp.is_closed and not irp.result %}row--open{% endif %}"
             data-href="{% url 'journal:detail' irp.pk %}">
           {% for col in cols %}
-            <td class="col-{{ col.key }}{% if col.key == 'n_irp' %} cell-id{% endif %}">
+            <td class="col-{{ col.key }}{% if col.key == 'n_irp' %} cell-id{% endif %}{% if col.key == 'date_close' and not irp.date_close %} cell--empty{% elif col.key == 'z_enp' and not irp.z_enp %} cell--empty{% elif col.key == 'employee_one' and not irp.employee_one %} cell--empty{% endif %}" data-label="{{ col.label }}">
               {% if col.key == 'id' %}<a class="table-row-link" href="{% url 'journal:detail' irp.pk %}" aria-label="Открыть обращение № {{ irp.n_irp }}">{{ irp.id }}</a>
               {% elif col.key == 'n_irp' %}<span class="mono compact-id" title="{{ irp.n_irp }}" aria-label="Полный номер обращения: {{ irp.n_irp }}">…{{ irp.n_irp|slice:"-12:" }}</span>
               {% elif col.key == 'date_create' %}<span data-value="{{ irp.date_create|date:'Y-m-d' }}">{{ irp.date_create|date:"d.m.Y" }}</span><br><span class="text-muted">{{ irp.time_create|time:"H:i"|default:"" }}</span>

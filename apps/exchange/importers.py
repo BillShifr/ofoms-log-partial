@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from lxml import etree
 
 from apps.core.models import EventLog, log_event
@@ -327,28 +327,24 @@ class EmployeeXMLFile(XsdExchangeFile):
             lname = fullname.split(" ")[0][:29].strip()
             fname = fullname.split(" ")[-1][:29].strip()
 
-            u = Employee.objects.filter(guid=guid).first()
-            if u is None:
-                username = _make_username(fname, lname, email)
-                Employee.objects.create_user(
-                    username=username,
-                    guid=guid,
-                    email=email,
-                    first_name=fname,
-                    last_name=lname,
-                    is_active=False,
-                    org=self.org,
-                )
-            else:
-                if u.last_name != lname or u.first_name != fname:
-                    u.last_name = lname
-                    u.first_name = fname
-                    u.save(update_fields=["last_name", "first_name"])
+            _upsert_employee(
+                guid=guid,
+                fname=fname,
+                lname=lname,
+                email=email,
+                org=self.org,
+            )
             self.rows += 1
 
 
-def _make_username(fname: str, lname: str, email: str | None) -> str:
-    """Уникальный username по образцу v1 (pytils.slugify + случайный суффикс)."""
+def _make_username(
+    fname: str,
+    lname: str,
+    email: str | None,
+    *,
+    with_suffix: bool = False,
+) -> str:
+    """Формирует bounded username; уникальность окончательно проверяет БД."""
     import uuid
 
     from pytils.translit import slugify
@@ -359,10 +355,45 @@ def _make_username(fname: str, lname: str, email: str | None) -> str:
         username = slugify(lname + fname[:1])
     if not username:
         username = uuid.uuid4().hex[:10]
-    uniq = username
-    while Employee.objects.filter(username=uniq).exists():
-        uniq = f"{username}_{uuid.uuid4().hex[:4]}"
-    return uniq
+    if with_suffix:
+        username = f"{username[:145]}_{uuid.uuid4().hex[:4]}"
+    return username[:150]
+
+
+def _upsert_employee(*, guid, fname: str, lname: str, email: str | None, org: int):
+    """Сериализует GUID-upsert и повторяет только подтверждённый username conflict."""
+    existing = Employee.objects.filter(guid=guid).first()
+    if existing is not None:
+        if existing.last_name != lname or existing.first_name != fname:
+            existing.last_name = lname
+            existing.first_name = fname
+            existing.save(update_fields=["last_name", "first_name"])
+        return existing
+
+    for attempt in range(20):
+        username = _make_username(fname, lname, email, with_suffix=attempt > 0)
+        try:
+            with transaction.atomic():
+                return Employee.objects.create_user(
+                    username=username,
+                    guid=guid,
+                    email=email,
+                    first_name=fname,
+                    last_name=lname,
+                    is_active=False,
+                    org=org,
+                )
+        except IntegrityError:
+            existing = Employee.objects.filter(guid=guid).first()
+            if existing is not None:
+                if existing.last_name != lname or existing.first_name != fname:
+                    existing.last_name = lname
+                    existing.first_name = fname
+                    existing.save(update_fields=["last_name", "first_name"])
+                return existing
+            if not Employee.objects.filter(username=username).exists():
+                raise
+    raise RuntimeError("Не удалось выделить уникальное имя импортируемому сотруднику")
 
 
 class IrpXMLFile(XsdExchangeFile):

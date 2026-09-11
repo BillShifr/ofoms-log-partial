@@ -716,3 +716,10 @@
 - [x] Убрать дублирующий exists-before-insert allocator документа.
 - [x] Применить общий bounded savepoint-retry контракт.
 - [x] Проверить одинаковые длинные названия двумя PostgreSQL connections.
+
+## 2026-09-12 — конкурентный импорт сотрудников
+
+- [x] Убрать exists-before-insert выделение username.
+- [x] Разрешать конкурентный GUID insert через savepoint и повторный lookup.
+- [x] Повторять только подтверждённый username-конфликт.
+- [x] Ограничить число попыток и длину username.

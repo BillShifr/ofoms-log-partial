@@ -6,6 +6,7 @@ upsert по guid/n_irp, ограничение доступа к протоко�
 import errno
 import os
 import stat
+import threading
 import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -17,8 +18,8 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import IntegrityError, transaction
-from django.test import TestCase, override_settings
+from django.db import IntegrityError, connection, transaction
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from apps.core.models import EventLog
@@ -31,6 +32,8 @@ from apps.exchange.importers import (
     EmployeeXMLFile,
     ExcelIrpFile,
     IrpXMLFile,
+    _make_username,
+    _upsert_employee,
     archive_artifact,
     validate_xlsx_container,
     write_unique_artifact,
@@ -82,6 +85,56 @@ def _irp_xml(theme_code: str, emp_guid: str, n_irp: str | None = None) -> bytes:
   </IRP>
 </IRP_LIST>
 """.encode("windows-1251")
+
+
+class EmployeeImportConcurrencyTests(TransactionTestCase):
+    def _run_concurrently(self, guids):
+        barrier = Barrier(2)
+        thread_state = threading.local()
+
+        def synchronized_username(*args, **kwargs):
+            username = _make_username(*args, **kwargs)
+            if not getattr(thread_state, "generated", False):
+                thread_state.generated = True
+                barrier.wait(timeout=5)
+            return username
+
+        def upsert(guid):
+            connection.close()
+            try:
+                employee = _upsert_employee(
+                    guid=guid,
+                    fname="Иван",
+                    lname="Иванов",
+                    email="shared@example.test",
+                    org=81000,
+                )
+                return employee.pk, employee.username
+            finally:
+                connection.close()
+
+        with (
+            patch("apps.exchange.importers._make_username", synchronized_username),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            return list(executor.map(upsert, guids))
+
+    def test_concurrent_same_guid_creates_one_employee(self):
+        guid = uuid.uuid4()
+
+        results = self._run_concurrently((guid, guid))
+
+        self.assertEqual(len({pk for pk, _ in results}), 1)
+        self.assertEqual(Employee.objects.filter(guid=guid).count(), 1)
+
+    def test_concurrent_same_username_base_retries_for_different_guids(self):
+        guids = (uuid.uuid4(), uuid.uuid4())
+
+        results = self._run_concurrently(guids)
+
+        self.assertEqual(len({username for _, username in results}), 2)
+        self.assertEqual(Employee.objects.filter(guid__in=guids).count(), 2)
+        self.assertTrue(all(len(username) <= 150 for _, username in results))
 
 
 class ExchangeTestMixin:

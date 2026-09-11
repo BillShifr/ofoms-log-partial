@@ -710,6 +710,14 @@ class MessageTests(BaseSystemTestCase):
             ).exists()
         )
 
+    def test_database_rejects_message_attachment_without_reply(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            MessageAttachment.objects.create(
+                reply=None,
+                file=SimpleUploadedFile("orphan.txt", b"orphan"),
+                uploaded_by=self.operator,
+            )
+
     @override_settings(MEDIA_ROOT=SYS_MEDIA_ROOT)
     def test_deleting_conversation_removes_cascaded_attachment_file(self):
         conv = self._conv()

@@ -344,8 +344,6 @@ class MessageAttachment(models.Model):
 
     reply = models.ForeignKey(
         MessageReply,
-        null=True,
-        blank=True,
         on_delete=models.CASCADE,
         related_name="attachments",
         verbose_name="Сообщение",

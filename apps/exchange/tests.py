@@ -22,6 +22,7 @@ from apps.employee.models import Employee
 from apps.exchange.flc import FLCP_ERROR, build_flcp, error_result, ok_result
 from apps.exchange.forms import UploadFileForm
 from apps.exchange.importers import (
+    SAFE_INTERNAL_IMPORT_ERROR,
     EmployeeXMLFile,
     ExcelIrpFile,
     IrpXMLFile,
@@ -237,6 +238,42 @@ class IrpImportTests(ExchangeTestMixin, TestCase):
         from apps.journal.models import XmlFiles
 
         self.assertEqual(XmlFiles.objects.count(), 0)
+
+    def test_unexpected_database_error_is_redacted_from_protocol(self):
+        path = Path(self.in_dir) / "G1R_internal_error.xml"
+        path.write_bytes(_irp_xml("TT.01", str(self.emp1.guid)))
+        importer = IrpXMLFile(81000, path, **self._imp_kwargs())
+
+        def mark_validated():
+            importer.validated = True
+
+        with patch.object(importer, "validate", side_effect=mark_validated), patch.object(
+            importer,
+            "load_db",
+            side_effect=RuntimeError("password=secret host=/internal/db.sock"),
+        ), patch("apps.exchange.importers.logger.exception") as log_exception:
+            result = importer.process()
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.errors[0]["COMMENT"], SAFE_INTERNAL_IMPORT_ERROR)
+        self.assertNotIn("secret", str(result.errors))
+        self.assertNotIn("/internal", str(result.errors))
+        log_exception.assert_called_once()
+
+    def test_internal_schema_error_is_redacted_and_archived(self):
+        path = Path(self.in_dir) / "G1R_missing_schema.xml"
+        path.write_bytes(_irp_xml("TT.01", str(self.emp1.guid)))
+        importer = IrpXMLFile(81000, path, **self._imp_kwargs())
+        importer.xsd_name = "/internal/config/private-schema.xsd"
+
+        with patch("apps.exchange.importers.logger.exception") as log_exception:
+            result = importer.process()
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.errors[0]["COMMENT"], SAFE_INTERNAL_IMPORT_ERROR)
+        self.assertNotIn("/internal", str(result.errors))
+        self.assertFalse(path.exists())
+        log_exception.assert_called_once()
 
 
 class FlcValidationTests(ExchangeTestMixin, TestCase):

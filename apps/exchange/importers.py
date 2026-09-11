@@ -9,6 +9,7 @@
 
 import errno
 import glob
+import logging
 import os
 import shutil
 import zipfile
@@ -29,6 +30,11 @@ XSD_DIR = Path(__file__).resolve().parent / "xsd"
 MAX_EXCHANGE_FILE_SIZE = 20 * 1024 * 1024
 MAX_XLSX_UNCOMPRESSED_SIZE = 100 * 1024 * 1024
 MAX_XLSX_MEMBERS = 1000
+SAFE_INTERNAL_IMPORT_ERROR = (
+    "Внутренняя ошибка обработки файла. Обратитесь к администратору."
+)
+
+logger = logging.getLogger(__name__)
 
 
 def validate_xlsx_container(path: Path) -> None:
@@ -148,28 +154,35 @@ class XsdExchangeFile:
 
     def validate(self):
         """XSD-валидация и разбор XML."""
-        if self.real_file.stat().st_size > MAX_EXCHANGE_FILE_SIZE:
-            self.errors.append(
-                flc.error_result("FILE", "Размер файла превышает 20 МБ")
-            )
-            return
-        schema_path = Path(self.xsd_name)
-        if not schema_path.is_absolute():
-            schema_path = XSD_DIR / schema_path
-        with open(schema_path, "rb") as f:
-            schema = etree.XMLSchema(etree.XML(f.read()))
-        parser = etree.XMLParser(
-            schema=schema,
-            resolve_entities=False,
-            no_network=True,
-            huge_tree=False,
-        )
         try:
+            if self.real_file.stat().st_size > MAX_EXCHANGE_FILE_SIZE:
+                self.errors.append(
+                    flc.error_result("FILE", "Размер файла превышает 20 МБ")
+                )
+                return
+            schema_path = Path(self.xsd_name)
+            if not schema_path.is_absolute():
+                schema_path = XSD_DIR / schema_path
+            with open(schema_path, "rb") as f:
+                schema = etree.XMLSchema(etree.XML(f.read()))
+            parser = etree.XMLParser(
+                schema=schema,
+                resolve_entities=False,
+                no_network=True,
+                huge_tree=False,
+            )
             with open(self.real_file, "rb") as f:
                 self.xml = etree.parse(f, parser).getroot()
             self.validated = True
-        except Exception as e:  # XML / XSD ошибка — протокол 41
-            self.errors.append(flc.error_result("XML", str(e)))
+        except (etree.XMLSyntaxError, etree.DocumentInvalid) as exc:
+            self.errors.append(flc.error_result("XML", str(exc)))
+        except Exception:  # noqa: BLE001 -- redact internal parser/config details
+            logger.exception(
+                "Unexpected XML import validation failure for %s (org=%s)",
+                self.basename,
+                self.org,
+            )
+            self.errors.append(flc.error_result("XML", SAFE_INTERNAL_IMPORT_ERROR))
 
     def load_db(self):
         raise NotImplementedError
@@ -183,8 +196,15 @@ class XsdExchangeFile:
                     self.load_db()
                     if self.errors:
                         transaction.set_rollback(True)
-            except Exception as exc:  # noqa: BLE001 -- convert to FLCP and rollback
-                self.errors.append(flc.error_result("IMPORT", str(exc)))
+            except Exception:  # noqa: BLE001 -- log details, expose stable FLCP error
+                logger.exception(
+                    "Unexpected database import failure for %s (org=%s)",
+                    self.basename,
+                    self.org,
+                )
+                self.errors.append(
+                    flc.error_result("IMPORT", SAFE_INTERNAL_IMPORT_ERROR)
+                )
             if self.errors:
                 self.rows = 0
         self._archive()
@@ -549,8 +569,15 @@ class ExcelIrpFile:
                     self._import_one(rec)
                 if self.errors:
                     transaction.set_rollback(True)
-        except Exception as e:
-            self.errors.append(flc.error_result("EXCEL", str(e)))
+        except ValueError as exc:
+            self.errors.append(flc.error_result("EXCEL", str(exc)))
+        except Exception:  # noqa: BLE001 -- log details, expose stable FLCP error
+            logger.exception(
+                "Unexpected Excel import failure for %s (org=%s)",
+                self.basename,
+                self.org,
+            )
+            self.errors.append(flc.error_result("EXCEL", SAFE_INTERNAL_IMPORT_ERROR))
         finally:
             if wb is not None:
                 wb.close()

@@ -14,8 +14,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import CharField, Count, F, OuterRef, Q, Subquery, Value
-from django.db.models.functions import Concat
+from django.db.models import CharField, Count, F, OuterRef, Subquery, Value
+from django.db.models.functions import Coalesce, Concat
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -426,23 +426,20 @@ def _conversations_meta(user, q=""):
         latest_reply_id=Subquery(latest_reply.values("pk")[:1])
     )
     if q:
-        conversations = (
-            conversations.annotate(
-                participant_name=Concat(
-                    "participants__first_name",
-                    Value(" "),
-                    "participants__last_name",
-                    output_field=CharField(),
-                )
+        conversations = conversations.annotate(
+            participant_name=Concat(
+                Coalesce("participants__first_name", Value("")),
+                Value(" "),
+                Coalesce("participants__last_name", Value("")),
+                output_field=CharField(),
             )
-            .filter(
-                Q(title__icontains=q)
-                | Q(participant_name__icontains=q)
-                | Q(participants__username__icontains=q)
-                | Q(threads__replies__body__icontains=q)
-            )
-            .distinct()
         )
+        conversations = filter_contains_any(
+            conversations,
+            ("title", "participant_name", "participants__username", "threads__replies__body"),
+            q,
+            prefix="conversation_search_",
+        ).distinct()
     conversations = list(conversations.prefetch_related("participants"))
     latest_by_id = MessageReply.objects.select_related("author").in_bulk(
         conv.latest_reply_id for conv in conversations if conv.latest_reply_id
@@ -680,16 +677,26 @@ def users_suggest(request):
     q = (request.GET.get("q") or "").strip()
     if len(q) < 3:
         return JsonResponse({"suggestions": []})
-    lower_q = q.lower()
-    labels = [
-        f"{u['first_name']} {u['last_name']}".strip() or u["username"]
-        for u in Employee.objects.values("id", "first_name", "last_name", "username")
-        if lower_q in (
-            f"{u['first_name']} {u['last_name']}".lower()
-            or u["username"].lower()
+    qs = Employee.objects.filter(is_active=True).annotate(
+        search_name=Concat(
+            Coalesce("first_name", Value("")),
+            Value(" "),
+            Coalesce("last_name", Value("")),
+            output_field=CharField(),
         )
+    )
+    qs = filter_contains_any(
+        qs, ("search_name", "username"), q, prefix="participant_search_"
+    )
+    employees = qs.order_by("last_name", "first_name", "pk")[:8]
+    suggestions = [
+        {
+            "id": employee.pk,
+            "label": f"{employee.full_name() or employee.username} ({employee.get_org_display()})",
+        }
+        for employee in employees
     ]
-    return JsonResponse({"suggestions": labels[:8]})
+    return JsonResponse({"suggestions": suggestions})
 
 
 # ---------------------------------------------------------------------------
@@ -718,14 +725,27 @@ def task_assignee_suggest(request):
     q = (request.GET.get("q") or "").strip()
     if len(q) < 3:
         return JsonResponse({"suggestions": []})
-    lower_q = q.lower()
+    qs = Employee.objects.filter(is_active=True).annotate(
+        search_name=Concat(
+            Coalesce("last_name", Value("")),
+            Value(" "),
+            Coalesce("first_name", Value("")),
+            output_field=CharField(),
+        )
+    )
+    qs = filter_contains_any(
+        qs, ("search_name", "username"), q, prefix="assignee_search_"
+    )
+    rows = qs.order_by("last_name", "first_name", "pk").values(
+        "id", "last_name", "first_name", "username"
+    )[:10]
     matches = []
-    for e in Employee.objects.order_by("last_name", "first_name").values("id", "last_name", "first_name", "username"):
-        text = f"{e.get('last_name') or ''} {e.get('first_name') or ''}".strip() or e.get("username") or ""
-        if lower_q in text.lower():
-            matches.append({"id": e["id"], "label": text})
-        if len(matches) == 10:
-            break
+    for employee in rows:
+        label = (
+            f"{employee['last_name']} {employee['first_name']}".strip()
+            or employee["username"]
+        )
+        matches.append({"id": employee["id"], "label": label})
     return JsonResponse({"suggestions": matches})
 
 

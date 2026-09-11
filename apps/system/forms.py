@@ -183,7 +183,9 @@ class NewConversationForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["participants"].widget = forms.CheckboxSelectMultiple()
-        self.fields["participants"].queryset = Employee.objects.order_by("last_name", "first_name")
+        self.fields["participants"].queryset = Employee.objects.filter(
+            is_active=True
+        ).order_by("last_name", "first_name")
         self.fields["participants"].label_from_instance = (
             lambda u: f"{u.full_name()} ({u.get_org_display()})"
         )

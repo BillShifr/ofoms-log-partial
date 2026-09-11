@@ -11,7 +11,9 @@ from unittest.mock import patch
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from apps.core.roles import ensure_role_groups
@@ -146,6 +148,28 @@ class JournalScreenTests(TestCase):
         self.assertContains(resp, 'class="col-status"')
         self.assertContains(resp, f'title="{irp.n_irp}"')
         self.assertContains(resp, f'…{irp.n_irp[-12:]}')
+
+    def test_suggest_runs_in_database_and_preserves_org_scope(self):
+        own = self._make_irp(owner=self.smo_user)
+        own.z_f = "АЛЕКСАНДР Свой"
+        own.save(update_fields=["z_f"])
+        foreign = self._make_irp(owner=self.tfoms_user)
+        foreign.z_f = "АЛЕКСАНДР Чужой"
+        foreign.save(update_fields=["z_f"])
+        self.client.force_login(self.smo_user)
+
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.get(
+                reverse("journal:suggest"), {"field": "z_f", "q": "александр"}
+            )
+
+        self.assertEqual(response.json()["suggestions"], ["АЛЕКСАНДР Свой"])
+        journal_queries = [
+            query["sql"].lower()
+            for query in captured.captured_queries
+            if "journal_irp" in query["sql"].lower()
+        ]
+        self.assertTrue(any("translate" in sql and "limit 8" in sql for sql in journal_queries))
 
     def test_print_list_preserves_filters_and_org_scope(self):
         own = self._make_irp(owner=self.smo_user)

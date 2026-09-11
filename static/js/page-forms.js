@@ -65,9 +65,6 @@
     var search = document.getElementById("participant-search");
     var list = document.querySelector(".participant-pick");
     if (!search || !list || !search.dataset.suggestUrl) return;
-    var labels = Array.prototype.map.call(list.querySelectorAll("label"), function (label) {
-      return label.textContent.trim();
-    });
     var boxes = Array.prototype.slice.call(list.querySelectorAll("input"));
     search.addEventListener("input", function () {
       var query = search.value.trim();
@@ -75,10 +72,12 @@
       fetch(search.dataset.suggestUrl + "?q=" + encodeURIComponent(query))
         .then(function (response) { return response.json(); })
         .then(function (data) {
-          (data.suggestions || []).forEach(function (label) {
-            var index = labels.indexOf(label);
-            if (index !== -1 && boxes[index] && !boxes[index].checked) {
-              boxes[index].checked = true;
+          (data.suggestions || []).forEach(function (item) {
+            var box = boxes.find(function (candidate) {
+              return String(candidate.value) === String(item.id);
+            });
+            if (box && !box.checked) {
+              box.checked = true;
               search.value = "";
             }
           });

@@ -398,6 +398,58 @@ class MessageTests(BaseSystemTestCase):
         reply = MessageReply.objects.get(thread=thread)
         self.assertEqual(reply.attachments.count(), 0)
 
+    def test_participant_suggest_uses_database_and_excludes_inactive_users(self):
+        active = Employee.objects.create_user(
+            username="active_lookup", first_name="АЛЕКСАНДР", last_name="Поисков", org=81000
+        )
+        Employee.objects.create_user(
+            username="inactive_lookup",
+            first_name="АЛЕКСАНДР",
+            last_name="Скрытый",
+            org=81000,
+            is_active=False,
+        )
+        self.client.force_login(self.operator)
+
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.get(
+                reverse("system:users_suggest"), {"q": "александр"}
+            )
+
+        self.assertEqual(
+            response.json()["suggestions"],
+            [
+                {
+                    "id": active.pk,
+                    "label": f"{active.full_name()} ({active.get_org_display()})",
+                }
+            ],
+        )
+        employee_queries = [
+            query["sql"].lower()
+            for query in captured.captured_queries
+            if "employee_employee" in query["sql"].lower()
+        ]
+        self.assertTrue(any("translate" in sql and "limit 8" in sql for sql in employee_queries))
+
+    def test_new_conversation_form_excludes_inactive_users(self):
+        inactive = Employee.objects.create_user(
+            username="inactive_participant", org=81000, is_active=False
+        )
+        self.client.force_login(self.operator)
+
+        response = self.client.get(reverse("system:messages"))
+
+        choices = response.context["form"].fields["participants"].queryset
+        self.assertNotIn(inactive, choices)
+
+        post_response = self.client.post(
+            reverse("system:conversation_create"),
+            {"title": "Недопустимый диалог", "participants": [inactive.pk]},
+        )
+        self.assertEqual(post_response.status_code, 302)
+        self.assertFalse(Conversation.objects.filter(title="Недопустимый диалог").exists())
+
     def test_attachment_download_is_limited_to_conversation_participants(self):
         conv = self._conv()
         thread = MessageThread.objects.create(
@@ -956,6 +1008,29 @@ class TaskTests(BaseSystemTestCase):
         self.assertTrue(any("Петров" in lbl for lbl in labels))
         short = self.client.get(reverse("system:task_assignee_suggest"), {"q": "Ив"})
         self.assertEqual(short.json()["suggestions"], [])
+
+    def test_assignee_suggest_excludes_inactive_and_limits_in_database(self):
+        Employee.objects.create_user(
+            username="inactive_task_user",
+            first_name="СЕРГЕЙ",
+            last_name="Скрытый",
+            org=81000,
+            is_active=False,
+        )
+        self.client.force_login(self.admin)
+
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.get(
+                reverse("system:task_assignee_suggest"), {"q": "сергей"}
+            )
+
+        self.assertEqual(response.json()["suggestions"], [])
+        employee_queries = [
+            query["sql"].lower()
+            for query in captured.captured_queries
+            if "employee_employee" in query["sql"].lower()
+        ]
+        self.assertTrue(any("translate" in sql and "limit 10" in sql for sql in employee_queries))
 
     def test_due_and_run_tasks_command(self):
         from io import StringIO

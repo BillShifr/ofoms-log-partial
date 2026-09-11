@@ -57,9 +57,8 @@ def irp_suggest(request):
     qs = Irp.objects.exclude(**{field: ""}).distinct()
     if request.user.org != TFOMS:
         qs = qs.filter(employee_one__org=request.user.org)
-    raw = list(qs.order_by(field).values_list(field, flat=True).distinct())
-    lower_q = q.lower()
-    values = [v for v in raw if lower_q in (v or "").lower()][:8]
+    qs = contains_folded(qs, field, q, "suggest_match")
+    values = list(qs.order_by(field).values_list(field, flat=True).distinct()[:8])
     return JsonResponse({"suggestions": values})
 
 

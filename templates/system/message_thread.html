@@ -4,18 +4,18 @@
 {% block content %}
 <div class="messenger">
   <aside class="messenger__side">
-    <div class="card" style="padding:14px">
+    <div class="card messenger__side-card">
       {% include "system/_conversation_side.html" %}
     </div>
   </aside>
 
   <section class="messenger__main">
-    <div class="flex-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <a class="btn btn--ghost" href="{% url 'system:conversation' conv.pk %}">← {{ conv.display_title }}</a>
-      <h1 style="flex:1;margin:0">{{ thread.title }}</h1>
+    <header class="conversation-heading">
+      <a class="conversation-heading__back" href="{% url 'system:conversation' conv.pk %}">← {{ conv.display_title }}</a>
+      <div class="conversation-heading__title"><p class="page-heading__eyebrow">Тема обсуждения</p><h1>{{ thread.title }}</h1></div>
       {% if thread.is_closed %}<span class="badge badge--open">Закрыта</span>{% endif %}
-    </div>
-    <p class="text-muted">Тему создал: {{ thread.created_by.full_name }} · {{ thread.created_at|date:"d.m.Y H:i" }}</p>
+      <p>Создал {{ thread.created_by.full_name }} · {{ thread.created_at|date:"d.m.Y H:i" }}</p>
+    </header>
 
     <div class="card">
       <div class="chat">
@@ -52,7 +52,7 @@
           </form>
         </div>
         {% empty %}
-        <p class="text-muted">В теме пока нет сообщений.</p>
+        <div class="empty-state">В теме пока нет сообщений</div>
         {% endfor %}
       </div>
 

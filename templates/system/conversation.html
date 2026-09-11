@@ -3,20 +3,18 @@
 {% block content %}
 <div class="messenger">
   <aside class="messenger__side">
-    <div class="card" style="padding:14px">
+    <div class="card messenger__side-card">
       {% include "system/_conversation_side.html" %}
     </div>
   </aside>
 
   <section class="messenger__main">
-    <div class="flex-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <a class="btn btn--ghost" href="{% url 'system:messages' %}">← Все диалоги</a>
-      <h1 style="flex:1;margin:0">{{ conv.display_title }}</h1>
-      {% if unread_total %}<span class="nav__badge">непрочитанных: {{ unread_total }}</span>{% endif %}
-    </div>
-    <p class="text-muted">
-      Участники: {% for p in conv.participants.all %}{{ p.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
-    </p>
+    <header class="conversation-heading">
+      <a class="conversation-heading__back" href="{% url 'system:messages' %}">← Все диалоги</a>
+      <div class="conversation-heading__title"><p class="page-heading__eyebrow">Диалог</p><h1>{{ conv.display_title }}</h1></div>
+      {% if unread_total %}<span class="badge badge--result">непрочитанных: {{ unread_total }}</span>{% endif %}
+      <p>Участники: {% for p in conv.participants.all %}{{ p.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+    </header>
 
     <div class="card">
       <details class="collapsible" data-key="new-thread-{{ conv.pk }}">
@@ -49,7 +47,7 @@
           {% if t.is_closed %}<span class="badge badge--open">Закрыта</span>{% endif %}
         </a>
         {% empty %}
-        <p class="text-muted">Тем в диалоге нет.</p>
+        <div class="empty-state">Тем в диалоге пока нет</div>
         {% endfor %}
       </div>
     </div>

@@ -27,10 +27,11 @@
       </div>
     </details>
 
-    <details class="collapsible" data-key="task-form-sched">
+    <details class="collapsible" data-key="task-form-sched"{% if form.errors %} open{% endif %}>
       <summary class="collapsible__toggle">Исполнение и приоритет</summary>
       <div class="form-grid">
-        <div class="field"><label for="{{ form.status.id_for_label }}">Статус</label>{{ form.status }}</div>
+        <div class="field"><label for="{{ form.status.id_for_label }}">Статус</label>{{ form.status }}
+          <span class="text-muted">{{ form.status.help_text }}</span></div>
         <div class="field" id="assignee-wrap">
           <label for="assignee_search">Исполнитель</label>
           <input id="assignee_search" type="text" data-assignee-search
@@ -39,6 +40,7 @@
                  placeholder="Введите ФИО (от 3 символов)" autocomplete="off">
           <div id="assignee-select">{{ form.assigned_to }}</div>
           <span class="text-muted">Начните вводить фамилию — система предложит сотрудников</span>
+          {% for error in form.assigned_to.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
         </div>
         <div class="field"><label for="{{ form.priority.id_for_label }}">Приоритет</label>{{ form.priority }}
           {% if form.priority.help_text %}<span class="text-muted">{{ form.priority.help_text }}</span>{% endif %}</div>

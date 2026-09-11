@@ -958,6 +958,92 @@ class TaskTests(BaseSystemTestCase):
         task = TaskJob.objects.get(name="Импорт")
         self.assertEqual(task.created_by, self.admin)
 
+    def test_task_status_cannot_be_forged_through_form(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:task_create"),
+            {
+                "name": "Подмена статуса",
+                "command": "noop",
+                "status": TaskJob.Status.RUNNING,
+                "run_mode": TaskJob.RunMode.MANUAL,
+                "enabled": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        task = TaskJob.objects.get(name="Подмена статуса")
+        self.assertEqual(task.status, TaskJob.Status.CREATED)
+        self.assertIsNone(task.last_started_at)
+
+    def test_task_command_must_come_from_registry(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:task_create"),
+            {
+                "name": "Неизвестная команда",
+                "command": "shell_arbitrary",
+                "run_mode": TaskJob.RunMode.MANUAL,
+                "enabled": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Выберите корректный вариант")
+        self.assertContains(response, '<select name="command"')
+        self.assertFalse(TaskJob.objects.filter(name="Неизвестная команда").exists())
+
+    def test_manual_mode_clears_stale_interval(self):
+        task = self._make_task(
+            run_mode=TaskJob.RunMode.SCHEDULED,
+            interval_minutes=15,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:task_update", args=[task.pk]),
+            {
+                "name": task.name,
+                "command": task.command,
+                "status": TaskJob.Status.RUNNING,
+                "run_mode": TaskJob.RunMode.MANUAL,
+                "priority": TaskJob.Priority.LOW,
+                "enabled": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        task.refresh_from_db()
+        self.assertEqual(task.status, TaskJob.Status.CREATED)
+        self.assertIsNone(task.interval_minutes)
+
+    def test_inactive_employee_cannot_be_newly_assigned(self):
+        inactive = Employee.objects.create_user(
+            username="inactive_task_assignment",
+            password=PASSWORD,
+            org=81000,
+            is_active=False,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:task_create"),
+            {
+                "name": "Недопустимый исполнитель",
+                "command": "noop",
+                "assigned_to": inactive.pk,
+                "run_mode": TaskJob.RunMode.MANUAL,
+                "enabled": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Выберите корректный вариант")
+        self.assertContains(response, 'data-key="task-form-sched" open')
+        self.assertFalse(TaskJob.objects.filter(name="Недопустимый исполнитель").exists())
+
     def test_manual_run(self):
         self.client.force_login(self.admin)
         task = self._make_task()

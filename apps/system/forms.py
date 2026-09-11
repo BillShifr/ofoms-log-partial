@@ -3,6 +3,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import Group
+from django.db.models import Q
 
 from apps.core.models import EventLog
 from apps.core.roles import GROUP_ROLE_MAP, ROLE_GROUP_MAP, SMO_ROLES, TFOMS_ROLES
@@ -262,6 +263,11 @@ class DocForm(forms.ModelForm):
 class TaskForm(forms.ModelForm):
     """Задание (ТЗ разд. 3.6, PRD v3 §2.11)."""
 
+    command = forms.ChoiceField(
+        choices=TASK_COMMAND_CHOICES,
+        label="Команда",
+    )
+
     class Meta:
         model = TaskJob
         fields = (
@@ -276,13 +282,21 @@ class TaskForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["command"].choices = TASK_COMMAND_CHOICES
         self.fields["interval_minutes"].help_text = "Интервал автозапуска в минутах"
         self.fields["interval_minutes"].required = False
         self.fields["priority"].help_text = "0 — низкий, 1 — средний, 2 — высокий"
         self.fields["priority"].required = False
         self.fields["status"].required = False
-        self.fields["assigned_to"].queryset = Employee.objects.order_by(
+        self.fields["status"].disabled = True
+        self.fields["status"].help_text = (
+            "Статус изменяется системой при запуске и завершении задания."
+        )
+        available_assignees = Q(is_active=True)
+        if self.instance.assigned_to_id:
+            available_assignees |= Q(pk=self.instance.assigned_to_id)
+        self.fields["assigned_to"].queryset = Employee.objects.filter(
+            available_assignees
+        ).order_by(
             "last_name", "first_name"
         )
         self.fields["assigned_to"].label_from_instance = (
@@ -298,6 +312,8 @@ class TaskForm(forms.ModelForm):
             raise forms.ValidationError(
                 {"interval_minutes": "Для задания «По расписанию» укажите интервал"}
             )
+        if cleaned.get("run_mode") == TaskJob.RunMode.MANUAL:
+            cleaned["interval_minutes"] = None
         return cleaned
 
 

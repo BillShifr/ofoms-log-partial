@@ -1619,6 +1619,23 @@ class DocUploadSecurityTests(BaseSystemTestCase):
         )
         self.assertEqual(resp.status_code, 403)
 
+    def test_streaming_upload_limit_returns_413_before_view(self):
+        self.client.force_login(self.admin)
+
+        with patch("apps.core.uploads.MAX_UPLOAD_SIZE_BYTES", 4):
+            response = self.client.post(
+                reverse("system:doc_upload"),
+                {
+                    "title": "Слишком большой",
+                    "file": SimpleUploadedFile("oversized.pdf", b"12345"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertFalse(SystemDocument.objects.filter(title="Слишком большой").exists())
+        event = EventLog.objects.get(target="POST /system/docs/upload/")
+        self.assertEqual(event.result, EventLog.Result.FAILED)
+
 
 class SecurityHeaderTests(BaseSystemTestCase):
     def test_security_headers_present(self):

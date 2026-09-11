@@ -48,6 +48,20 @@ class AccountStateSessionMiddleware:
         return self.get_response(request)
 
 
+class UploadLimitResponseMiddleware:
+    """Не запускает view после остановки чрезмерного multipart upload."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.method == "POST" and request.content_type.startswith("multipart/"):
+            _ = request.POST
+        if getattr(request, "upload_size_limit_exceeded", False):
+            return HttpResponse("Файл превышает допустимый размер.", status=413)
+        return self.get_response(request)
+
+
 class ContentSecurityPolicyMiddleware:
     """Запрещает inline/external scripts на пользовательских экранах портала."""
 

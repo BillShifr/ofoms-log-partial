@@ -13,6 +13,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import ValidationError
+from django.core.files.uploadhandler import StopUpload
 from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.db.models.deletion import ProtectedError
 from django.test import Client, TestCase, override_settings
@@ -27,6 +28,7 @@ from apps.core.tokens import (
     issue_token,
     resolve_user,
 )
+from apps.core.uploads import BoundedUploadHandler
 from apps.core.validators import ComplexityPasswordValidator
 
 User = get_user_model()
@@ -332,6 +334,38 @@ class ComplexityPasswordValidatorTests(TestCase):
 
     def test_help_text(self):
         self.assertIn("строчные и прописные буквы", self.validator.get_help_text())
+
+
+class UploadLimitTests(TestCase):
+    def test_declared_oversized_file_stops_before_first_chunk(self):
+        request = mock.Mock()
+        handler = BoundedUploadHandler(request)
+
+        with mock.patch("apps.core.uploads.MAX_UPLOAD_SIZE_BYTES", 4), self.assertRaises(
+            StopUpload
+        ):
+            handler.new_file(
+                "file",
+                "oversized.bin",
+                "application/octet-stream",
+                5,
+            )
+
+        self.assertTrue(request.upload_size_limit_exceeded)
+
+    def test_chunked_oversized_file_stops_at_boundary(self):
+        request = mock.Mock()
+        handler = BoundedUploadHandler(request)
+        handler.new_file("file", "chunked.bin", "application/octet-stream", None)
+
+        with mock.patch("apps.core.uploads.MAX_UPLOAD_SIZE_BYTES", 4):
+            self.assertEqual(handler.receive_data_chunk(b"1234", 0), b"1234")
+        with mock.patch("apps.core.uploads.MAX_UPLOAD_SIZE_BYTES", 4), self.assertRaises(
+            StopUpload
+        ):
+            handler.receive_data_chunk(b"5", 4)
+
+        self.assertTrue(request.upload_size_limit_exceeded)
 
 
 class FailedLoginLockTests(TestCase):

@@ -77,7 +77,14 @@ MIDDLEWARE = [
     "apps.core.middleware.SensitiveResponseCacheMiddleware",
     # Приказ ФСТЭК № 17 (2 класс): аудит действий пользователя
     "apps.core.middleware.AuditMiddleware",
+    "apps.core.middleware.UploadLimitResponseMiddleware",
 ]
+
+FILE_UPLOAD_HANDLERS = [
+    "apps.core.uploads.BoundedUploadHandler",
+    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+]
+DATA_UPLOAD_MAX_NUMBER_FILES = 1
 
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "

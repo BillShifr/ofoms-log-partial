@@ -8,6 +8,7 @@ import os
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
@@ -47,14 +48,15 @@ def exchange_upload(request):
         if form.is_valid():
             org = int(form.cleaned_data["org"])
             uploaded = request.FILES["file"]
-            log = _process_upload(request.user, org, uploaded)
-            log_event(
-                module="exchange",
-                event_type=EventLog.EventType.CREATE,
-                user=request.user,
-                target=f"import:{log.pk}:{log.filename}",
-                ip=request.META.get("REMOTE_ADDR"),
-            )
+            with transaction.atomic():
+                log = _process_upload(request.user, org, uploaded)
+                log_event(
+                    module="exchange",
+                    event_type=EventLog.EventType.CREATE,
+                    user=request.user,
+                    target=f"import:{log.pk}:{log.filename}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
             return redirect("exchange:protocol", pk=log.pk)
     return render(
         request,

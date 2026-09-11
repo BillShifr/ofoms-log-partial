@@ -564,6 +564,28 @@ class UploadPostTests(ExchangeTestMixin, TestCase):
         # два пользователя загружены (новый + обновлённый по GUID)
         self.assertEqual(Employee.objects.count(), 4)  # 2 фикстуры + 2 из файла
 
+    def test_upload_database_changes_roll_back_when_audit_fails(self):
+        with (
+            patch(
+                "apps.exchange.views.log_event",
+                side_effect=RuntimeError("audit"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            self._post(SAMPLE_USERS, "users260514-audit.xml")
+
+        self.assertEqual(Employee.objects.count(), 3)
+        self.emp1.refresh_from_db()
+        self.assertEqual(self.emp1.first_name, "Иван")
+        self.assertFalse(
+            Employee.objects.filter(
+                guid=uuid.UUID("00000000-0000-0000-0000-000000000002")
+            ).exists()
+        )
+        self.assertFalse(ImportLog.objects.exists())
+        self.assertTrue((self._arch / "81000" / "users260514-audit.xml").exists())
+        self.assertTrue((self._out / "81000" / "users260514-audit.xml").exists())
+
     def test_upload_valid_g1_file(self):
         resp = self._post(
             _irp_xml("TT.01", str(self.emp1.guid)), "G1R_26051401.xml"

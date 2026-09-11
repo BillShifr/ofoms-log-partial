@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Настройки таблицы{% endblock %}
 {% block content %}
-<h1>{{ meta.title }} — настройки таблицы</h1>
+<header class="module-heading"><a class="module-heading__back" href="{% url 'system:prefs' %}">← Настройки интерфейса</a><p class="page-heading__eyebrow">Рабочая таблица</p><h1>{{ meta.title }}</h1><p>Выберите видимые колонки, их порядок и начальную сортировку.</p></header>
 <div class="card">
   <form method="post" data-validate>
     {% csrf_token %}
-    <h2 class="text-muted mt-1" style="font-size:1.05rem;">Колонки (порядок = число в поле «#»)</h2>
+    <h2 class="form-section">Колонки и порядок</h2>
     <div class="table-wrap" tabindex="0" aria-label="Настройка колонок; прокручивается по горизонтали">
       <table class="data">
         <thead>
@@ -52,7 +52,7 @@
 
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Сохранить</button>
-      <a class="btn btn--ghost" href="{% url 'journal:list' %}">К журналу</a>
+      <a class="btn btn--ghost" href="{% url 'system:prefs' %}">Отмена</a>
     </div>
   </form>
 </div>

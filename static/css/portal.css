@@ -243,10 +243,13 @@ a:hover { text-decoration: underline; }
 .page-heading__metric { flex: 0 0 auto; display: grid; min-width: 96px; padding: 10px 14px; text-align: right; border-left: 3px solid var(--accent); }
 .page-heading__metric strong { font-size: 1.5rem; line-height: 1; }
 .page-heading__metric span { margin-top: 5px; font-size: .72rem; opacity: .7; text-transform: uppercase; letter-spacing: .06em; }
+.page-heading__actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .module-heading { margin-bottom: 22px; }
 .module-heading__back { display: inline-flex; width: fit-content; margin-bottom: 12px; font-size: .86rem; font-weight: 650; }
 .module-heading h1 { margin-bottom: 8px; }
 .module-heading > p:last-child { max-width: 800px; margin: 0; color: color-mix(in srgb, var(--ink) 66%, transparent); }
+.module-heading--actions { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 6px 20px; }
+.module-heading--actions .module-heading__back { grid-column: 1 / -1; }
 .scope-note { margin: -8px 0 20px; padding: 10px 14px; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--chip-blue) 55%, transparent); font-size: .86rem; }
 
 /* ---------- Таблицы ---------- */
@@ -379,6 +382,8 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .form-card .form-grid { margin-bottom: 26px; }
 .field:has(:required) > label::after { content: " *"; color: var(--danger); }
 .form-actions--sticky { position: sticky; bottom: 0; z-index: 3; margin: 8px -26px 0; padding: 14px 26px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--card) 94%, transparent); box-shadow: 0 -8px 20px rgba(14,36,51,.06); backdrop-filter: blur(10px); }
+.management-form > form { padding-bottom: 0; }
+.option-group { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* ---------- Фильтры ---------- */
 .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
@@ -764,6 +769,10 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
   .page-heading__metric { min-width: 72px; padding-right: 0; }
   .page-heading > .btn { width: 100%; justify-content: center; }
   .page-heading--action { align-items: stretch; flex-direction: column; }
+  .page-heading--action .page-heading__actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .page-heading--action .page-heading__actions .btn { justify-content: center; padding-inline: 10px; }
+  .module-heading--actions { grid-template-columns: 1fr; }
+  .module-heading--actions .page-heading__actions { justify-content: flex-start; }
   .reports-grid { grid-template-columns: 1fr; }
   .scope-note { margin-top: 0; }
   .module-heading h1 { font-size: 1.45rem; }

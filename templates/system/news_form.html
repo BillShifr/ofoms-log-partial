@@ -1,9 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<a class="btn btn--ghost mb-2" href="{% url 'system:news' %}">← Все новости</a>
-<h1>{{ title }}</h1>
-<div class="card">
+<header class="module-heading"><a class="module-heading__back" href="{% url 'system:news' %}">← Все новости</a><p class="page-heading__eyebrow">Публикация</p><h1>{{ title }}</h1><p>Материал для информационного центра сотрудников.</p></header>
+<div class="card management-form">
   <form method="post" enctype="multipart/form-data" data-validate>
     {% csrf_token %}
     <div class="form-grid">
@@ -29,7 +28,7 @@
         {% endif %}
       {% endfor %}
     </div>
-    <div class="form-actions">
+    <div class="form-actions form-actions--sticky">
       <button class="btn btn--primary" type="submit">Сохранить</button>
       <a class="btn btn--ghost" href="{% url 'system:news' %}">Отмена</a>
     </div>

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<h1>{{ title }}</h1>
-<div class="card">
+<header class="module-heading"><a class="module-heading__back" href="{% url 'system:users' %}">← Все учётные записи</a><p class="page-heading__eyebrow">Управление доступом</p><h1>{{ title }}</h1><p>Личные данные, организация и набор разрешённых ролей.</p></header>
+<div class="card management-form">
   <form method="post" data-validate>
     {% csrf_token %}
     <details class="collapsible" data-key="user-section-auth">
@@ -75,7 +75,7 @@
       </div>
     </details>
 
-    <div class="form-actions">
+    <div class="form-actions form-actions--sticky">
       <button class="btn btn--primary" type="submit">Сохранить</button>
       <a class="btn btn--ghost" href="{% url 'system:users' %}">Отмена</a>
     </div>

@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Журнал загрузок обмена{% endblock %}
 {% block content %}
-<h1>Журнал загрузок файлов обмена</h1>
-
-<div class="flex mb-2">
-  <a class="btn btn--accent" href="{% url 'exchange:upload' %}">+ Загрузить файл</a>
-  <a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a>
-</div>
+<header class="page-heading page-heading--action">
+  <div><p class="page-heading__eyebrow">Обмен данными</p><h1>Загрузки файлов</h1><p class="page-heading__lead">История обработки входящих реестров и протоколы проверки</p></div>
+  <div class="page-heading__actions"><a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a><a class="btn btn--primary" href="{% url 'exchange:upload' %}">+ Загрузить файл</a></div>
+</header>
 
 <div class="card table-card">
   <div class="table-wrap" tabindex="0" aria-label="Таблица загрузок; прокручивается по горизонтали">

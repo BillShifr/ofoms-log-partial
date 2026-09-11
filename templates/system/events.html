@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Журнал событий{% endblock %}
 {% block content %}
-<h1>Журнал событий</h1>
+<header class="page-heading">
+  <div><p class="page-heading__eyebrow">Аудит системы</p><h1>Журнал событий</h1><p class="page-heading__lead">Действия пользователей и результаты системных операций</p></div>
+  <div class="page-heading__metric"><strong>{{ page.paginator.count }}</strong><span>событий</span></div>
+</header>
 
 <div class="card mb-2">
   <form method="get" id="events-filter-form">
@@ -27,7 +30,7 @@
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Применить</button>
       <a class="btn btn--ghost" href="{% url 'system:events' %}">Сбросить</a>
-      <a class="btn btn--accent" href="{% url 'system:events_export' %}?{{ request.GET.urlencode }}">Скачать Excel</a>
+      <a class="btn btn--ghost" href="{% url 'system:events_export' %}?{{ request.GET.urlencode }}">Скачать Excel</a>
     </div>
   </form>
 </div>

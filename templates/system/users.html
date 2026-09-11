@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Пользователи{% endblock %}
 {% block content %}
-<h1>Каталог учётных записей</h1>
+<header class="page-heading page-heading--action">
+  <div><p class="page-heading__eyebrow">Управление доступом</p><h1>Учётные записи</h1><p class="page-heading__lead">Сотрудники, организации, роли и состояние доступа</p></div>
+  <a class="btn btn--primary" href="{% url 'system:user_create' %}">+ Новая учётная запись</a>
+</header>
 
 <div class="card mb-2">
   <form method="get">
@@ -13,7 +16,6 @@
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Применить</button>
       <a class="btn btn--ghost" href="{% url 'system:users' %}">Сбросить</a>
-      <a class="btn btn--accent" href="{% url 'system:user_create' %}">+ Новая учётная запись</a>
     </div>
   </form>
 </div>

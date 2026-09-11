@@ -54,6 +54,16 @@ def _boolean_env(name, default):
     )
 
 
+def _production_log_level():
+    value = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+    allowed = {"INFO", "WARNING", "ERROR", "CRITICAL"}
+    if value not in allowed:
+        raise ImproperlyConfigured(
+            "LOG_LEVEL must be one of INFO, WARNING, ERROR, or CRITICAL in production."
+        )
+    return value
+
+
 def _production_hosts():
     hosts = [item.strip() for item in os.getenv("ALLOWED_HOSTS", "").split(",")]
     hosts = [item for item in hosts if item]
@@ -112,6 +122,10 @@ if DB_POOL_MIN_SIZE > DB_POOL_MAX_SIZE:
 
 ALLOWED_HOSTS = _production_hosts()
 TOKEN_LOGIN_TRUSTED_ORIGINS = _trusted_token_origins()
+LOG_LEVEL = _production_log_level()
+LOGGING["root"]["level"] = LOG_LEVEL  # noqa: F405
+for _logger_config in LOGGING["loggers"].values():  # noqa: F405
+    _logger_config["level"] = LOG_LEVEL
 SECURE_SSL_REDIRECT = _boolean_env("SECURE_SSL_REDIRECT", True)
 SESSION_COOKIE_SECURE = _boolean_env("SESSION_COOKIE_SECURE", True)
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE

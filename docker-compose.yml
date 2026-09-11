@@ -73,6 +73,7 @@ services:
       TRUST_PROXY_CLIENT_IP_HEADER: ${TRUST_PROXY_CLIENT_IP_HEADER:-True}
       SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-31536000}
       TASK_STALE_AFTER_SECONDS: ${TASK_STALE_AFTER_SECONDS:-3600}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - media:/app/media
       - exchange:/app/exchange

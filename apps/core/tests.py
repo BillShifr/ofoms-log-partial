@@ -43,6 +43,7 @@ class ProductionSettingsTests(TestCase):
     ):
         environment = os.environ.copy()
         environment.pop("TRUST_PROXY_SSL_HEADER", None)
+        environment.pop("LOG_LEVEL", None)
         environment.update(
             {
                 "DJANGO_SETTINGS_MODULE": "config.settings.prod",
@@ -72,6 +73,30 @@ class ProductionSettingsTests(TestCase):
     def test_production_accepts_strong_database_password(self):
         result = self._import_settings("database-secret-4827-strong")
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_production_rejects_debug_or_invalid_logging(self):
+        for level in ("DEBUG", "NOTSET", "verbose", ""):
+            with self.subTest(level=level):
+                result = self._import_settings(
+                    "database-secret-4827-strong",
+                    extra_environment={"LOG_LEVEL": level},
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("LOG_LEVEL", result.stderr)
+
+    def test_production_applies_safe_log_level_to_all_console_loggers(self):
+        result = self._import_settings(
+            "database-secret-4827-strong",
+            code=(
+                "from config.settings.prod import LOGGING; "
+                "print(LOGGING['root']['level']); "
+                "print(sorted(v['level'] for v in LOGGING['loggers'].values()))"
+            ),
+            extra_environment={"LOG_LEVEL": "warning"},
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("WARNING", result.stdout)
 
     def test_production_rejects_wildcard_or_malformed_allowed_hosts(self):
         for hosts in ("", "*", "https://journal.example", "valid.example/bad", "two hosts"):
@@ -236,6 +261,8 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("r.status == 200", compose)
         self.assertIn("SESSION_COOKIE_SECURE=True", example)
         self.assertIn("SECURE_SSL_REDIRECT=True", example)
+        self.assertIn("LOG_LEVEL: ${LOG_LEVEL:-INFO}", compose)
+        self.assertIn("LOG_LEVEL=INFO", example)
 
     def test_build_executables_are_pinned_to_immutable_revisions(self):
         dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()

@@ -141,7 +141,7 @@ def irp_list(request):
 
     log_event(
         module="journal",
-        event_type=EventLog.EventType.OTHER,
+        event_type=EventLog.EventType.VIEW,
         user=request.user,
         target="journal:list",
         ip=request.META.get("REMOTE_ADDR"),
@@ -210,6 +210,7 @@ def irp_detail(request, pk):
     history = irp.history.select_related("user")
     answers = irp.answers.select_related("user").prefetch_related("files")
     files = irp.files.filter(answer__isnull=True)
+    _log_irp_access(request, irp, EventLog.EventType.VIEW, "view")
     return render(
         request,
         "journal/irp_detail.html",
@@ -230,6 +231,7 @@ def irp_print(request, pk):
     """Печатная форма обращения (п. 35: РКК сохраняется на каждом этапе)."""
     irp = _get_irp_for_user(request, pk)
     history = irp.history.select_related("user")
+    _log_irp_access(request, irp, EventLog.EventType.PRINT, "print")
     return render(
         request,
         "journal/irp_print.html",
@@ -393,9 +395,13 @@ def irp_file_download(request, pk):
     attachment = get_object_or_404(
         IrpFile.objects.select_related("irp__employee_one"), pk=pk
     )
-    _get_irp_for_user(request, attachment.irp_id)
+    irp = _get_irp_for_user(request, attachment.irp_id)
+    file_handle = attachment.file.open("rb")
+    _log_irp_access(
+        request, irp, EventLog.EventType.EXPORT, f"file:{attachment.pk}"
+    )
     return FileResponse(
-        attachment.file.open("rb"),
+        file_handle,
         filename=attachment.file.name.rsplit("/", 1)[-1],
         as_attachment=True,
     )
@@ -438,6 +444,7 @@ def irp_redirect(request, pk):
 def irp_cover(request, pk):
     """Печатное сопроводительное письмо при переадресации (ТЗ п. 212)."""
     irp = _get_irp_for_user(request, pk)
+    _log_irp_access(request, irp, EventLog.EventType.PRINT, "cover")
     return render(
         request,
         "journal/irp_cover.html",
@@ -451,6 +458,16 @@ def _get_irp_for_user(request, pk):
     if request.user.org != TFOMS and irp.employee_one.org != request.user.org:
         raise PermissionDenied
     return irp
+
+
+def _log_irp_access(request, irp, event_type, action):
+    log_event(
+        module="journal",
+        event_type=event_type,
+        user=request.user,
+        target=f"irp:{irp.pk}:{action}",
+        ip=request.META.get("REMOTE_ADDR"),
+    )
 
 
 def _require_capability(request, capability):

@@ -39,6 +39,7 @@ class EventLog(models.Model):
         IMPORT = "import", "Импорт данных"
         EXPORT = "export", "Экспорт данных"
         PRINT = "print", "Печать"
+        VIEW = "view", "Просмотр данных"
         SEND = "send", "Отправка/переадресация"
         BLOCK = "block", "Блокировка учётной записи"
         UNBLOCK = "unblock", "Разблокировка учётной записи"
@@ -96,7 +97,7 @@ class EventLog(models.Model):
                 condition=models.Q(
                     event_type__in=(
                         "login", "login_failed", "logout", "create", "update",
-                        "delete", "import", "export", "print", "send", "block",
+                        "delete", "import", "export", "print", "view", "send", "block",
                         "unblock", "task", "other",
                     )
                 ),

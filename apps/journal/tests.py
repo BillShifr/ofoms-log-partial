@@ -17,6 +17,7 @@ from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from apps.core.models import EventLog
 from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
 from apps.journal.models import Irp, IrpFile, IrpHistory, IrpTheme
@@ -183,6 +184,13 @@ class JournalScreenTests(TestCase):
         self.assertContains(resp, 'data-label="Статус"')
         self.assertContains(resp, f'title="{irp.n_irp}"')
         self.assertContains(resp, f'…{irp.n_irp[-12:]}')
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.VIEW,
+                user=self.tfoms_user,
+                target="journal:list",
+            ).exists()
+        )
 
         css = (settings.BASE_DIR / "static/css/portal.css").read_text()
         self.assertIn(".data--journal .col-status", css)
@@ -317,6 +325,13 @@ class JournalScreenTests(TestCase):
         self.assertContains(resp, "Петров")
         self.assertContains(resp, irp.get_irp_type_display())
         self.assertContains(resp, 'class="data" data-client-sort')
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.VIEW,
+                user=self.tfoms_user,
+                target=f"irp:{irp.pk}:view",
+            ).exists()
+        )
 
     def test_create_records_history(self):
         self.client.force_login(self.tfoms_user)
@@ -511,6 +526,12 @@ class JournalScreenTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Петров")
         self.assertContains(resp, "Печать")
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.PRINT,
+                target=f"irp:{irp.pk}:print",
+            ).exists()
+        )
 
 
 @override_settings(MEDIA_ROOT=ROUTING_MEDIA_ROOT)
@@ -658,10 +679,23 @@ class RoutingTests(TestCase):
         self.client.force_login(self.smo_user)
         denied = self.client.get(reverse("journal:file_download", args=[attachment.pk]))
         self.assertEqual(denied.status_code, 403)
+        self.assertFalse(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.EXPORT,
+                target=f"irp:{irp.pk}:file:{attachment.pk}",
+            ).exists()
+        )
         self.client.force_login(self.tfoms_user)
         allowed = self.client.get(reverse("journal:file_download", args=[attachment.pk]))
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(b"".join(allowed.streaming_content), b"private")
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.EXPORT,
+                user=self.tfoms_user,
+                target=f"irp:{irp.pk}:file:{attachment.pk}",
+            ).exists()
+        )
 
     @override_settings(MEDIA_ROOT=ROUTING_MEDIA_ROOT)
     def test_deleting_irp_removes_cascaded_attachment_file(self):
@@ -784,6 +818,12 @@ class RoutingTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Сопроводительное письмо")
         self.assertContains(resp, "Прошу разобраться")
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.PRINT,
+                target=f"irp:{irp.pk}:cover",
+            ).exists()
+        )
 
     def test_cover_letter_smo_foreign_forbidden(self):
         other = self._make_irp(owner=self.tfoms_user)

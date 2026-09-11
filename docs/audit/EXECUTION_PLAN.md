@@ -5,14 +5,14 @@
 
 | Этап | Область | Критерий завершения | Статус | Доказательства |
 |---|---|---|---|---|
-| 0 | Публикация накопленных изменений | Merge актуального `main`, все CI-gates, Docker image build, push | в работе | `origin/main` merged; Python/Compose/Docker gates зелёные; готовится push |
+| 0 | Публикация накопленных изменений | Merge актуального `main`, все CI-gates, Docker image build, push | готово | `origin/main` merged; все CI-gates и Docker build зелёные; ветка pushed |
 | 1 | Доступность и ошибки форм | Label/input association, `aria-invalid`, `aria-describedby`, понятная inline-ошибка и фокус во всех формах | готово | DOM enhancement; `node --check`; browser AX: 26 полей формы обращения имеют accessible names |
 | 2 | Полная визуальная матрица | Ключевые страницы проверены при 1024, 1280, 1366, 1440, 1920 и mobile; light/dark/font-lg | готово | 132 browser-cases, 11 маршрутов, 6 viewport; redirect/overflow failures: 0; выборочная ручная проверка PNG |
 | 3 | Состояния и роли | Empty/populated/error/forbidden/overdue/closed для Admin, ОП, СП и СМО | готово | Admin/ОП1/СП1: 396 role-cases + 156 state-cases; mismatch/overflow: 0; оформлены 403/404/500 |
 | 4 | Сквозные рабочие потоки | Создание → изменение → результат для обращения, обмена, отчёта, сообщений, задачи, новости, документа и пользователя | готово | 5 live HTTP E2E: cookie/CSRF, multipart, БД, XLSX и ФЛК; все проходят |
 | 5 | Вторичный UI debt | Удалены значимые inline-styles, унифицированы ошибки, destructive confirmations, loading/disabled states | готово | inline attrs: 0; общий submit/action guard; 132 visual cases; template hygiene regression |
 | 6 | Внешние требования | Приложения №1–10 и XSD сверены; маршрутизация подтверждена оргструктурой | заблокировано внешне | исходные приложения и эталонная оргструктура не предоставлены |
-| 7 | Финальный release audit | Backlog/matrix/route map актуальны; все доступные gates зелёные; branch pushed | в работе | локальные финальные gates готовятся; push зависит от восстановления DNS |
+| 7 | Финальный release audit | Backlog/matrix/route map актуальны; все доступные gates зелёные; branch pushed | готово | полный pytest/Ruff/Django/Compose/Docker/JS/visual QA; branch pushed |
 
 ## Журнал выполнения
 
@@ -84,3 +84,9 @@
 - Сборка выявила лишний второй `uv sync`: после `COPY . .` он пытался собрать локальный Django-проект как wheel и повторно получить build-backend `hatchling` из PyPI.
 - Проект запускается непосредственно из `/app`; зависимости уже устанавливаются frozen-слоем до копирования исходников. Повторная установка проекта удалена без изменения runtime-команды.
 - `docker build -t ofoms-log-partial:local-gate .` завершился успешно, включая `collectstatic` (142 файла, 426 post-process операций).
+
+### 2026-09-11 — финальный доступный release audit
+
+- После повторного fetch подтверждено, что `origin/main` полностью содержится в feature-ветке.
+- После merge базы повторно прошли frozen sync, Ruff, полный pytest, migration drift, Django base/prod checks, Compose, JavaScript syntax, diff check и production Docker build.
+- Ветка опубликована в `origin`. Единственный незакрытый этап всего проекта — внешняя сверка приложений №1–10, XSD и оргструктуры, для которой исходные материалы не предоставлены.

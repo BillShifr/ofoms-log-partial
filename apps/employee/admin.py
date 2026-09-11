@@ -113,5 +113,23 @@ class EmployeeAdmin(UserAdmin):
     is_locked.short_description = "Заблокирован"
 
 
+class RoleGroupAdmin(GroupAdmin):
+    """Показывает только канонические роли и не позволяет менять их идентичность."""
+
+    readonly_fields = ("name",)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(name__in=ROLE_GROUP_MAP.values())
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return bool(request.user.is_superuser)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 admin.site.unregister(Group)
-admin.site.register(GroupProxy, GroupAdmin)
+admin.site.register(GroupProxy, RoleGroupAdmin)

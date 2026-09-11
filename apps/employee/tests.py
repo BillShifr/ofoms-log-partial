@@ -2,8 +2,8 @@
 
 from types import SimpleNamespace
 
-from apps.core.roles import ensure_role_groups
-from apps.employee.admin import EmployeeAdmin, EmployeeChangeForm
+from apps.core.roles import ROLE_GROUP_MAP, ensure_role_groups
+from apps.employee.admin import EmployeeAdmin, EmployeeChangeForm, RoleGroupAdmin
 from apps.employee.models import Employee, GroupProxy
 from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
@@ -148,3 +148,25 @@ class GroupProxyTests(TestCase):
     def test_proxy_model(self):
         GroupProxy.objects.get_or_create(name="Тестовая роль")
         self.assertTrue(GroupProxy.objects.filter(name="Тестовая роль").exists())
+
+    def test_admin_lists_only_canonical_roles(self):
+        ensure_role_groups()
+        Group.objects.create(name="Произвольная группа")
+        model_admin = admin.site._registry[GroupProxy]
+        request = SimpleNamespace(user=SimpleNamespace(is_superuser=True))
+
+        names = set(model_admin.get_queryset(request).values_list("name", flat=True))
+
+        self.assertIsInstance(model_admin, RoleGroupAdmin)
+        self.assertEqual(names, set(ROLE_GROUP_MAP.values()))
+
+    def test_admin_protects_role_identity_and_lifecycle(self):
+        model_admin = admin.site._registry[GroupProxy]
+        superuser_request = SimpleNamespace(user=SimpleNamespace(is_superuser=True))
+        staff_request = SimpleNamespace(user=SimpleNamespace(is_superuser=False))
+
+        self.assertIn("name", model_admin.get_readonly_fields(superuser_request))
+        self.assertFalse(model_admin.has_add_permission(superuser_request))
+        self.assertFalse(model_admin.has_delete_permission(superuser_request))
+        self.assertTrue(model_admin.has_change_permission(superuser_request))
+        self.assertFalse(model_admin.has_change_permission(staff_request))

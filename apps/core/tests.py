@@ -192,8 +192,8 @@ class ProductionSettingsTests(TestCase):
         self.assertEqual(liveness.content, b"ok")
         self.assertEqual(readiness.status_code, 200)
         self.assertEqual(readiness.content, b"ready")
-        self.assertEqual(liveness.headers["Cache-Control"], "no-store")
-        self.assertEqual(readiness.headers["Cache-Control"], "no-store")
+        self.assertIn("no-store", liveness.headers["Cache-Control"])
+        self.assertIn("no-store", readiness.headers["Cache-Control"])
 
     def test_readiness_fails_closed_when_database_is_unavailable(self):
         with mock.patch.object(connection, "cursor", side_effect=DatabaseError("offline")):
@@ -201,7 +201,7 @@ class ProductionSettingsTests(TestCase):
 
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.content, b"unavailable")
-        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertIn("no-store", response.headers["Cache-Control"])
 
     def test_compose_binds_web_to_loopback_by_default(self):
         compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
@@ -394,7 +394,7 @@ class TokenLoginTests(TestCase):
         response = self.client.post(self.url, {"token": issue_token(self.user)})
         self.assertRedirects(response, reverse("journal:list"), fetch_redirect_response=False)
         self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.pk)
-        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertIn("no-store", response.headers["Cache-Control"])
         self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
         self.assertIn("Origin", response.headers["Vary"])
         self.assertIn("Sec-Fetch-Site", response.headers["Vary"])
@@ -521,7 +521,7 @@ class TokenLoginTests(TestCase):
         response = self.client.post(self.url)
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertIn("no-store", response.headers["Cache-Control"])
         self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
 
     def test_signed_token_with_invalid_subject_is_rejected(self):

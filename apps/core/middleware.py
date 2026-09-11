@@ -31,6 +31,23 @@ class ContentSecurityPolicyMiddleware:
         return response
 
 
+class SensitiveResponseCacheMiddleware:
+    """Запрещает хранение динамических ответов портала браузером и proxy."""
+
+    _CACHE_CONTROL = "no-store, no-cache, max-age=0, private"
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if not request.path.startswith(settings.STATIC_URL):
+            response.headers["Cache-Control"] = self._CACHE_CONTROL
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+
 class AuditMiddleware:
     """Простая промежуточная защита: HTTP-аудит действий пользователя."""
 

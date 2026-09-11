@@ -357,3 +357,9 @@
 - CSRF exemption сохранён для server-to-server интеграции, но браузерный POST теперь проверяется по `Sec-Fetch-Site` и `Origin`, с Referer fallback для совместимости.
 - Same-origin проходит автоматически; отдельная SSO-подсистема допускается только через точный HTTPS allowlist без credentials/path/query/fragment.
 - Cross-site запрос отклоняется до decode/consume, поэтому не создаёт сессию и не делает валидный одноразовый `jti` непригодным. Все ответы endpoint, включая 400/403, имеют `no-store`, `no-referrer` и корректный `Vary`.
+
+### 2026-09-11 — запрет кеширования динамических ответов
+
+- Единый middleware назначает `no-store, no-cache, max-age=0, private`, `Pragma: no-cache` и просроченный `Expires` всем динамическим ответам независимо от status и content type.
+- Контракт покрывает анонимный redirect, 403/404/500, HTML-карточки, XLSX/PDF и защищённые FileResponse; отдельным view больше не нужно помнить о заголовке.
+- `/static/` исключён из middleware и остаётся под fingerprint/cache policy WhiteNoise. Reverse proxy обязан сохранять application cache headers.

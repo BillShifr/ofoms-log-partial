@@ -257,3 +257,9 @@
 - Полный Django CSRF token нельзя требовать от независимого server-to-server клиента, поэтому endpoint остаётся `csrf_exempt`; exemption компенсируется отдельной проверкой browser provenance до любых side effects.
 - Наличие `Origin` имеет приоритет и требует точного совпадения с текущим либо явно доверенным origin; `Sec-Fetch-Site: cross-site` без Origin также запрещён. Отсутствие обоих заголовков допускается для небраузерной интеграции.
 - Trusted SSO origins отделены от общего `CSRF_TRUSTED_ORIGINS`, чтобы разрешение token exchange не расширяло доверие ко всем state-changing формам портала.
+
+## 2026-09-11 Cache policy динамических ответов
+
+- Закрытый контур и авторизация не делают proxy/browser cache безопасным для ПДн; динамическая поверхность использует fail-closed `no-store` независимо от роли и кода ответа.
+- Политика централизована в middleware, чтобы новый endpoint автоматически наследовал её, а ранний redirect/error не обходил заголовок.
+- Fingerprinted static assets исключены: они не содержат пользовательских данных и должны сохранять эффективное immutable-кеширование WhiteNoise.

@@ -1579,10 +1579,24 @@ class SecurityHeaderTests(BaseSystemTestCase):
         self.assertIn("script-src 'self'", policy)
         self.assertIn("style-src 'self'", policy)
         self.assertNotIn("'unsafe-inline'", policy)
+        self.assertEqual(
+            resp.headers["Cache-Control"],
+            "no-store, no-cache, max-age=0, private",
+        )
+        self.assertEqual(resp.headers["Pragma"], "no-cache")
+        self.assertEqual(resp.headers["Expires"], "0")
 
     def test_anonymous_redirected_to_login(self):
         resp = self.client.get(reverse("system:users"))
         self.assertRedirects(resp, "/accounts/login/?next=/system/users/")
+        self.assertIn("no-store", resp.headers["Cache-Control"])
+
+    def test_error_response_is_not_cacheable(self):
+        resp = self.client.get("/missing-sensitive-page/")
+
+        self.assertEqual(resp.status_code, 404)
+        self.assertIn("no-store", resp.headers["Cache-Control"])
+        self.assertEqual(resp.headers["Pragma"], "no-cache")
 
     def test_non_admin_forbidden_on_admin_screens(self):
         self.client.force_login(self.operator)

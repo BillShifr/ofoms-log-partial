@@ -6,18 +6,22 @@
 
 import datetime
 import tempfile
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from import_export.formats.base_formats import XLSX
+from openpyxl import load_workbook
 
 from apps.core.models import EventLog
 from apps.core.roles import ensure_role_groups
@@ -584,6 +588,39 @@ class JournalScreenTests(TestCase):
         self.assertContains(edit_page, "disabled", count=2)
         self.assertContains(
             edit_page, "Уникальный номер фиксируется при регистрации."
+        )
+
+    def test_admin_export_neutralizes_formula_and_writes_subject_audit(self):
+        irp = self._make_irp()
+        irp.z_f = "  =HYPERLINK(\"https://example.invalid\")"
+        irp.save(update_fields=["z_f"])
+        self.tfoms_user.is_staff = True
+        self.tfoms_user.is_superuser = True
+        self.tfoms_user.save(update_fields=["is_staff", "is_superuser"])
+        request = RequestFactory().post("/admin/journal/irp/export/")
+        request.user = self.tfoms_user
+        request.META["REMOTE_ADDR"] = "127.0.0.1"
+        model_admin = admin.site._registry[Irp]
+        queryset = Irp.objects.filter(pk=irp.pk)
+
+        dataset = model_admin.get_data_for_export(request, queryset)
+        exported_name = dataset[0][dataset.headers.index("z_f")]
+        self.assertEqual(exported_name, f"'{irp.z_f}")
+
+        response = model_admin._do_file_export(XLSX(), request, queryset)
+        self.assertEqual(response.status_code, 200)
+        worksheet = load_workbook(BytesIO(response.content), data_only=False).active
+        headers = [cell.value for cell in worksheet[1]]
+        exported_cell = worksheet.cell(row=2, column=headers.index("z_f") + 1)
+        self.assertEqual(exported_cell.value, f"'{irp.z_f}")
+        self.assertEqual(exported_cell.data_type, "s")
+        self.assertTrue(
+            EventLog.objects.filter(
+                module="journal",
+                event_type=EventLog.EventType.EXPORT,
+                user=self.tfoms_user,
+                target="admin:irp:export:xlsx",
+            ).exists()
         )
 
     def test_smo_cannot_assign_foreign_organization_or_employee(self):

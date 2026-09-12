@@ -6,6 +6,8 @@ from import_export.admin import ExportMixin
 from rangefilter.filters import DateRangeFilterBuilder
 
 from apps.core.admin_utils import ReadOnlyAdminMixin
+from apps.core.exports import excel_safe_value
+from apps.core.models import EventLog, log_event
 from apps.employee.models import ORGS, TFOMS
 from apps.journal.models import (
     Irp,
@@ -39,6 +41,27 @@ class IrpAdmin(ReadOnlyAdminMixin, ExportMixin, admin.ModelAdmin):
         "date_close",
     )
     ordering = ("-date_create", "-id")
+
+    def get_data_for_export(self, request, queryset, **kwargs):
+        """Нейтрализует формулы во всех строковых ячейках admin-export."""
+        dataset = super().get_data_for_export(request, queryset, **kwargs)
+        for index, row in enumerate(dataset):
+            dataset[index] = tuple(excel_safe_value(value) for value in row)
+        return dataset
+
+    def _do_file_export(self, file_format, request, queryset, export_form=None):
+        """Фиксирует фактическую подготовку выгрузки до передачи ответа."""
+        response = super()._do_file_export(
+            file_format, request, queryset, export_form=export_form
+        )
+        log_event(
+            module="journal",
+            event_type=EventLog.EventType.EXPORT,
+            user=request.user,
+            target=f"admin:irp:export:{file_format.get_extension()}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+        return response
 
     fieldsets = [
         (

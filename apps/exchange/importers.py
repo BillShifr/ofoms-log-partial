@@ -44,10 +44,15 @@ class ArtifactRollback:
 
     def __init__(self):
         self.paths: list[Path] = []
+        self.moves: list[tuple[Path, Path]] = []
 
     def track(self, path: Path | None) -> None:
         if path is not None:
             self.paths.append(Path(path))
+
+    def restore_on_failure(self, current: Path | None, original: Path) -> None:
+        if current is not None:
+            self.moves.append((Path(current), Path(original)))
 
     def __enter__(self):
         return self
@@ -60,6 +65,26 @@ class ArtifactRollback:
                 path.unlink(missing_ok=True)
             except OSError:
                 logger.exception("Failed to roll back exchange artifact %s", path.name)
+        for current, original in reversed(self.moves):
+            if not current.exists():
+                continue
+            try:
+                os.replace(current, original)
+            except OSError as error:
+                if error.errno != errno.EXDEV:
+                    logger.exception(
+                        "Failed to restore exchange input %s", original.name
+                    )
+                    continue
+                try:
+                    shutil.copy2(current, original)
+                    current.unlink()
+                except OSError:
+                    original.unlink(missing_ok=True)
+                    logger.exception(
+                        "Failed to restore cross-filesystem exchange input %s",
+                        original.name,
+                    )
         return False
 
 
@@ -927,9 +952,11 @@ def import_all(orgs=None):
                 importer = IrpXMLFile(org, path)
             else:
                 importer = ExcelIrpFile(org, path)
-            with transaction.atomic():
+            with ArtifactRollback() as artifacts, transaction.atomic():
                 result = importer.process()
-                importer.write_flcp(result)
+                artifacts.restore_on_failure(importer.archived_path, path)
+                protocol_path = importer.write_flcp(result)
+                artifacts.track(protocol_path)
                 status = (
                     ImportLog.Status.ERROR
                     if not result.ok

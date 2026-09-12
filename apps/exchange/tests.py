@@ -1121,6 +1121,38 @@ class ImportCommandTests(ExchangeTestMixin, TestCase):
             ).exists()
         )
 
+    def test_auto_import_restores_input_when_audit_fails(self):
+        from django.core.management import call_command
+
+        in_dir = Path(self.in_dir)
+        out_dir = Path(self.out_dir)
+        arch_dir = Path(self.arch_dir)
+        source = in_dir / "81000" / "users-audit.xml"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(SAMPLE_USERS)
+
+        with (
+            override_settings(
+                EXCHANGE_IN=in_dir,
+                EXCHANGE_OUT=out_dir,
+                EXCHANGE_ARCHIVE=arch_dir,
+            ),
+            patch(
+                "apps.exchange.importers.log_event",
+                side_effect=RuntimeError("audit unavailable"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            call_command("import_exchange", orgs=[81000], verbosity=0)
+
+        self.assertTrue(source.exists())
+        self.assertEqual(source.read_bytes(), SAMPLE_USERS)
+        self.assertFalse((arch_dir / "81000" / source.name).exists())
+        self.assertFalse((out_dir / "81000" / source.name).exists())
+        self.assertFalse(ImportLog.objects.exists())
+        self.assertFalse(EventLog.objects.filter(module="exchange").exists())
+        self.assertEqual(Employee.objects.count(), 3)
+
     def test_batch_failure_preserves_committed_protocol_for_previous_file(self):
         from django.core.management import call_command
 

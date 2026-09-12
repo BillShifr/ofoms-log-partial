@@ -857,3 +857,10 @@
 - [x] Обернуть credential save и предметное событие общей транзакцией.
 - [x] Не писать событие при невалидной форме без изменения hash.
 - [x] Проверить успешную смену и rollback прежнего пароля реальным endpoint.
+
+## 2026-09-12 — защита superuser в EmployeeAdmin
+
+- [x] Разрешить administrative password endpoint только superuser.
+- [x] Исключить superuser principals из queryset любого non-superuser.
+- [x] Добавить object-level change guard как независимую защиту.
+- [x] Проверить список, прямой profile POST и password POST ограниченного staff.

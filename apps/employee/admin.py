@@ -7,7 +7,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.contrib.auth.models import Group
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 
 
@@ -94,8 +94,21 @@ class EmployeeAdmin(UserAdmin):
     )
     readonly_fields = ("guid", "failed_attempts", "lock_until")
 
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        if not request.user.is_superuser:
+            queryset = queryset.filter(is_superuser=False)
+        return queryset
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and obj.is_superuser and not request.user.is_superuser:
+            return False
+        return super().has_change_permission(request, obj)
+
     def user_change_password(self, request, id, form_url=""):
         """Связывает credential change с предметным audit в одной транзакции."""
+        if not request.user.is_superuser:
+            raise PermissionDenied
         if request.method != "POST":
             return super().user_change_password(request, id, form_url)
 

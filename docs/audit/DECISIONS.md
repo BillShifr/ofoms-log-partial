@@ -341,4 +341,10 @@
 - Стандартный password endpoint Django Admin является отдельным credential write-path и не проходит через `save_model`/`save_related` сотрудника.
 - POST формы выполняется в явной транзакции; предметный `UPDATE` создаётся только при фактическом изменении password hash и откатывает credential при собственной ошибке.
 - Audit target содержит только PK и вид операции: пароль, password hash и иные секреты не записываются ни в target, ни в detail.
+
+## 2026-09-12 Защита superuser от делегированного EmployeeAdmin
+
+- `change_employee` разрешает обслуживать обычные учётные записи, но не делегирует управление корневым principal.
+- Password endpoint доступен только действующему superuser; non-superuser не видит superuser-строки в admin queryset, поэтому direct URL и bulk action также не получают объект.
+- Object-level `has_change_permission` остаётся второй серверной границей на случай вызова Admin API с уже разрешённым объектом.
 - Login/logout подключены явно с прежними именами, поэтому декораторы, redirects, шаблоны и аудит не меняют публичный контракт.

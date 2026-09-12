@@ -277,6 +277,91 @@ class EmployeeAdminPolicyTests(TestCase):
         self.assertTrue(target.check_password("OriginalGoodPass!1"))
         self.assertFalse(target.check_password("Quartz!5938River"))
 
+    def test_non_superuser_admin_cannot_reset_another_password(self):
+        actor = Employee.objects.create_user(
+            username="limited_password_admin",
+            password="GoodPass!1",
+            org=81000,
+            is_staff=True,
+        )
+        actor.user_permissions.set(
+            Permission.objects.filter(
+                codename__in=("view_employee", "change_employee")
+            )
+        )
+        target = Employee.objects.create_superuser(
+            username="protected_password_target",
+            password="ProtectedGoodPass!1",
+            org=81000,
+        )
+        self.client.force_login(actor)
+
+        response = self.client.post(
+            reverse("admin:auth_user_password_change", args=[target.pk]),
+            {
+                "password1": "Hijacked!4827Orbit",
+                "password2": "Hijacked!4827Orbit",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        target.refresh_from_db()
+        self.assertTrue(target.check_password("ProtectedGoodPass!1"))
+        self.assertFalse(target.check_password("Hijacked!4827Orbit"))
+        self.assertFalse(
+            EventLog.objects.filter(
+                target=f"admin:employee:{target.pk}:password"
+            ).exists()
+        )
+
+    def test_non_superuser_admin_cannot_list_or_change_superuser_account(self):
+        actor = Employee.objects.create_user(
+            username="limited_profile_admin",
+            password="GoodPass!1",
+            org=81000,
+            is_staff=True,
+        )
+        actor.user_permissions.set(
+            Permission.objects.filter(
+                codename__in=("view_employee", "change_employee")
+            )
+        )
+        target = Employee.objects.create_superuser(
+            username="protected_profile_superuser",
+            password="ProtectedGoodPass!1",
+            org=81000,
+        )
+        self.assertFalse(
+            admin.site._registry[Employee].has_change_permission(
+                SimpleNamespace(user=actor), target
+            )
+        )
+        self.client.force_login(actor)
+
+        listing = self.client.get(reverse("admin:employee_employee_changelist"))
+        response = self.client.post(
+            reverse("admin:employee_employee_change", args=[target.pk]),
+            {
+                "username": target.username,
+                "last_name": "Подмена",
+                "first_name": "",
+                "email": "",
+                "org": "81000",
+                "date_joined_0": target.date_joined.strftime("%Y-%m-%d"),
+                "date_joined_1": target.date_joined.strftime("%H:%M:%S"),
+                "_save": "Сохранить",
+            },
+        )
+
+        self.assertEqual(listing.status_code, 200)
+        self.assertNotContains(listing, target.username)
+        self.assertIn(response.status_code, (302, 404))
+        target.refresh_from_db()
+        self.assertEqual(target.last_name, "")
+        self.assertTrue(target.is_active)
+        self.assertTrue(target.is_staff)
+        self.assertTrue(target.is_superuser)
+
     def test_admin_change_records_subject_audit_after_roles(self):
         actor = Employee.objects.create_superuser(
             username="employee_admin_actor",

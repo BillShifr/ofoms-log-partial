@@ -384,8 +384,8 @@ table.data tbody tr[data-href]:focus-within {
 }
 table.data tr.row--overdue { background: color-mix(in srgb, var(--chip-red) 60%, var(--card)); box-shadow: inset 4px 0 var(--danger); }
 table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%, var(--card)); box-shadow: inset 4px 0 var(--warn); }
-.data--journal { min-width: 1080px !important; font-size: .75rem; }
-.data--journal th, .data--journal td { padding: 8px 9px; }
+.data--journal { min-width: 1080px !important; font-size: .76rem; }
+.data--journal th, .data--journal td { padding: 9px 10px; }
 .data--journal thead tr:not(.group-row) th {
   background: color-mix(in srgb, var(--ink) 2.5%, var(--card));
   color: color-mix(in srgb, var(--ink) 68%, transparent);
@@ -399,6 +399,21 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .data--journal tbody tr.row--overdue td:first-child { border-left: 2px solid color-mix(in srgb, var(--danger) 72%, var(--line)); }
 .data--journal tbody tr.row--open td:first-child { border-left: 2px solid color-mix(in srgb, var(--warn) 72%, var(--line)); }
 .data--journal tbody tr:hover { background: color-mix(in srgb, var(--ink) 2.5%, var(--card)); box-shadow: none; }
+.data--journal thead tr:not(.group-row) th:first-child,
+.data--journal tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  width: 58px;
+  min-width: 58px;
+  background: var(--card);
+  box-shadow: 10px 0 18px -20px color-mix(in srgb, var(--ink) 65%, transparent);
+}
+.data--journal thead tr:not(.group-row) th:first-child {
+  z-index: 6;
+  background: color-mix(in srgb, var(--ink) 2.5%, var(--card));
+}
+.data--journal tbody tr:hover td:first-child { background: color-mix(in srgb, var(--ink) 2.5%, var(--card)); }
 .data--journal .col-theme { min-width: 150px; }
 .data--journal .col-n_irp { width: 148px; max-width: 148px; }
 .data--journal .col-z_f { min-width: 156px; }
@@ -731,26 +746,31 @@ table.data .group-row th {
 }
 table.data .group-row th.group-row__empty { background: transparent; border: none; border-radius: 0; }
 .data--journal .group-row th {
-  height: 27px;
-  padding: 5px 9px 4px;
-  background: transparent !important;
+  height: 32px;
+  padding: 7px 10px 6px;
+  background: color-mix(in srgb, var(--green) 5%, var(--card)) !important;
   border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--green) 14%, var(--line));
   box-shadow: none;
 }
-.data--journal .group-row th:first-child,
-.data--journal .group-row th:last-child { border-radius: 0; }
+.data--journal .group-row th:first-child { border-top-left-radius: var(--r-lg); }
+.data--journal .group-row th:last-child { border-top-right-radius: var(--r-lg); }
+.data--journal .group-row th.group-row__empty {
+  background: color-mix(in srgb, var(--green) 5%, var(--card)) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--green) 14%, var(--line));
+}
 .group-row__label {
-  display: inline-flex;
-  width: fit-content;
+  display: block;
+  width: 100%;
   max-width: 100%;
-  padding: 3px 7px;
-  border: 1px solid color-mix(in srgb, var(--green) 18%, var(--line));
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--green) 6%, var(--card));
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: color-mix(in srgb, var(--ink) 56%, transparent);
   font-size: .64rem;
   letter-spacing: .055em;
-  line-height: 1;
+  line-height: 1.2;
+  text-align: center;
   white-space: nowrap;
 }
 table.data th { border-top: 1px solid var(--line); }

@@ -972,6 +972,11 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
         resp = self.client.get(reverse("exchange:logs"))
         self.assertContains(resp, "a.xml")
         self.assertNotContains(resp, "b.xml")
+        self.assertContains(
+            resp, 'class="data data--exchange data--responsive"'
+        )
+        self.assertContains(resp, 'class="responsive-row"')
+        self.assertContains(resp, 'data-label="Действия"')
 
     def test_smo_cannot_open_foreign_protocol(self):
         log = ImportLog.objects.create(

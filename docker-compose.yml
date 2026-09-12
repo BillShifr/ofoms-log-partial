@@ -5,6 +5,11 @@ x-logging: &default-logging
     max-file: "5"
     compress: "true"
 
+x-app-build: &app-build
+  context: .
+  args:
+    VCS_REF: ${VCS_REF:?VCS_REF must be the full Git commit SHA}
+
 x-app-security: &app-security
   read_only: true
   security_opt:
@@ -32,7 +37,7 @@ services:
     logging: *default-logging
 
   volume-init:
-    build: .
+    build: *app-build
     user: "0:0"
     read_only: true
     security_opt:
@@ -50,7 +55,7 @@ services:
 
   web:
     <<: *app-security
-    build: .
+    build: *app-build
     init: true
     command: [".venv/bin/gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60"]
     environment: &web_env
@@ -112,7 +117,7 @@ services:
 
   migrate:
     <<: *app-security
-    build: .
+    build: *app-build
     command: [".venv/bin/python", "manage.py", "migrate", "--noinput"]
     environment: *web_env
     depends_on:
@@ -123,7 +128,7 @@ services:
 
   scheduler:
     <<: *app-security
-    build: .
+    build: *app-build
     init: true
     command: [".venv/bin/python", "manage.py", "run_scheduler", "--interval", "60"]
     environment: *web_env

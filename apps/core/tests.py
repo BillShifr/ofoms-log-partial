@@ -758,6 +758,7 @@ class ProductionSettingsTests(TestCase):
 
     def test_ci_verifies_runtime_image_before_push(self):
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
         runtime_gate = (
             settings.BASE_DIR / "scripts" / "container_runtime_gate.sh"
         ).read_text()
@@ -775,6 +776,7 @@ class ProductionSettingsTests(TestCase):
         )
         self.assertIn("frozendevs/tfoms-ejournal:${{ github.sha }}", workflow)
         self.assertIn("build-args: VCS_REF=${{ github.sha }}", workflow)
+        self.assertIn("VCS_REF: ${{ github.sha }}", workflow)
         self.assertLess(
             workflow.index("docker push frozendevs/tfoms-ejournal:${{ github.sha }}"),
             workflow.index("docker push frozendevs/tfoms-ejournal:latest"),
@@ -788,8 +790,11 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("org.opencontainers.image.revision", runtime_gate)
 
         dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()
-        self.assertIn("ARG VCS_REF=unknown", dockerfile)
+        self.assertIn("ARG VCS_REF\n", dockerfile)
+        self.assertIn('test "${#VCS_REF}" -eq 40', dockerfile)
         self.assertIn("org.opencontainers.image.revision=\"${VCS_REF}\"", dockerfile)
+        self.assertIn("VCS_REF: ${VCS_REF:?VCS_REF must be the full Git commit SHA}", compose)
+        self.assertEqual(compose.count("build: *app-build"), 4)
 
     def test_ci_uses_least_privilege_and_bounded_jobs(self):
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()

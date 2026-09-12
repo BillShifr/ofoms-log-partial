@@ -61,6 +61,7 @@ POST-операции карточки автоматизированного з
 ## Запуск и обновление
 
 ```bash
+export VCS_REF=$(git rev-parse HEAD)
 docker compose config --quiet
 docker compose build
 docker compose up -d
@@ -77,11 +78,15 @@ Runtime image не содержит build-инструмент `uv`, тесто�
 CI загружает собранный image в локальный Docker daemon runner, выполняет `scripts/container_runtime_gate.sh` и только после успешной проверки публикует tag из `main`. Gate подтверждает отсутствие build/test content, непривилегированность основного runtime, read-only rootfs, размер `/tmp`, а также минимальный `CHOWN`-контракт init-контейнера. Сборка без выполнения этого gate не считается готовой к публикации.
 
 Каждая проверенная сборка `main` публикуется одновременно как `frozendevs/tfoms-ejournal:<полный-git-sha>` и `latest`. Для установки и rollback используйте SHA-tag; `latest` предназначен только как указатель на последнюю проверенную версию. OCI label `org.opencontainers.image.revision` обязан совпадать с SHA-tag и проверяется до push: `docker image inspect frozendevs/tfoms-ejournal:<sha> --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'`.
+Compose также требует `VCS_REF` и передаёт его всем четырём сборкам приложения. Dockerfile
+принимает только полный 40-символьный lowercase Git SHA, поэтому локальная или production-сборка
+без доказуемой ревизии завершается до создания runtime-образа.
 
 Для обновления сначала создайте резервную копию, затем:
 
 ```bash
 git pull --ff-only
+export VCS_REF=$(git rev-parse HEAD)
 docker compose build
 docker compose up -d
 docker compose ps

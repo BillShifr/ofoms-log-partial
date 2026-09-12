@@ -2,9 +2,13 @@ FROM ghcr.io/astral-sh/uv@sha256:b485bd65cc2cf1c9a93b3554012c9c3778cf7b1b5fd3d30
 
 FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285
 
-ARG VCS_REF=unknown
+ARG VCS_REF
 LABEL org.opencontainers.image.source="https://github.com/BillShifr/ofoms-log-partial" \
       org.opencontainers.image.revision="${VCS_REF}"
+
+RUN case "$VCS_REF" in *[!0-9a-f]*|'') exit 1 ;; esac && \
+    test "${#VCS_REF}" -eq 40 || \
+    { echo >&2 "VCS_REF must be a full 40-character lowercase Git SHA"; exit 1; }
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

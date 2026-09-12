@@ -31,7 +31,7 @@ CREATE DATABASE ejournal OWNER ejournal;
 ## Запуск в Docker
 
 ```bash
-docker compose up --build
+VCS_REF=$(git rev-parse HEAD) docker compose up --build
 ```
 
 Compose запускает отдельный сервис `scheduler`, который раз в минуту вызывает

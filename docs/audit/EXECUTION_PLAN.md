@@ -1165,3 +1165,12 @@
 - [x] Проверять нейтральный фон просроченных и открытых строк; слабую зебру обычных строк сохранить.
 - [x] Прогнать журнал во всех viewport/theme/font/contrast режимах без palette mismatch:
   15 journal-сценариев и 3 print-сценария, ошибок нет.
+
+## 2026-09-12 — provenance Compose-сборок
+
+- [x] Воспроизвести полный Compose startup и проверить `volume-init → migrate → web → scheduler`.
+- [x] Выявить `org.opencontainers.image.revision=unknown` у Compose-built application images.
+- [x] Сделать полный lowercase Git SHA обязательным общим build argument.
+- [x] Отклонять сборку без SHA и обновить CI/операционные команды.
+- [x] Повторить live Compose startup: миграции завершены, web healthy, scheduler running;
+  SHA label `volume-init`, `migrate`, `web` и `scheduler` совпадает с проверяемым commit.

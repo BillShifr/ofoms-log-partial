@@ -78,6 +78,7 @@ jobs:
       - name: Compose configuration
         run: docker compose config --quiet
         env:
+          VCS_REF: ${{ github.sha }}
           SECRET_KEY: ci-only-secret-key-with-more-than-fifty-characters-123456789
           JWT_SECRET: ci-only-jwt-secret-with-more-than-fifty-characters-987654321
           DB_PASSWORD: ci-only-database-password-4827

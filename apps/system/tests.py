@@ -15,7 +15,7 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import CommandError, call_command
-from django.db import IntegrityError, connection, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.db.models import QuerySet
 from django.test import (
@@ -177,6 +177,27 @@ class AccessTests(BaseSystemTestCase):
         for name in ("messages", "docs", "news", "prefs"):
             resp = self.client.get(reverse(f"system:{name}"))
             self.assertEqual(resp.status_code, 200, name)
+
+
+class PaginationTests(TestCase):
+    def test_invalid_and_out_of_range_pages_fall_back_to_last_page(self):
+        from apps.system.views import _paginate
+
+        for value in ("invalid", "0", "-1", "999"):
+            request = RequestFactory().get("/", {"page": value})
+            page = _paginate(request, list(range(21)), per_page=10)
+            self.assertEqual(page.number, 3, value)
+
+    def test_database_error_is_not_masked_or_retried(self):
+        from apps.system.views import _paginate
+
+        request = RequestFactory().get("/", {"page": "1"})
+        with patch(
+            "apps.system.views.Paginator.page",
+            side_effect=DatabaseError("database unavailable"),
+        ) as page, self.assertRaises(DatabaseError):
+            _paginate(request, list(range(3)))
+        page.assert_called_once_with(1)
 
 
 class UserManagementTests(BaseSystemTestCase):

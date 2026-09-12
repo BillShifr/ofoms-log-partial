@@ -13,7 +13,7 @@ from pathlib import PurePosixPath
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.core.paginator import Paginator
+from django.core.paginator import InvalidPage, Paginator
 from django.db import transaction
 from django.db.models import CharField, Count, F, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce, Concat
@@ -88,7 +88,7 @@ def _paginate(request, qs, per_page=PAGE_SIZE):
     paginator = Paginator(qs, per_page)
     try:
         return paginator.page(int(request.GET.get("page", 1)))
-    except Exception:  # noqa: BLE001 — невалидный номер страницы -> последняя
+    except (InvalidPage, TypeError, ValueError):
         return paginator.page(paginator.num_pages or 1)
 
 

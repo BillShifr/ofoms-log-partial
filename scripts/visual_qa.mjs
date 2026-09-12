@@ -100,6 +100,48 @@ async function evaluate(expression) {
   return result.result.value;
 }
 
+async function measureJournalLayout() {
+  return evaluate(`(async () => {
+    const wrap = document.querySelector('.table-wrap--journal');
+    const table = wrap?.querySelector('table.data--journal');
+    const row = table?.tBodies[0]?.rows[0];
+    const groupCells = table?.tHead?.rows[0]?.cells;
+    if (!wrap || !table || !row) return null;
+    const mobile = innerWidth <= 720;
+    const tableRect = table.getBoundingClientRect();
+    const firstGroupRect = groupCells?.[0]?.getBoundingClientRect();
+    const lastGroupRect = groupCells?.[groupCells.length - 1]?.getBoundingClientRect();
+    const groupCoversTable = mobile || Boolean(firstGroupRect && lastGroupRect &&
+      Math.abs(firstGroupRect.left - tableRect.left) <= 1 &&
+      Math.abs(lastGroupRect.right - tableRect.right) <= 1);
+    if (mobile) return {
+      mobile,
+      cardGrid: getComputedStyle(row).display === 'grid',
+      headerHidden: getComputedStyle(table.tHead).display === 'none',
+      groupCoversTable
+    };
+    wrap.scrollLeft = wrap.scrollWidth;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const wrapRect = wrap.getBoundingClientRect();
+    const firstCell = row.cells[0];
+    const lastCell = row.cells[row.cells.length - 1];
+    const firstRect = firstCell.getBoundingClientRect();
+    const lastRect = lastCell.getBoundingClientRect();
+    const statusSticky = getComputedStyle(lastCell).position === 'sticky';
+    const result = {
+      mobile,
+      internalOverflow: wrap.scrollWidth > wrap.clientWidth + 1,
+      groupCoversTable,
+      firstPinned: getComputedStyle(firstCell).position === 'sticky' &&
+        Math.abs(firstRect.left - wrapRect.left) <= 2,
+      statusSticky,
+      statusPinned: !statusSticky || Math.abs(lastRect.right - wrapRect.right) <= 2
+    };
+    wrap.scrollLeft = 0;
+    return result;
+  })()`);
+}
+
 try {
   const port = await devtoolsPort();
   const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
@@ -180,6 +222,7 @@ try {
         width: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth
       }))()`);
+      metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
       metrics.browserErrors = browserErrors.slice(errorStart);
       const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
       const filename = `${name}-${width}x${height}-light.png`;
@@ -217,6 +260,7 @@ try {
           width: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth
         }))()`);
+        metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
         metrics.browserErrors = browserErrors.slice(errorStart);
         const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
         const filename = `${name}-${width}x${height}-${theme}-${font}-${contrast}.png`;
@@ -232,6 +276,11 @@ try {
     modeMismatch: item.appliedMode.theme !== item.theme ||
       item.appliedMode.font !== item.font ||
       item.appliedMode.contrast !== (item.contrast || "default"),
+    journalLayoutMismatch: item.name === "journal" && (!item.journalLayout ||
+      !item.journalLayout.groupCoversTable ||
+      (item.journalLayout.mobile
+        ? (!item.journalLayout.cardGrid || !item.journalLayout.headerHidden)
+        : (!item.journalLayout.firstPinned || !item.journalLayout.statusPinned))),
   }));
   const report = {
     generatedAt: new Date().toISOString(),
@@ -239,7 +288,7 @@ try {
     cases: results.length,
     expectedForbidden: [...expectedForbidden],
     failures: checkedResults.filter((item) =>
-      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") || item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch || item.activeAnimations
+      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") || item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch || item.journalLayoutMismatch || item.activeAnimations
     ),
     results: checkedResults,
   };

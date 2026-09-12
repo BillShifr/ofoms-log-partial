@@ -937,3 +937,10 @@
 - [x] Исключить forged ОП/Admin у СМО и СП у ТФОМС из всех capabilities.
 - [x] Согласовать header labels и system-admin predicate с effective roles.
 - [x] Сохранить валидные роли обеих сторон и безусловный superuser recovery bypass.
+
+## 2026-09-12 — protected superuser in portal user management
+
+- [x] Исключить root accounts из каталога обычного администратора.
+- [x] Применить один scoped queryset к GET, update, block и unblock.
+- [x] Возвращать 404 на прямые URL без изменения root-профиля или статуса.
+- [x] Сохранить межорганизационное recovery-управление для другого superuser.

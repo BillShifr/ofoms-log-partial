@@ -97,11 +97,24 @@ def _paginate(request, qs, per_page=PAGE_SIZE):
 # ---------------------------------------------------------------------------
 
 
+def _manageable_users_for_actor(actor, *, for_update=False):
+    queryset = Employee.objects.all()
+    if not actor.is_superuser:
+        queryset = queryset.filter(is_superuser=False)
+    if for_update:
+        queryset = queryset.select_for_update()
+    return queryset
+
+
 @admin_required
 @require_safe
 def user_list(request):
     form = EmployeeFilterForm(request.GET or None)
-    qs = Employee.objects.prefetch_related("groups").order_by("last_name", "first_name")
+    qs = (
+        _manageable_users_for_actor(request.user)
+        .prefetch_related("groups")
+        .order_by("last_name", "first_name")
+    )
     if form.is_valid():
         cd = form.cleaned_data
         if cd["q"]:
@@ -163,7 +176,9 @@ def user_create(request):
 def user_update(request, pk):
     if request.method == "POST":
         with transaction.atomic():
-            user = get_object_or_404(Employee.objects.select_for_update(), pk=pk)
+            user = get_object_or_404(
+                _manageable_users_for_actor(request.user, for_update=True), pk=pk
+            )
             form = EmployeeUpdateForm(request.POST, instance=user, actor=request.user)
             if form.is_valid():
                 changed = list(form.changed_data)
@@ -182,7 +197,7 @@ def user_update(request, pk):
             messages.success(request, "Учётная запись обновлена.")
             return redirect("system:users")
     else:
-        user = get_object_or_404(Employee, pk=pk)
+        user = get_object_or_404(_manageable_users_for_actor(request.user), pk=pk)
         form = EmployeeUpdateForm(instance=user, actor=request.user)
     return render(
         request,
@@ -208,7 +223,9 @@ def _user_form_context(form, title, *, user=None):
 @require_http_methods(["POST"])
 def user_block(request, pk):
     with transaction.atomic():
-        user = get_object_or_404(Employee.objects.select_for_update(), pk=pk)
+        user = get_object_or_404(
+            _manageable_users_for_actor(request.user, for_update=True), pk=pk
+        )
         if user.pk == request.user.pk:
             messages.error(request, "Нельзя заблокировать собственную учётную запись.")
             return redirect("system:users")
@@ -229,7 +246,9 @@ def user_block(request, pk):
 @require_http_methods(["POST"])
 def user_unblock(request, pk):
     with transaction.atomic():
-        user = get_object_or_404(Employee.objects.select_for_update(), pk=pk)
+        user = get_object_or_404(
+            _manageable_users_for_actor(request.user, for_update=True), pk=pk
+        )
         user.is_active = True
         user.reset_failed_logins()
         user.save(update_fields=["is_active"])

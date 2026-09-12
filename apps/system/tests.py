@@ -180,6 +180,63 @@ class AccessTests(BaseSystemTestCase):
 
 
 class UserManagementTests(BaseSystemTestCase):
+    def test_non_superuser_admin_cannot_discover_or_mutate_superuser(self):
+        root = Employee.objects.create_superuser(
+            username="protected_portal_root",
+            password=PASSWORD,
+            org=81000,
+            first_name="Исходное",
+        )
+        self.client.force_login(self.admin)
+
+        listing = self.client.get(reverse("system:users"))
+        update_url = reverse("system:user_update", args=[root.pk])
+        self.assertNotContains(listing, root.username)
+        self.assertEqual(self.client.get(update_url).status_code, 404)
+        self.assertEqual(
+            self.client.post(
+                update_url,
+                {
+                    "first_name": "Подменено",
+                    "org": "81000",
+                    "is_active": "on",
+                },
+            ).status_code,
+            404,
+        )
+        for route in ("user_block", "user_unblock"):
+            response = self.client.post(reverse(f"system:{route}", args=[root.pk]))
+            self.assertEqual(response.status_code, 404, route)
+
+        root.refresh_from_db()
+        self.assertEqual(root.first_name, "Исходное")
+        self.assertTrue(root.is_active)
+        self.assertTrue(root.is_staff)
+        self.assertTrue(root.is_superuser)
+
+    def test_superuser_can_manage_other_superuser_through_portal(self):
+        actor = Employee.objects.create_superuser(
+            username="portal_recovery_root",
+            password=PASSWORD,
+            org=81001,
+        )
+        target = Employee.objects.create_superuser(
+            username="portal_recovery_target",
+            password=PASSWORD,
+            org=81000,
+        )
+        self.client.force_login(actor)
+
+        listing = self.client.get(reverse("system:users"))
+        response = self.client.post(
+            reverse("system:user_block", args=[target.pk])
+        )
+
+        self.assertContains(listing, target.username)
+        self.assertEqual(response.status_code, 302)
+        target.refresh_from_db()
+        self.assertFalse(target.is_active)
+
     def test_create_user_with_role(self):
         self.client.force_login(self.admin)
         resp = self.client.post(

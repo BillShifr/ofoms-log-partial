@@ -409,3 +409,9 @@
 - Effective role set вычисляется как пересечение назначенных канонических групп с допустимыми для `user.org` ролями ТФОМС или СМО.
 - Capability policy, header role labels и system-admin boundary используют один effective set; несовместимая группа не даёт скрытых прав и не рекламируется как действующая роль.
 - Superuser bypass проверяется отдельно до role matrix и не зависит от profile organization; исходные M2M-группы сохраняются для административного обнаружения и исправления данных.
+
+## 2026-09-12 Защита superuser в portal user management
+
+- Все portal-пути list/update/block/unblock получают пользователя из одного actor-scoped queryset; non-superuser никогда не получает строку с `is_superuser=True`.
+- Прямой URL возвращает 404 вместо раскрытия существования корневой учётной записи, а row lock берётся только после применения scope.
+- Другой superuser сохраняет recovery-возможность управлять root principal; создание root и смена credential через portal не добавляются.

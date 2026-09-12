@@ -471,6 +471,25 @@ class IrpImportTests(ExchangeTestMixin, TestCase):
         self.assertFalse(Irp.objects.exists())
         self.assertFalse(XmlFiles.objects.exists())
 
+    def test_primary_employee_must_belong_to_sender_organization(self):
+        foreign_employee = Employee.objects.create_user(
+            username="foreign-import-owner",
+            org=81001,
+            is_active=False,
+        )
+        path = Path(self.in_dir) / "G1R_foreign_employee.xml"
+        path.write_bytes(_irp_xml("TT.01", str(foreign_employee.guid)))
+
+        result = IrpXMLFile(81000, path, **self._imp_kwargs()).process()
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.rows, 0)
+        self.assertTrue(
+            any(error["IM_POL"] == "EMPLOYEE_1" for error in result.errors)
+        )
+        self.assertFalse(Irp.objects.exists())
+        self.assertFalse(XmlFiles.objects.exists())
+
     def test_unknown_theme_rejected(self):
         from pathlib import Path
 
@@ -671,6 +690,36 @@ class ExcelImportTests(ExchangeTestMixin, TestCase):
         source_change = IrpHistory.objects.get(irp=irp, field_name="input_file")
         self.assertEqual(source_change.old_value, f"journal.XmlFiles:{source.pk}")
         self.assertEqual(source_change.new_value, "—")
+
+    def test_excel_primary_employee_must_belong_to_sender_organization(self):
+        foreign_employee = Employee.objects.create_user(
+            username="foreign-excel-owner",
+            org=81001,
+            is_active=False,
+        )
+        importer = ExcelIrpFile(81000, Path(self.in_dir) / "foreign.xlsx")
+
+        importer._import_one(
+            {
+                "n_irp": str(uuid.uuid4()),
+                "irp_type": 1,
+                "date_create": datetime.date(2026, 9, 12),
+                "way": 1,
+                "how": 2,
+                "theme": self.theme.code_name,
+                "otv_t": 1,
+                "otv_kon": 81000,
+                "employee_1": str(foreign_employee.guid),
+                "data_plan": datetime.date(2026, 10, 12),
+                "z_f": "Чужой владелец",
+            }
+        )
+
+        self.assertEqual(importer.rows, 0)
+        self.assertTrue(
+            any(error["IM_POL"] == "EMPLOYEE_1" for error in importer.errors)
+        )
+        self.assertFalse(Irp.objects.filter(z_f="Чужой владелец").exists())
 
     def test_xlsx_container_rejects_excessive_uncompressed_size(self):
         path = Path(self.in_dir) / "oversized-content.xlsx"

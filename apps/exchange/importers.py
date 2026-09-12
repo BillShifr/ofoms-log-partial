@@ -465,6 +465,15 @@ class IrpXMLFile(XsdExchangeFile):
                 )
             )
             return
+        if employee_one.org != self.org:
+            self.errors.append(
+                flc.error_result(
+                    "EMPLOYEE_1",
+                    "Сотрудник не относится к организации-отправителю",
+                    d.get("n_irp"),
+                )
+            )
+            return
 
         # Ответственный сотрудник (необязателен)
         employee_it = None
@@ -791,6 +800,15 @@ class ExcelIrpFile:
         if not employee_one:
             self.errors.append(
                 flc.error_result("EMPLOYEE_1", "Неизвестный сотрудник", n_irp)
+            )
+            return
+        if employee_one.org != self.org:
+            self.errors.append(
+                flc.error_result(
+                    "EMPLOYEE_1",
+                    "Сотрудник не относится к организации-отправителю",
+                    n_irp,
+                )
             )
             return
         employee_it = None

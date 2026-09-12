@@ -720,7 +720,13 @@ class ProductionSettingsTests(TestCase):
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()
 
         self.assertIn("FROM python:3.13-slim@sha256:", dockerfile)
-        self.assertIn("--from=ghcr.io/astral-sh/uv@sha256:", dockerfile)
+        self.assertIn("FROM ghcr.io/astral-sh/uv@sha256:", dockerfile)
+        self.assertIn("AS uv-tools", dockerfile)
+        self.assertIn(
+            "--mount=from=uv-tools,source=/uv,target=/usr/local/bin/uv",
+            dockerfile,
+        )
+        self.assertNotIn("COPY --from=ghcr.io/astral-sh/uv", dockerfile)
         self.assertNotIn("uv:latest", dockerfile)
         self.assertIn("image: postgres:16-alpine@sha256:", compose)
         self.assertIn("image: postgres:16-alpine@sha256:", workflow)
@@ -730,6 +736,12 @@ class ProductionSettingsTests(TestCase):
             [ref for ref in action_refs if not re.fullmatch(r"[^@]+@[0-9a-f]{40}", ref)],
             [],
         )
+
+    def test_docker_context_excludes_local_tool_caches(self):
+        dockerignore = (settings.BASE_DIR / ".dockerignore").read_text().splitlines()
+
+        for path in (".pytest_cache", ".ruff_cache", ".mypy_cache", ".tox", ".nox"):
+            self.assertIn(path, dockerignore)
 
     def test_ci_uses_least_privilege_and_bounded_jobs(self):
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()

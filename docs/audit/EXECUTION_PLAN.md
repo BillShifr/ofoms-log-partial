@@ -951,3 +951,10 @@
 - [x] Сбросить все capabilities и вернуть только `CHOWN`.
 - [x] Запретить privilege escalation.
 - [x] Проверить реальный chown mounted path и невозможность записи в image filesystem.
+
+## 2026-09-12 — minimal runtime image content
+
+- [x] Убрать `uv` из финального runtime filesystem через ephemeral BuildKit mount.
+- [x] Сохранить immutable digest build tool и frozen dependency install.
+- [x] Исключить локальные Python tool caches из build context.
+- [x] Проверить собранный image на отсутствие executable и cache directories.

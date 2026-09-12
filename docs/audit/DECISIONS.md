@@ -421,3 +421,9 @@
 - `volume-init` сохраняет UID 0 только для смены владельца подключённых data volumes, но получает единственную capability `CHOWN` после `cap_drop: ALL`.
 - Image root filesystem init-контейнера read-only, а `no-new-privileges` запрещает расширение прав через исполняемые файлы.
 - Ошибка `chown` остаётся блокирующей зависимостью web; fallback к world-writable каталогам намеренно отсутствует.
+
+## 2026-09-12 Минимальный runtime image content
+
+- Pinned `uv` оформлен отдельным build stage и подключается к dependency-install step через BuildKit mount, поэтому executable не копируется в финальные layers.
+- `.dockerignore` исключает caches pytest, Ruff, mypy, tox и nox независимо от их наличия в локальном checkout.
+- Runtime image сохраняет только production dependencies, Django source/templates/static и обязательные пустые data paths; диагностические build tools не поставляются.

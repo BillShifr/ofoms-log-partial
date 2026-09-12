@@ -158,12 +158,19 @@ try {
       const errorStart = browserErrors.length;
       await navigate(`${baseUrl}${path}`);
       await evaluate(`document.documentElement.dataset.theme='light'; document.documentElement.dataset.font='base'; document.documentElement.dataset.contrast='default'`);
+      await pause(180);
       const metrics = await evaluate(`(() => ({
         path: location.pathname,
         title: document.title,
         forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
         documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
         navOverflow: Boolean(document.querySelector('.nav__scroll')) && document.querySelector('.nav__scroll').scrollWidth > document.querySelector('.nav__scroll').clientWidth + 1,
+        tablePalette: [...document.querySelectorAll('table.data tbody tr')].slice(0, 4).map((row) => ({
+          row: getComputedStyle(row).backgroundColor,
+          firstCell: row.cells[0] ? getComputedStyle(row.cells[0]).backgroundColor : null,
+          middleCell: row.cells[1] ? getComputedStyle(row.cells[1]).backgroundColor : null,
+          lastCell: row.cells.length ? getComputedStyle(row.cells[row.cells.length - 1]).backgroundColor : null
+        })),
         width: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth
       }))()`);
@@ -182,12 +189,19 @@ try {
         const errorStart = browserErrors.length;
         await navigate(`${baseUrl}${path}`);
         await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}; document.documentElement.dataset.font=${JSON.stringify(font)}; document.documentElement.dataset.contrast=${JSON.stringify(contrast)}`);
+        await pause(180);
       const metrics = await evaluate(`(() => ({
           path: location.pathname,
           title: document.title,
           forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
           documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
           navOverflow: Boolean(document.querySelector('.nav__scroll')) && document.querySelector('.nav__scroll').scrollWidth > document.querySelector('.nav__scroll').clientWidth + 1,
+          tablePalette: [...document.querySelectorAll('table.data tbody tr')].slice(0, 4).map((row) => ({
+            row: getComputedStyle(row).backgroundColor,
+            firstCell: row.cells[0] ? getComputedStyle(row.cells[0]).backgroundColor : null,
+            middleCell: row.cells[1] ? getComputedStyle(row.cells[1]).backgroundColor : null,
+            lastCell: row.cells.length ? getComputedStyle(row.cells[row.cells.length - 1]).backgroundColor : null
+          })),
           width: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth
         }))()`);

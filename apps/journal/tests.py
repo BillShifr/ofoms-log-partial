@@ -604,6 +604,9 @@ class JournalScreenTests(TestCase):
         self.assertIn("background: color-mix(in srgb, var(--green) 5%, var(--card))", css)
         self.assertIn(".data--journal tbody td:first-child", css)
         self.assertIn("left: 0", css)
+        self.assertIn(
+            "background: color-mix(in srgb, var(--bg) 38%, var(--card))", css
+        )
         self.assertIn("min-width: 1080px !important", css)
         self.assertIn("table.data .group-row th", css)
         self.assertIn(".data--journal thead { display: none; }", css)

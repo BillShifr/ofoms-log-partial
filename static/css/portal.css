@@ -384,8 +384,8 @@ table.data tbody tr[data-href]:focus-within {
 }
 table.data tr.row--overdue { background: color-mix(in srgb, var(--chip-red) 60%, var(--card)); box-shadow: inset 4px 0 var(--danger); }
 table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%, var(--card)); box-shadow: inset 4px 0 var(--warn); }
-.data--journal { min-width: 1120px !important; font-size: .76rem; }
-.data--journal th, .data--journal td { padding: 7px 10px; }
+.data--journal { min-width: 1080px !important; font-size: .75rem; }
+.data--journal th, .data--journal td { padding: 8px 9px; }
 .data--journal thead tr:not(.group-row) th {
   background: color-mix(in srgb, var(--ink) 2.5%, var(--card));
   color: color-mix(in srgb, var(--ink) 68%, transparent);
@@ -399,9 +399,9 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .data--journal tbody tr.row--overdue td:first-child { border-left: 2px solid color-mix(in srgb, var(--danger) 72%, var(--line)); }
 .data--journal tbody tr.row--open td:first-child { border-left: 2px solid color-mix(in srgb, var(--warn) 72%, var(--line)); }
 .data--journal tbody tr:hover { background: color-mix(in srgb, var(--ink) 2.5%, var(--card)); box-shadow: none; }
-.data--journal .col-theme { min-width: 160px; }
-.data--journal .col-n_irp { width: 158px; max-width: 158px; }
-.data--journal .col-z_f { min-width: 170px; }
+.data--journal .col-theme { min-width: 150px; }
+.data--journal .col-n_irp { width: 148px; max-width: 148px; }
+.data--journal .col-z_f { min-width: 156px; }
 .data--journal .col-status {
   position: sticky;
   right: 0;
@@ -731,20 +731,27 @@ table.data .group-row th {
 }
 table.data .group-row th.group-row__empty { background: transparent; border: none; border-radius: 0; }
 .data--journal .group-row th {
-  height: 28px;
-  padding: 6px 10px 4px;
-  background: transparent;
+  height: 27px;
+  padding: 5px 9px 4px;
+  background: transparent !important;
   border: 0;
+  box-shadow: none;
 }
+.data--journal .group-row th:first-child,
+.data--journal .group-row th:last-child { border-radius: 0; }
 .group-row__label {
   display: inline-flex;
   width: fit-content;
-  padding: 3px 8px;
-  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--line));
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--primary) 7%, var(--card));
-  color: color-mix(in srgb, var(--ink) 58%, transparent);
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--green) 18%, var(--line));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--green) 6%, var(--card));
+  color: color-mix(in srgb, var(--ink) 56%, transparent);
+  font-size: .64rem;
+  letter-spacing: .055em;
   line-height: 1;
+  white-space: nowrap;
 }
 table.data th { border-top: 1px solid var(--line); }
 table.data.th-sticky th:first-child,

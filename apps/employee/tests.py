@@ -151,6 +151,119 @@ class EmployeeAdminPolicyTests(TestCase):
             <= set(fields)
         )
 
+    def test_non_tfoms_staff_is_confined_to_own_organization_in_admin(self):
+        actor = Employee.objects.create_user(
+            username="smo_delegated_employee_admin",
+            password="GoodPass!1",
+            org=81001,
+            is_staff=True,
+        )
+        actor.user_permissions.set(
+            Permission.objects.filter(
+                codename__in=("add_employee", "change_employee", "view_employee")
+            )
+        )
+        own = Employee.objects.create_user(
+            username="smo_own_employee",
+            password="GoodPass!1",
+            org=81001,
+        )
+        foreign = Employee.objects.create_user(
+            username="smo_foreign_employee",
+            password="GoodPass!1",
+            org=81007,
+        )
+        root = Employee.objects.create_superuser(
+            username="smo_hidden_root",
+            password="GoodPass!1",
+            org=81001,
+        )
+        request = SimpleNamespace(user=actor)
+        model_admin = admin.site._registry[Employee]
+
+        visible_ids = set(
+            model_admin.get_queryset(request).values_list("pk", flat=True)
+        )
+
+        self.assertIn(actor.pk, visible_ids)
+        self.assertIn(own.pk, visible_ids)
+        self.assertNotIn(foreign.pk, visible_ids)
+        self.assertNotIn(root.pk, visible_ids)
+        self.assertTrue(model_admin.has_change_permission(request, own))
+        self.assertFalse(model_admin.has_change_permission(request, foreign))
+        self.assertFalse(model_admin.has_add_permission(request))
+        self.assertIn("org", model_admin.get_readonly_fields(request, own))
+
+    def test_non_tfoms_staff_cannot_move_employee_to_foreign_organization(self):
+        actor = Employee.objects.create_user(
+            username="smo_employee_admin_move_actor",
+            password="GoodPass!1",
+            org=81001,
+            is_staff=True,
+        )
+        actor.user_permissions.set(
+            Permission.objects.filter(
+                codename__in=("change_employee", "view_employee")
+            )
+        )
+        target = Employee.objects.create_user(
+            username="smo_employee_move_target",
+            password="GoodPass!1",
+            org=81001,
+        )
+        target.groups.add(Group.objects.get(name="СП1"))
+        self.client.force_login(actor)
+
+        response = self.client.post(
+            reverse("admin:employee_employee_change", args=[target.pk]),
+            {
+                "username": target.username,
+                "last_name": "Остался в СМО",
+                "first_name": "",
+                "email": "",
+                "org": "81007",
+                "date_joined_0": target.date_joined.strftime("%Y-%m-%d"),
+                "date_joined_1": target.date_joined.strftime("%H:%M:%S"),
+                "is_active": "on",
+                "groups": list(target.groups.values_list("pk", flat=True)),
+                "_save": "Сохранить",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        target.refresh_from_db()
+        self.assertEqual(target.org, 81001)
+        self.assertEqual(target.last_name, "Остался в СМО")
+
+    def test_tfoms_staff_retains_cross_organization_employee_management(self):
+        actor = Employee.objects.create_user(
+            username="tfoms_delegated_employee_admin",
+            password="GoodPass!1",
+            org=81000,
+            is_staff=True,
+        )
+        actor.user_permissions.set(
+            Permission.objects.filter(
+                codename__in=("add_employee", "change_employee", "view_employee")
+            )
+        )
+        foreign = Employee.objects.create_user(
+            username="tfoms_managed_foreign_employee",
+            password="GoodPass!1",
+            org=81007,
+        )
+        request = SimpleNamespace(user=actor)
+        model_admin = admin.site._registry[Employee]
+
+        visible_ids = set(
+            model_admin.get_queryset(request).values_list("pk", flat=True)
+        )
+
+        self.assertIn(foreign.pk, visible_ids)
+        self.assertTrue(model_admin.has_change_permission(request, foreign))
+        self.assertTrue(model_admin.has_add_permission(request))
+        self.assertNotIn("org", model_admin.get_readonly_fields(request, foreign))
+
     def test_non_superuser_admin_cannot_grant_superuser_or_direct_permissions(self):
         actor = Employee.objects.create_user(
             username="limited_employee_admin",

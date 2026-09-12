@@ -1,5 +1,6 @@
 """Администрирование сотрудников (пользователей) — перенос из v1."""
 
+from apps.core.admin_utils import OrganizationScopedAdminMixin
 from apps.core.models import EventLog, log_event
 from apps.core.roles import GROUP_ROLE_MAP, ROLE_GROUP_MAP, SMO_ROLES, TFOMS_ROLES
 from apps.employee.models import TFOMS, Employee, GroupProxy
@@ -71,7 +72,7 @@ def unlock_accounts(modeladmin, request, queryset):
 
 
 @admin.register(Employee)
-class EmployeeAdmin(UserAdmin):
+class EmployeeAdmin(OrganizationScopedAdminMixin, UserAdmin):
     model = Employee
     form = EmployeeChangeForm
     add_form = EmployeeCreationForm
@@ -101,9 +102,21 @@ class EmployeeAdmin(UserAdmin):
         return queryset
 
     def has_change_permission(self, request, obj=None):
+        if (
+            obj is not None
+            and not request.user.is_superuser
+            and request.user.org != TFOMS
+            and obj.org != request.user.org
+        ):
+            return False
         if obj is not None and obj.is_superuser and not request.user.is_superuser:
             return False
         return super().has_change_permission(request, obj)
+
+    def has_add_permission(self, request):
+        if not request.user.is_superuser and request.user.org != TFOMS:
+            return False
+        return super().has_add_permission(request)
 
     def user_change_password(self, request, id, form_url=""):
         """Связывает credential change с предметным audit в одной транзакции."""
@@ -159,6 +172,8 @@ class EmployeeAdmin(UserAdmin):
         fields = super().get_readonly_fields(request, obj)
         if not request.user.is_superuser:
             fields = (*fields, "is_superuser", "user_permissions")
+        if not request.user.is_superuser and request.user.org != TFOMS:
+            fields = (*fields, "org")
         if obj is not None and obj.pk == request.user.pk:
             fields = (
                 *fields,

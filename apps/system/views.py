@@ -271,7 +271,7 @@ def user_unblock(request, pk):
 
 def _events_qs(form):
     qs = EventLog.objects.select_related("user")
-    if form.is_valid():
+    if form.is_bound and form.is_valid():
         cd = form.cleaned_data
         if cd["module"]:
             qs = qs.filter(module=cd["module"])
@@ -287,6 +287,8 @@ def _events_qs(form):
             qs = qs.filter(started_at__gte=cd["date_from"])
         if cd["date_to"]:
             qs = qs.filter(started_at__lte=cd["date_to"])
+    elif form.is_bound:
+        qs = qs.none()
     return qs
 
 

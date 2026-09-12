@@ -81,7 +81,7 @@ def irp_list(request):
         qs = qs.filter(employee_one__org=request.user.org)
 
     form = IrpFilterForm(request.GET or None)
-    if form.is_valid():
+    if form.is_bound and form.is_valid():
         cd = form.cleaned_data
         if cd["id"]:
             qs = qs.filter(id=cd["id"])
@@ -109,6 +109,8 @@ def irp_list(request):
                 qs = qs.filter(date_close__isnull=True, data_plan__lt=today)
             elif cd["status"] == "open":
                 qs = qs.filter(date_close__isnull=True)
+    elif form.is_bound:
+        qs = qs.none()
 
     pref = UserTableViewPref.for_table(
         request.user, JOURNAL_TABLE_KEY, [c["key"] for c in JOURNAL_COLUMNS]

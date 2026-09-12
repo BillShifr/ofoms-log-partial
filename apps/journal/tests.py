@@ -572,6 +572,17 @@ class JournalScreenTests(TestCase):
         self.client.force_login(user)
         self.assertEqual(self.client.get(reverse("journal:list")).status_code, 403)
 
+    def test_invalid_list_filter_does_not_expand_personal_data_queryset(self):
+        self._make_irp()
+        self.client.force_login(self.tfoms_user)
+
+        response = self.client.get(reverse("journal:list"), {"id": "not-an-id"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Введите целое число")
+        self.assertContains(response, "<strong>0</strong>", html=True)
+        self.assertNotContains(response, "Петров")
+
     def test_list_shows_irp(self):
         irp = self._make_irp()
         self.client.force_login(self.tfoms_user)

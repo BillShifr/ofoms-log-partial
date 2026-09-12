@@ -18,15 +18,16 @@
     <details class="collapsible" id="journal-filters" data-key="journal-filters">
       <summary class="collapsible__toggle">Фильтры и поиск</summary>
       <div class="filters">
-        <div class="field"><label for="id_id">ID</label>{{ form.id }}</div>
-        <div class="field"><label for="id_n_irp">Номер</label>{{ form.n_irp }}</div>
-        <div class="field"><label for="id_z_f">Фамилия заявителя</label>{{ form.z_f }}</div>
-        <div class="field"><label for="id_z_enp">ЕНП</label>{{ form.z_enp }}</div>
-        <div class="field"><label for="id_irp_type">Вид обращения</label>{{ form.irp_type }}</div>
-        <div class="field"><label for="id_how">Способ</label>{{ form.how }}</div>
-        <div class="field"><label for="id_status">Статус</label>{{ form.status }}</div>
-        <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}</div>
-        <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}</div>
+        <div class="field"><label for="id_id">ID</label>{{ form.id }}{{ form.id.errors }}</div>
+        <div class="field"><label for="id_n_irp">Номер</label>{{ form.n_irp }}{{ form.n_irp.errors }}</div>
+        <div class="field"><label for="id_z_f">Фамилия заявителя</label>{{ form.z_f }}{{ form.z_f.errors }}</div>
+        <div class="field"><label for="id_z_enp">ЕНП</label>{{ form.z_enp }}{{ form.z_enp.errors }}</div>
+        <div class="field"><label for="id_irp_type">Вид обращения</label>{{ form.irp_type }}{{ form.irp_type.errors }}</div>
+        <div class="field"><label for="id_how">Способ</label>{{ form.how }}{{ form.how.errors }}</div>
+        <div class="field"><label for="id_status">Статус</label>{{ form.status }}{{ form.status.errors }}</div>
+        <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}{{ form.date_from.errors }}</div>
+        <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}{{ form.date_to.errors }}</div>
+        {% for error in form.non_field_errors %}<div class="field field--wide"><div class="alert alert--error" role="alert">{{ error }}</div></div>{% endfor %}
       </div>
     </details>
     <div class="form-actions journal-actions">

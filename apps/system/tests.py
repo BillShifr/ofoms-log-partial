@@ -516,6 +516,24 @@ class EventLogScreenTests(BaseSystemTestCase):
         )
         self.assertEqual(dangerous_cell.data_type, "s")
 
+    def test_invalid_event_filter_does_not_expand_audit_queryset(self):
+        log_event(
+            module="journal",
+            event_type=EventLog.EventType.CREATE,
+            user=self.operator,
+            target="sensitive:audit:target",
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse("system:events"), {"user": "not-a-primary-key"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Выберите корректный вариант")
+        self.assertContains(response, "<strong>0</strong>", html=True)
+        self.assertNotContains(response, "sensitive:audit:target")
+
     def test_event_initiator_suggest_is_filtered_and_limited_in_database(self):
         for index in range(12):
             Employee.objects.create_user(

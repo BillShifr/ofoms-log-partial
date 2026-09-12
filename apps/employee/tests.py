@@ -151,6 +151,73 @@ class EmployeeAdminPolicyTests(TestCase):
             <= set(fields)
         )
 
+    def test_non_superuser_admin_cannot_grant_superuser_or_direct_permissions(self):
+        actor = Employee.objects.create_user(
+            username="limited_employee_admin",
+            password="GoodPass!1",
+            org=81000,
+            is_staff=True,
+        )
+        employee_permissions = Permission.objects.filter(
+            codename__in=("view_employee", "change_employee")
+        )
+        actor.user_permissions.set(employee_permissions)
+        target = Employee.objects.create_user(
+            username="no_privilege_escalation_target",
+            password="GoodPass!1",
+            org=81000,
+        )
+        unrelated_permission = Permission.objects.exclude(
+            pk__in=employee_permissions.values_list("pk", flat=True)
+        ).order_by("pk").first()
+        model_admin = admin.site._registry[Employee]
+        readonly = model_admin.get_readonly_fields(
+            SimpleNamespace(user=actor), target
+        )
+        self.assertIn("is_superuser", readonly)
+        self.assertIn("user_permissions", readonly)
+        self.client.force_login(actor)
+
+        response = self.client.post(
+            reverse("admin:employee_employee_change", args=[target.pk]),
+            {
+                "username": target.username,
+                "last_name": "",
+                "first_name": "",
+                "email": "",
+                "org": "81000",
+                "date_joined_0": target.date_joined.strftime("%Y-%m-%d"),
+                "date_joined_1": target.date_joined.strftime("%H:%M:%S"),
+                "is_active": "on",
+                "is_superuser": "on",
+                "user_permissions": [unrelated_permission.pk],
+                "_save": "Сохранить",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        target.refresh_from_db()
+        self.assertFalse(target.is_superuser)
+        self.assertFalse(target.user_permissions.exists())
+
+    def test_superuser_can_manage_privilege_fields_for_another_account(self):
+        actor = Employee.objects.create_superuser(
+            username="superuser_readonly_policy_actor",
+            password="GoodPass!1",
+            org=81000,
+        )
+        target = Employee.objects.create_user(
+            username="superuser_readonly_policy_target",
+            password="GoodPass!1",
+            org=81000,
+        )
+        readonly = admin.site._registry[Employee].get_readonly_fields(
+            SimpleNamespace(user=actor), target
+        )
+
+        self.assertNotIn("is_superuser", readonly)
+        self.assertNotIn("user_permissions", readonly)
+
     def test_admin_change_records_subject_audit_after_roles(self):
         actor = Employee.objects.create_superuser(
             username="employee_admin_actor",

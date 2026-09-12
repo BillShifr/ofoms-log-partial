@@ -843,3 +843,10 @@
 - [x] Проверить 405 для POST на всей матрице до object lookup.
 - [x] Проверить POST/PUT/PATCH/DELETE на представительном read route.
 - [x] Не изменять счётчик просмотров новости при безопасном HEAD.
+
+## 2026-09-12 — защита privilege fields в EmployeeAdmin
+
+- [x] Скрыть `is_superuser` и direct permissions от любого non-superuser actor.
+- [x] Игнорировать forged POST этих полей на сервере.
+- [x] Сохранить controlled управление чужой учётной записью для superuser.
+- [x] Сохранить запрет изменения собственных access fields.

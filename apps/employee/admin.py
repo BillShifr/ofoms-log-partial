@@ -121,8 +121,10 @@ class EmployeeAdmin(UserAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         fields = super().get_readonly_fields(request, obj)
+        if not request.user.is_superuser:
+            fields = (*fields, "is_superuser", "user_permissions")
         if obj is not None and obj.pk == request.user.pk:
-            return (
+            fields = (
                 *fields,
                 "is_active",
                 "is_staff",
@@ -130,7 +132,7 @@ class EmployeeAdmin(UserAdmin):
                 "groups",
                 "user_permissions",
             )
-        return fields
+        return tuple(dict.fromkeys(fields))
 
     def has_delete_permission(self, request, obj=None):
         """Учётные записи деактивируются, но не удаляются из audit trail."""

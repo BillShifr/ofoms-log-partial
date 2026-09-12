@@ -93,6 +93,77 @@ class SystemMetaContextTests(TestCase):
         self.assertTrue(context["can_manage_system"])
 
 
+class EventLogAdminScopeTests(TestCase):
+    def setUp(self):
+        self.smo_user = User.objects.create_user(
+            username="event-admin-smo-actor",
+            password="GoodPass!1",
+            org=81001,
+            is_staff=True,
+        )
+        self.tfoms_user = User.objects.create_user(
+            username="event-admin-tfoms-actor",
+            password="GoodPass!1",
+            org=81000,
+            is_staff=True,
+        )
+        self.own = log_event(
+            module="scope",
+            event_type=EventLog.EventType.VIEW,
+            user=self.smo_user,
+            ip="192.0.2.1",
+            target="own",
+        )
+        self.foreign = log_event(
+            module="scope",
+            event_type=EventLog.EventType.VIEW,
+            user=self.tfoms_user,
+            ip="192.0.2.2",
+            target="foreign",
+        )
+        self.system = log_event(
+            module="scope",
+            event_type=EventLog.EventType.TASK,
+            target="system",
+        )
+
+    @staticmethod
+    def _request(user):
+        return mock.Mock(user=user)
+
+    def test_smo_staff_sees_only_events_from_own_organization(self):
+        model_admin = admin.site._registry[EventLog]
+
+        queryset = model_admin.get_queryset(self._request(self.smo_user))
+
+        self.assertEqual(list(queryset.values_list("pk", flat=True)), [self.own.pk])
+
+    def test_tfoms_staff_sees_all_events_including_system_events(self):
+        model_admin = admin.site._registry[EventLog]
+
+        queryset = model_admin.get_queryset(self._request(self.tfoms_user))
+
+        self.assertEqual(
+            set(queryset.values_list("pk", flat=True)),
+            {self.own.pk, self.foreign.pk, self.system.pk},
+        )
+
+    def test_superuser_outside_tfoms_sees_all_events(self):
+        root = User.objects.create_superuser(
+            username="event-admin-foreign-root",
+            password="GoodPass!1",
+            org=81007,
+        )
+        model_admin = admin.site._registry[EventLog]
+
+        queryset = model_admin.get_queryset(self._request(root))
+
+        self.assertEqual(
+            set(queryset.values_list("pk", flat=True)),
+            {self.own.pk, self.foreign.pk, self.system.pk},
+        )
+
+
 class PortalHttpMethodContractTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_superuser(

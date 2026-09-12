@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib.admin import DateFieldListFilter, SimpleListFilter
 from rangefilter.filters import DateRangeFilter
 
-from apps.core.admin_utils import ReadOnlyAdminMixin
+from apps.core.admin_utils import OrganizationScopedAdminMixin, ReadOnlyAdminMixin
 from apps.core.models import EventLog
 
 
@@ -30,7 +30,10 @@ class EventUserFilter(SimpleListFilter):
 
 
 @admin.register(EventLog)
-class EventLogAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+class EventLogAdmin(
+    OrganizationScopedAdminMixin, ReadOnlyAdminMixin, admin.ModelAdmin
+):
+    organization_lookup = "user__org"
     list_display = (
         "id",
         "started_at",

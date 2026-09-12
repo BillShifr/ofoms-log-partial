@@ -371,4 +371,10 @@
 - Прямые Django permissions для non-ТФОМС staff действуют только внутри собственной организации и не дают права создавать principal в произвольной СМО.
 - `org` становится readonly для такого actor, а независимый object-level guard отклоняет foreign object даже при прямом вызове permission API.
 - Staff ТФОМС сохраняет межорганизационные add/change/view возможности; управление superuser и password endpoint остаётся исключительно за superuser.
+
+## 2026-09-12 Конфиденциальность EventLog в Django Admin
+
+- Для non-ТФОМС staff событие относится к организации через `EventLog.user.org`; чужие IP, targets и details не возвращаются admin queryset.
+- События без actor считаются общесистемными и не показываются отдельной СМО, поскольку надёжной tenant-привязки у записи нет.
+- Staff ТФОМС и superuser сохраняют полный audit/recovery view, включая межорганизационные и system events.
 - Login/logout подключены явно с прежними именами, поэтому декораторы, redirects, шаблоны и аудит не меняют публичный контракт.

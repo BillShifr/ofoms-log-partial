@@ -345,6 +345,41 @@ class ReportScreenTests(BaseReportTestCase):
         self.assertEqual(numbers, [own.n_irp])
         self.assertNotIn(foreign.n_irp, numbers)
 
+    def test_superuser_outside_tfoms_retains_global_report_scope(self):
+        self._make(owner=self.tfoms_user, irp_type=2)
+        self._make(owner=self.smo_user, irp_type=2)
+        root = Employee.objects.create_superuser(
+            username="report_foreign_org_root",
+            password="GoodPass!1",
+            org=81007,
+        )
+        self.client.force_login(root)
+
+        response = self.client.get(
+            reverse("reports:detail", args=["r4_complaints"]),
+            {"date_from": datetime.date.today().isoformat()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["rows"][-1]["total"], 2)
+        self.assertEqual(
+            set(dict(response.context["form"].fields["otv_kon"].choices)),
+            {"", 81000, 81001, 81007, 81008},
+        )
+        exported = self.client.get(
+            reverse("reports:export", args=["r4_complaints", "xlsx"]),
+            {"date_from": datetime.date.today().isoformat()},
+        )
+        worksheet = load_workbook(io.BytesIO(exported.content)).active
+        headers = [cell.value for cell in worksheet[1]]
+        total_column = headers.index("Кол-во") + 1
+
+        self.assertEqual(exported.status_code, 200)
+        self.assertEqual(
+            worksheet.cell(row=worksheet.max_row, column=total_column).value,
+            2,
+        )
+
     def test_export_invalid_fmt_404(self):
         self.client.force_login(self.tfoms_user)
         resp = self.client.get(

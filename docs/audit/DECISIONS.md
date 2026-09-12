@@ -384,4 +384,10 @@
 - Lookup показывает только principals, связанные с доступными строками, и использует имя без дополнительных запросов на каждый вариант.
 - Фильтрация по подставленному ID применяется к тому же scoped queryset и не может расширить tenant boundary.
 - Значение query parameter принимается только как ASCII decimal PK не меньше единицы; любое malformed значение fail-closed возвращает пустой queryset вместо 500 или сброса к более широкой выборке.
+
+## 2026-09-12 Глобальный report scope superuser
+
+- Report builders сохраняют существующий integer organization contract; web boundary передаёт `TFOMS` как маркер глобального scope для любого superuser.
+- Форма фильтров учитывает `is_superuser` отдельно от profile `org`, поэтому root principal видит полный список организаций.
+- Обычный пользователь СМО по-прежнему ограничен immutable owner organization и не может расширить scope параметрами фильтра.
 - Login/logout подключены явно с прежними именами, поэтому декораторы, redirects, шаблоны и аудит не меняют публичный контракт.

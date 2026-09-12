@@ -909,3 +909,10 @@
 - [x] Сохранить фильтрацию по конкретному сотруднику без расширения scope.
 - [x] Проверить реальный changelist для SМО staff с own/foreign principals.
 - [x] Валидировать недоверенный employee PK и fail-closed обрабатывать malformed query без HTTP 500.
+
+## 2026-09-12 — глобальный report scope superuser
+
+- [x] Отвязать recovery scope отчётов от profile organization superuser.
+- [x] Показывать root principal полный фильтр организаций.
+- [x] Проверить preview и реальный XLSX export с обращениями двух организаций.
+- [x] Сохранить SМО owner-scope regression.

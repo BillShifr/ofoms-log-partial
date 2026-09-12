@@ -7,6 +7,7 @@ from django.views.decorators.http import require_GET
 
 from apps.core.models import EventLog, log_event
 from apps.core.policy import REPORTS_READ, user_has_capability
+from apps.employee.models import TFOMS
 from apps.reports.export import write_pdf, write_xlsx_bytes
 from apps.reports.forms import ReportFilterForm
 from apps.reports.reports import REPORT_INDEX, REPORTS
@@ -19,6 +20,11 @@ EXPORT_META = {
     ),
     "pdf": ("application/pdf", "pdf", write_pdf),
 }
+
+
+def _report_scope_org(user):
+    """Superuser получает глобальный recovery scope независимо от profile org."""
+    return TFOMS if user.is_superuser else user.org
 
 
 def _get_spec(slug):
@@ -47,7 +53,7 @@ def report_detail(request, slug):
     form = ReportFilterForm(request.GET or None, user=request.user)
     rows = None
     if form.is_valid() and form.has_filters:
-        rows = spec.build(request.user.org, form.to_filters())
+        rows = spec.build(_report_scope_org(request.user), form.to_filters())
         log_event(
             module="reports",
             event_type=EventLog.EventType.EXPORT,
@@ -78,7 +84,10 @@ def report_export(request, slug, fmt):
     form = ReportFilterForm(request.GET or None, user=request.user)
     if not form.is_valid():
         return HttpResponse(status=400)
-    payload = writer(spec, spec.build(request.user.org, form.to_filters()))
+    payload = writer(
+        spec,
+        spec.build(_report_scope_org(request.user), form.to_filters()),
+    )
     log_event(
         module="reports",
         event_type=EventLog.EventType.EXPORT,

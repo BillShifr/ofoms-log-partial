@@ -49,7 +49,7 @@ class ReportFilterForm(forms.Form):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if user is not None and user.org != TFOMS:
+        if user is not None and not user.is_superuser and user.org != TFOMS:
             self.fields["otv_kon"].choices = _EMPTY + [
                 o for o in ORGS if o[0] == user.org
             ]

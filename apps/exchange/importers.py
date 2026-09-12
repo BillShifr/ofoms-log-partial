@@ -12,6 +12,7 @@ import glob
 import logging
 import os
 import shutil
+import stat
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -132,6 +133,16 @@ def validate_xlsx_container(path: Path) -> None:
             raise ValueError("Распакованный XLSX превышает 100 МБ")
 
 
+def validate_regular_exchange_input(path: Path) -> None:
+    """Разрешает importer только обычный файл, не следуя filesystem links."""
+    try:
+        mode = path.lstat().st_mode
+    except OSError as error:
+        raise ValueError("Входной файл недоступен") from error
+    if not stat.S_ISREG(mode):
+        raise ValueError("Входной объект должен быть обычным файлом; ссылки запрещены")
+
+
 def write_unique_artifact(path: Path, chunks) -> Path:
     """Атомарно создаёт новый artifact, не перезаписывая параллельный файл."""
     import uuid
@@ -172,7 +183,9 @@ def reserve_unique_artifact_path(path: Path) -> Path:
 
 def archive_artifact(source: Path, archive_dir: Path, org: int) -> Path:
     """Move a processed input exactly once, including across filesystems."""
-    source.chmod(0o600)
+    source_mode = source.lstat().st_mode
+    if stat.S_ISREG(source_mode):
+        source.chmod(0o600)
     org_dir = archive_dir / str(org)
     destination = reserve_unique_artifact_path(org_dir / source.name)
     try:
@@ -263,6 +276,7 @@ class XsdExchangeFile:
     def validate(self):
         """XSD-валидация и разбор XML."""
         try:
+            validate_regular_exchange_input(self.real_file)
             if self.real_file.stat().st_size > MAX_EXCHANGE_FILE_SIZE:
                 self.errors.append(
                     flc.error_result("FILE", "Размер файла превышает 20 МБ")
@@ -282,6 +296,8 @@ class XsdExchangeFile:
             with open(self.real_file, "rb") as f:
                 self.xml = etree.parse(f, parser).getroot()
             self.validated = True
+        except ValueError as exc:
+            self.errors.append(flc.error_result("FILE", str(exc)))
         except (etree.XMLSyntaxError, etree.DocumentInvalid) as exc:
             self.errors.append(flc.error_result("XML", str(exc)))
         except Exception:  # noqa: BLE001 -- redact internal parser/config details
@@ -777,6 +793,7 @@ class ExcelIrpFile:
 
         wb = None
         try:
+            validate_regular_exchange_input(self.real_file)
             if self.real_file.stat().st_size > MAX_EXCHANGE_FILE_SIZE:
                 raise ValueError("Размер файла превышает 20 МБ")
             validate_xlsx_container(self.real_file)
@@ -929,7 +946,7 @@ def discover_files(in_dir, org, masks) -> list[Path]:
         files.extend(
             Path(p)
             for p in glob.glob(str(org_dir / mask))
-            if os.path.isfile(p)
+            if os.path.isfile(p) or os.path.islink(p)
         )
     return sorted(set(files), key=lambda p: p.name)
 

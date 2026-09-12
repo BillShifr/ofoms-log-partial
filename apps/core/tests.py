@@ -53,6 +53,64 @@ from apps.system.models import (
 User = get_user_model()
 
 
+class PortalHttpMethodContractTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="http-method-contract-admin",
+            password="GoodPass!1",
+            org=81000,
+        )
+        self.client.force_login(self.user)
+
+    def _read_only_urls(self):
+        return (
+            reverse("journal:suggest"),
+            reverse("journal:list"),
+            reverse("journal:list_print"),
+            reverse("journal:detail", args=[999999]),
+            reverse("journal:print", args=[999999]),
+            reverse("journal:cover", args=[999999]),
+            reverse("exchange:logs"),
+            reverse("exchange:protocol", args=[999999]),
+            reverse("system:users"),
+            reverse("system:events"),
+            reverse("system:messages"),
+            reverse("system:conversation", args=[999999]),
+            reverse("system:thread", args=[999999]),
+            reverse("system:tasks"),
+            reverse("system:docs"),
+            reverse("system:doc_category", args=["missing"]),
+            reverse("system:news"),
+            reverse("system:news_detail", args=[999999]),
+            reverse("system:prefs"),
+        )
+
+    def test_all_portal_read_routes_reject_post_before_object_lookup(self):
+        for url in self._read_only_urls():
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url).status_code, 405)
+
+    def test_read_route_rejects_every_unsafe_http_method(self):
+        url = reverse("journal:list")
+        for method in ("POST", "PUT", "PATCH", "DELETE"):
+            with self.subTest(method=method):
+                response = self.client.generic(method, url)
+                self.assertEqual(response.status_code, 405)
+
+    def test_head_is_safe_and_does_not_increment_news_views(self):
+        item = NewsItem.objects.create(
+            title="HEAD без просмотра",
+            author=self.user,
+            views_count=4,
+        )
+
+        response = self.client.head(reverse("system:news_detail", args=[item.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        item.refresh_from_db()
+        self.assertEqual(item.views_count, 4)
+
+
 class FileOwnershipTests(TestCase):
     def test_close_file_on_error_closes_handle_when_handoff_fails(self):
         file_handle = io.BytesIO(b"content")

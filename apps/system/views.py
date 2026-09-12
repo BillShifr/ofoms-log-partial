@@ -20,7 +20,7 @@ from django.db.models.functions import Coalesce, Concat
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_safe
 
 from apps.core.fold import contains_folded, filter_contains_any
 from apps.core.models import EventLog, log_event
@@ -103,6 +103,7 @@ def _paginate(request, qs, per_page=PAGE_SIZE):
 
 
 @admin_required
+@require_safe
 def user_list(request):
     form = EmployeeFilterForm(request.GET or None)
     qs = Employee.objects.prefetch_related("groups").order_by("last_name", "first_name")
@@ -305,6 +306,7 @@ def event_initiator_suggest(request):
 
 
 @admin_required
+@require_safe
 def event_list(request):
     from django.urls import reverse
 
@@ -490,6 +492,7 @@ def _conversations_meta(user, q=""):
 
 
 @login_required
+@require_safe
 def message_list(request):
     """Список диалогов (левая панель) + форма создания диалога."""
     q = (request.GET.get("q") or "").strip().lower()
@@ -536,6 +539,7 @@ def conversation_create(request):
 
 
 @login_required
+@require_safe
 def conversation_detail(request, pk):
     """Диалог: список тем/веток + создание новой темы."""
     conv = get_object_or_404(
@@ -588,6 +592,7 @@ def conversation_thread_create(request, pk):
 
 
 @login_required
+@require_safe
 def thread_detail(request, pk):
     """Тема: лента сообщений, ответы, реакции, вложения."""
     thread = get_object_or_404(
@@ -818,6 +823,7 @@ def users_suggest(request):
 
 
 @admin_required
+@require_safe
 def task_list(request):
     tasks = TaskJob.objects.select_related("assigned_to", "created_by").prefetch_related("runs")
     from apps.system.tasks import TASK_COMMAND_LABELS
@@ -1087,6 +1093,7 @@ def task_file_download(request, pk):
 
 
 @login_required
+@require_safe
 def doc_list(request):
     """Главная документации (wiki-стиль): карточки категорий + без категории."""
     categories = DocCategory.objects.annotate(docs_total=Count("docs"))
@@ -1115,6 +1122,7 @@ def doc_list(request):
 
 
 @login_required
+@require_safe
 def doc_category(request, slug):
     """Документы конкретной категории (wiki-просмотр)."""
     category = get_object_or_404(
@@ -1260,6 +1268,7 @@ def doc_delete(request, pk):
 
 
 @login_required
+@require_safe
 def news_list(request):
     """Карточки новостей с поиском и фильтрами (PRD v3 §2.7)."""
     qs = NewsItem.objects.select_related("author", "category")
@@ -1373,6 +1382,7 @@ def news_update(request, pk):
 
 
 @login_required
+@require_safe
 def news_detail(request, pk):
     """Детальный просмотр новости с подсчётом просмотров (PRD v3 §2.7)."""
     item = get_object_or_404(
@@ -1380,8 +1390,9 @@ def news_detail(request, pk):
     )
     if not item.is_active and not _is_admin(request.user):
         raise Http404
-    NewsItem.objects.filter(pk=pk).update(views_count=F("views_count") + 1)
-    item.views_count += 1
+    if request.method == "GET":
+        NewsItem.objects.filter(pk=pk).update(views_count=F("views_count") + 1)
+        item.views_count += 1
     return render(
         request,
         "system/news_detail.html",
@@ -1484,6 +1495,7 @@ def _tables_meta() -> dict:
 
 
 @login_required
+@require_safe
 def prefs_list(request):
     prefs = UserTableViewPref.objects.filter(user=request.user)
     tables = _tables_meta()

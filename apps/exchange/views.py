@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_safe
 
 from apps.core.models import EventLog, log_event
 from apps.core.policy import EXCHANGE_READ, EXCHANGE_UPLOAD, user_has_capability
@@ -99,6 +99,7 @@ def _process_upload(user, org, uploaded) -> ImportLog:
 
 
 @login_required
+@require_safe
 def exchange_logs(request):
     if not user_has_capability(request.user, EXCHANGE_READ):
         raise PermissionDenied
@@ -114,6 +115,7 @@ def exchange_logs(request):
 
 
 @login_required
+@require_safe
 def exchange_protocol(request, pk):
     if not user_has_capability(request.user, EXCHANGE_READ):
         raise PermissionDenied

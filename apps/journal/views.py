@@ -19,7 +19,7 @@ from django.db import transaction
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_safe
 
 from apps.core.fold import contains_folded
 from apps.core.models import EventLog, log_event
@@ -50,6 +50,7 @@ PRINT_LIST_LIMIT = 500
 
 
 @login_required
+@require_safe
 def irp_suggest(request):
     """Автозаполнение фильтров журнала (PRD v3 §2.3.2).
 
@@ -69,6 +70,7 @@ def irp_suggest(request):
 
 
 @login_required
+@require_safe
 def irp_list(request):
     """Реестр обращений: таблица + панель фильтров + пагинация."""
     _require_capability(request, JOURNAL_READ)
@@ -176,6 +178,7 @@ def irp_list(request):
 
 
 @login_required
+@require_safe
 def irp_list_print(request):
     """Печатное представление текущей выборки реестра (не более 500 строк)."""
     mutable_query = request.GET.copy()
@@ -210,6 +213,7 @@ def _paginate_irp(request, qs):
 
 
 @login_required
+@require_safe
 def irp_detail(request, pk):
     """Полная карточка обращения (РКК) + история, ответы, файлы."""
     irp = _get_irp_for_user(request, pk)
@@ -233,6 +237,7 @@ def irp_detail(request, pk):
 
 
 @login_required
+@require_safe
 def irp_print(request, pk):
     """Печатная форма обращения (п. 35: РКК сохраняется на каждом этапе)."""
     irp = _get_irp_for_user(request, pk)
@@ -473,6 +478,7 @@ def irp_redirect(request, pk):
 
 
 @login_required
+@require_safe
 def irp_cover(request, pk):
     """Печатное сопроводительное письмо при переадресации (ТЗ п. 212)."""
     irp = _get_irp_for_user(request, pk)

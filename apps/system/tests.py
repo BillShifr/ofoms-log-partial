@@ -1727,6 +1727,41 @@ class NewsTests(BaseSystemTestCase):
         resp = self.client.get(reverse("system:news"), {"category": "other"})
         self.assertNotContains(resp, "Регламент")
 
+    def test_invalid_news_date_filter_fails_closed(self):
+        NewsItem.objects.create(
+            title="Не должно попасть в расширенную выборку",
+            author=self.admin,
+            is_active=True,
+        )
+        self.client.force_login(self.smo)
+
+        response = self.client.get(
+            reverse("system:news"), {"date_from": "not-a-date"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Укажите даты в корректном формате")
+        self.assertNotContains(response, "Не должно попасть в расширенную выборку")
+
+    def test_reversed_news_date_range_fails_closed(self):
+        NewsItem.objects.create(
+            title="Не должно попасть в обратный период",
+            author=self.admin,
+            is_active=True,
+        )
+        self.client.force_login(self.smo)
+
+        response = self.client.get(
+            reverse("system:news"),
+            {"date_from": "2026-09-12", "date_to": "2026-09-11"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, "Дата начала периода не может быть позже даты окончания"
+        )
+        self.assertNotContains(response, "Не должно попасть в обратный период")
+
 
 class TaskTests(BaseSystemTestCase):
     def _make_task(self, **kw):

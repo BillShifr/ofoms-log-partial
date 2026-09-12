@@ -10,6 +10,7 @@
   <details class="collapsible" data-key="news-filters">
     <summary class="collapsible__toggle">Поиск и фильтры</summary>
     <form method="get" class="filters">
+      {% if filter_error %}<div class="field field--wide"><div class="alert alert--error" role="alert">{{ filter_error }}</div></div>{% endif %}
       <div class="field">
         <label for="news-q">Поиск</label>
         <input id="news-q" type="text" name="q" value="{{ request.GET.q }}"

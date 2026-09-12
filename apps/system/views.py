@@ -7,6 +7,7 @@
 """
 
 import mimetypes
+from datetime import date
 from functools import wraps
 from pathlib import PurePosixPath
 
@@ -1291,6 +1292,16 @@ def news_list(request):
     date_from = request.GET.get("date_from", "")
     date_to = request.GET.get("date_to", "")
     q = (request.GET.get("q") or "").strip()
+    filter_error = ""
+
+    try:
+        parsed_from = date.fromisoformat(date_from) if date_from else None
+        parsed_to = date.fromisoformat(date_to) if date_to else None
+    except ValueError:
+        parsed_from = parsed_to = None
+        filter_error = "Укажите даты в корректном формате."
+    if parsed_from and parsed_to and parsed_from > parsed_to:
+        filter_error = "Дата начала периода не может быть позже даты окончания."
 
     if not _is_admin(request.user) or status == "on":
         qs = qs.filter(is_active=True)
@@ -1298,20 +1309,13 @@ def news_list(request):
         qs = qs.filter(is_active=False)
     if category_slug:
         qs = qs.filter(category__slug=category_slug)
-    if date_from:
-        try:
-            from datetime import datetime
-
-            qs = qs.filter(created_at__date__gte=datetime.strptime(date_from, "%Y-%m-%d").date())
-        except ValueError:
-            pass
-    if date_to:
-        try:
-            from datetime import datetime
-
-            qs = qs.filter(created_at__date__lte=datetime.strptime(date_to, "%Y-%m-%d").date())
-        except ValueError:
-            pass
+    if filter_error:
+        qs = qs.none()
+    else:
+        if parsed_from:
+            qs = qs.filter(created_at__date__gte=parsed_from)
+        if parsed_to:
+            qs = qs.filter(created_at__date__lte=parsed_to)
 
     if q:
         qs = filter_contains_any(
@@ -1330,6 +1334,7 @@ def news_list(request):
             "categories": NewsCategory.objects.all(),
             "can_manage": _is_admin(request.user),
             "form": NewsForm(),
+            "filter_error": filter_error,
             "active_nav": "news",
         },
     )

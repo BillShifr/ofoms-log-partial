@@ -930,3 +930,10 @@
 - [x] Закрыть одной boundary все служебные administrative portal routes.
 - [x] Проверить forged Admin group для СМО, включая попытку блокировки чужого пользователя.
 - [x] Сохранить recovery scope superuser с profile organization СМО.
+
+## 2026-09-12 — organization-compatible effective RBAC roles
+
+- [x] Ограничить effective role set матрицей организации на центральной policy boundary.
+- [x] Исключить forged ОП/Admin у СМО и СП у ТФОМС из всех capabilities.
+- [x] Согласовать header labels и system-admin predicate с effective roles.
+- [x] Сохранить валидные роли обеих сторон и безусловный superuser recovery bypass.

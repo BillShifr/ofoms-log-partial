@@ -1,6 +1,6 @@
 """Central deny-by-default capability policy for regulated business actions."""
 
-from apps.core.roles import GROUP_ROLE_MAP, Roles
+from apps.core.roles import GROUP_ROLE_MAP, SMO_ROLES, TFOMS_ROLES, Roles
 
 JOURNAL_CREATE = "journal.create"
 JOURNAL_CHANGE = "journal.change"
@@ -51,11 +51,15 @@ CAPABILITY_ROLES = {
 def role_codes_for_user(user) -> set[int]:
     if user is None or not user.is_authenticated:
         return set()
-    return {
+    from apps.employee.models import TFOMS
+
+    assigned = {
         code
         for name in user.groups.values_list("name", flat=True)
         if (code := GROUP_ROLE_MAP.get(name)) is not None
     }
+    compatible = TFOMS_ROLES if user.org == TFOMS else SMO_ROLES
+    return assigned & compatible
 
 
 def user_has_capability(user, capability: str) -> bool:

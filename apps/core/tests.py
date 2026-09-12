@@ -27,6 +27,13 @@ from django.utils import timezone
 from apps.core.auth import on_logged_in, on_login_failed
 from apps.core.context_processors import system_meta
 from apps.core.models import ConsumedToken, EventLog, log_event
+from apps.core.policy import (
+    EXCHANGE_UPLOAD,
+    JOURNAL_CREATE,
+    REPORTS_READ,
+    role_codes_for_user,
+    user_has_capability,
+)
 from apps.core.roles import ensure_role_groups, role_code_for_user
 from apps.core.storage import close_file_on_error
 from apps.core.tokens import (
@@ -103,6 +110,62 @@ class SystemMetaContextTests(TestCase):
         context = system_meta(mock.Mock(user=user))
 
         self.assertFalse(context["can_manage_system"])
+
+
+class CapabilityOrganizationBoundaryTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        ensure_role_groups()
+
+    def test_smo_ignores_incompatible_tfoms_roles(self):
+        user = User.objects.create_user(
+            username="forged-smo-operator",
+            password="GoodPass!1",
+            org=81001,
+        )
+        user.groups.set(
+            [Group.objects.get(name="ОП1"), Group.objects.get(name="Администратор")]
+        )
+
+        self.assertEqual(role_codes_for_user(user), set())
+        for capability in (JOURNAL_CREATE, EXCHANGE_UPLOAD, REPORTS_READ):
+            self.assertFalse(user_has_capability(user, capability), capability)
+
+    def test_tfoms_ignores_incompatible_smo_role(self):
+        user = User.objects.create_user(
+            username="forged-tfoms-representative",
+            password="GoodPass!1",
+            org=81000,
+        )
+        user.groups.add(Group.objects.get(name="СП1"))
+
+        self.assertEqual(role_codes_for_user(user), set())
+        self.assertFalse(user_has_capability(user, JOURNAL_CREATE))
+
+    def test_compatible_roles_and_superuser_bypass_remain_effective(self):
+        tfoms_user = User.objects.create_user(
+            username="valid-tfoms-operator",
+            password="GoodPass!1",
+            org=81000,
+        )
+        tfoms_user.groups.add(Group.objects.get(name="ОП1"))
+        smo_user = User.objects.create_user(
+            username="valid-smo-representative",
+            password="GoodPass!1",
+            org=81001,
+        )
+        smo_user.groups.add(Group.objects.get(name="СП1"))
+        root = User.objects.create_superuser(
+            username="capability-foreign-org-root",
+            password="GoodPass!1",
+            org=81001,
+        )
+
+        self.assertTrue(user_has_capability(tfoms_user, JOURNAL_CREATE))
+        self.assertTrue(user_has_capability(smo_user, JOURNAL_CREATE))
+        for capability in (JOURNAL_CREATE, EXCHANGE_UPLOAD, REPORTS_READ):
+            self.assertTrue(user_has_capability(root, capability), capability)
 
 
 class EventLogAdminScopeTests(TestCase):

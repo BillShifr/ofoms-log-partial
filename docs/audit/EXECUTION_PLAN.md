@@ -1201,3 +1201,13 @@
 - [x] Требовать явное подтверждение замены состояния и fail closed после начала restore.
 - [x] Выполнить изолированный round-trip: БД и оба volume вернули исходные маркеры,
   поздние данные исчезли, readiness=200; аварийный backup возобновил те же container ID.
+
+## 2026-09-12 — provenance и compatibility backup
+
+- [x] Записывать versioned manifest с точной OCI Git-ревизией, временем снимка, именем и версией БД.
+- [x] Включать manifest в checksum-набор и отклонять дополнительные либо пропущенные artifacts.
+- [x] Проверять каталог custom PostgreSQL dump до удаления целевой базы.
+- [x] Сверять revision копии с фактическим revision текущего `web` image до остановки writers.
+- [x] Доказать isolated positive restore и отказ mismatch/corrupt dump до destructive phase:
+  данные БД/media/exchange восстановлены, readiness=200; оба отказа сохранили исходные container ID,
+  запущенных writers и неизменённую контрольную строку БД.

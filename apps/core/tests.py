@@ -822,8 +822,8 @@ class ProductionSettingsTests(TestCase):
         restore = (settings.BASE_DIR / "scripts" / "restore_release.sh").read_text()
 
         self.assertIn("docker compose stop web scheduler", backup)
-        self.assertIn("web_container=$(docker compose ps -q web)", backup)
-        self.assertIn("scheduler_container=$(docker compose ps -q scheduler)", backup)
+        self.assertIn("web_container=$(docker compose ps -q -a web)", backup)
+        self.assertIn("scheduler_container=$(docker compose ps -q -a scheduler)", backup)
         self.assertEqual(
             backup.count('docker start "$web_container" "$scheduler_container"'), 2
         )
@@ -832,11 +832,22 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("trap - EXIT HUP INT TERM", backup)
         self.assertIn("docker compose exec -T db pg_dump", backup)
         self.assertEqual(backup.count("docker compose run --rm --no-deps"), 2)
-        self.assertIn("sha256sum database.dump media.tar.gz exchange.tar.gz", backup)
+        self.assertIn(
+            "sha256sum MANIFEST database.dump media.tar.gz exchange.tar.gz", backup
+        )
+        self.assertIn("BACKUP_FORMAT_VERSION=1", backup)
+        self.assertIn("org.opencontainers.image.revision", backup)
         self.assertNotIn("ofoms-log-partial_media", backup)
         self.assertIn('RESTORE_CONFIRM:-}', restore)
         self.assertLess(restore.index("sha256sum -c"), restore.index("dropdb"))
         self.assertLess(restore.index("tar -tzf"), restore.index("dropdb"))
+        self.assertLess(restore.index("pg_restore --list"), restore.index("dropdb"))
+        self.assertLess(
+            restore.index('current_revision" != "$backup_revision'),
+            restore.index("dropdb"),
+        )
+        self.assertIn("SHA256SUMS must contain only", restore)
+        self.assertIn("Unsupported backup format version", restore)
         self.assertIn("dropdb", restore)
         self.assertIn("--if-exists --force", restore)
         self.assertIn("docker compose run --rm --no-deps migrate", restore)

@@ -987,6 +987,31 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
         resp = self.client.get(reverse("exchange:protocol", args=[log.pk]))
         self.assertEqual(resp.status_code, 403)
 
+    def test_valid_protocol_uses_responsive_result_rows(self):
+        log = ImportLog.objects.create(
+            org=81000,
+            kind="irp",
+            filename="responsive.xml",
+            status="error",
+            rows=0,
+            flcp=(
+                '<?xml version="1.0" encoding="windows-1251"?>'
+                '<FLCP><PR OSHIB="41" IM_POL="z_f" N_ZAP="7" '
+                'COMMENT="Обязательное поле не заполнено"/></FLCP>'
+            ),
+        )
+        self.client.force_login(self.tfoms)
+
+        response = self.client.get(reverse("exchange:protocol", args=[log.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, 'class="data data--protocol data--responsive"'
+        )
+        self.assertContains(response, 'class="responsive-row"')
+        self.assertContains(response, 'data-label="Комментарий"')
+        self.assertContains(response, "Обязательное поле не заполнено")
+
     def test_malformed_protocol_fails_closed(self):
         log = ImportLog.objects.create(
             org=81000,

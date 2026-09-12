@@ -43,6 +43,7 @@ const routes = [
   ["events", "/system/events/"],
   ["exchange", "/exchange/logs/"],
 ];
+const responsiveRouteNames = new Set(["events", "users", "exchange", "exchange-protocol"]);
 if (process.env.QA_EXTRA_ROUTES) {
   const extraRoutes = JSON.parse(process.env.QA_EXTRA_ROUTES);
   if (!Array.isArray(extraRoutes) || extraRoutes.some((item) =>
@@ -305,7 +306,7 @@ try {
       }))()`);
       metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
       metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
-      metrics.responsiveTable = ["events", "users", "exchange"].includes(name) ? await measureResponsiveTable() : null;
+      metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
       metrics.browserErrors = browserErrors.slice(errorStart);
       const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
       const filename = `${name}-${width}x${height}-light.png`;
@@ -345,7 +346,7 @@ try {
         }))()`);
         metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
         metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
-        metrics.responsiveTable = ["events", "users", "exchange"].includes(name) ? await measureResponsiveTable() : null;
+        metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
         metrics.browserErrors = browserErrors.slice(errorStart);
         const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
         const filename = `${name}-${width}x${height}-${theme}-${font}-${contrast}.png`;
@@ -370,7 +371,7 @@ try {
     taskLayoutMismatch: item.name === "tasks" && item.width <= 1100 &&
       (!item.taskLayout || !item.taskLayout.compact || !item.taskLayout.headerHidden ||
         !item.taskLayout.cardGrid || !item.taskLayout.actionsVisible),
-    responsiveTableMismatch: ["events", "users", "exchange"].includes(item.name) && item.width <= 900 &&
+    responsiveTableMismatch: responsiveRouteNames.has(item.name) && item.width <= 900 &&
       (!item.responsiveTable || !item.responsiveTable.compact ||
         !item.responsiveTable.headerHidden || !item.responsiveTable.cardGrid ||
         item.responsiveTable.horizontallyScrollable || !item.responsiveTable.actionsVisible),

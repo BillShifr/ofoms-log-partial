@@ -982,6 +982,43 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
         resp = self.client.get(reverse("exchange:protocol", args=[log.pk]))
         self.assertEqual(resp.status_code, 403)
 
+    def test_malformed_protocol_fails_closed(self):
+        log = ImportLog.objects.create(
+            org=81000,
+            kind="irp",
+            filename="broken.xml",
+            status="error",
+            rows=0,
+            flcp="<not-flcp><PR OSHIB='0'/></not-flcp>",
+        )
+        self.client.force_login(self.tfoms)
+
+        response = self.client.get(reverse("exchange:protocol", args=[log.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Протокол контроля отсутствует или повреждён")
+        self.assertContains(response, "Нельзя подтвердить отсутствие нарушений")
+        self.assertNotContains(response, "Нарушений не зафиксировано")
+
+    def test_protocol_parser_does_not_resolve_external_entities(self):
+        log = ImportLog.objects.create(
+            org=81000,
+            kind="irp",
+            filename="entity.xml",
+            status="error",
+            rows=0,
+            flcp=(
+                "<!DOCTYPE FLCP [<!ENTITY secret SYSTEM 'file:///etc/passwd'>]>"
+                "<FLCP><PR OSHIB='41' COMMENT='&secret;'/></FLCP>"
+            ),
+        )
+        self.client.force_login(self.tfoms)
+
+        response = self.client.get(reverse("exchange:protocol", args=[log.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "root:")
+
 
 class UploadPostTests(ExchangeTestMixin, TestCase):
     """POST-загрузка файла: запись в in/, обработка, FLCP в out/, ImportLog."""

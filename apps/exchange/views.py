@@ -134,16 +134,35 @@ def exchange_protocol(request, pk):
     return render(
         request,
         "exchange/protocol.html",
-        {"log": log, "prs": rows, "active_nav": "exchange"},
+        {
+            "log": log,
+            "prs": rows or [],
+            "protocol_unavailable": rows is None,
+            "active_nav": "exchange",
+        },
     )
 
 
-def _parse_flcp(text: str) -> list[dict]:
+def _parse_flcp(text: str) -> list[dict] | None:
     """FLCP (XML) -> список записей протокола для отображения."""
+    if not text or not text.strip():
+        return None
     try:
         from lxml import etree
 
-        root = etree.fromstring(text.encode("windows-1251"))
-    except Exception:
-        return []
-    return [dict(el.attrib) for el in root.iter("PR")]
+        parser = etree.XMLParser(
+            resolve_entities=False,
+            no_network=True,
+            huge_tree=False,
+            recover=False,
+        )
+        root = etree.fromstring(text.encode("windows-1251"), parser=parser)
+        if etree.QName(root).localname != "FLCP":
+            return None
+        return [
+            dict(el.attrib)
+            for el in root.iterchildren()
+            if etree.QName(el).localname == "PR"
+        ]
+    except (UnicodeError, ValueError, etree.XMLSyntaxError):
+        return None

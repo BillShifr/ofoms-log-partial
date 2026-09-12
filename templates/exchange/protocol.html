@@ -21,6 +21,11 @@
 
 <div class="card">
   <div class="section-heading"><div><p class="section-heading__index">ФЛК</p><h2>Результаты контроля</h2></div><span>{{ prs|length }} записей</span></div>
+  {% if protocol_unavailable %}
+  <div class="alert alert--error" role="alert">
+    Протокол контроля отсутствует или повреждён. Нельзя подтвердить отсутствие нарушений; повторите обработку файла или обратитесь к администратору.
+  </div>
+  {% else %}
   <div class="table-wrap" tabindex="0" aria-label="Протокол ФЛК; прокручивается по горизонтали">
     <table class="data" data-client-sort>
       <thead><tr><th>Код</th><th>Поле</th><th data-type="num">Обращение</th><th>Комментарий</th></tr></thead>
@@ -39,5 +44,6 @@
       </tbody>
     </table>
   </div>
+  {% endif %}
 </div>
 {% endblock %}

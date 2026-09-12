@@ -4,11 +4,22 @@ set -eu
 backup_dir=${1:?Usage: RESTORE_CONFIRM=replace-current-state restore_release.sh BACKUP_DIR}
 db_user=${DB_USER:-ejournal}
 db_name=${DB_NAME:-ejournal}
+lock_file=${BACKUP_RESTORE_LOCK_FILE:-/tmp/ofoms-ejournal-backup-restore.lock}
 
 if [ "${RESTORE_CONFIRM:-}" != "replace-current-state" ]; then
   echo >&2 "Set RESTORE_CONFIRM=replace-current-state to allow destructive restore"
   exit 1
 fi
+
+command -v flock >/dev/null 2>&1 || {
+  echo >&2 "flock is required for backup/restore serialization"
+  exit 1
+}
+exec 9>"$lock_file"
+flock -n 9 || {
+  echo >&2 "Another backup or restore operation is already running"
+  exit 1
+}
 
 for artifact in SHA256SUMS MANIFEST database.dump media.tar.gz exchange.tar.gz; do
   test -f "$backup_dir/$artifact" || {

@@ -5,9 +5,21 @@ umask 077
 backup_root=${1:?Usage: backup_release.sh BACKUP_ROOT}
 db_user=${DB_USER:-ejournal}
 db_name=${DB_NAME:-ejournal}
+lock_file=${BACKUP_RESTORE_LOCK_FILE:-/tmp/ofoms-ejournal-backup-restore.lock}
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 backup_dir=$backup_root/$timestamp
 writers_stopped=0
+
+command -v flock >/dev/null 2>&1 || {
+  echo >&2 "flock is required for backup/restore serialization"
+  exit 1
+}
+exec 9>"$lock_file"
+flock -n 9 || {
+  echo >&2 "Another backup or restore operation is already running"
+  exit 1
+}
+
 web_container=$(docker compose ps -q -a web)
 scheduler_container=$(docker compose ps -q -a scheduler)
 test -n "$web_container"

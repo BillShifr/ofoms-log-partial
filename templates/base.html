@@ -37,7 +37,7 @@
             <button class="btn btn--ghost btn--sm" type="submit">Выйти</button>
           </form>
         {% else %}
-          <a class="btn btn--primary" href="{% url 'login' %}">Войти</a>
+          {% block anonymous_header_action %}<a class="btn btn--primary" href="{% url 'login' %}">Войти</a>{% endblock %}
         {% endif %}
       </div>
     </div>

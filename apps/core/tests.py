@@ -1024,7 +1024,10 @@ class FailedLoginLockTests(TestCase):
 
 class AuthenticationSurfaceTests(TestCase):
     def test_only_explicit_interactive_auth_routes_are_exposed(self):
-        self.assertEqual(self.client.get("/accounts/login/").status_code, 200)
+        login_response = self.client.get("/accounts/login/")
+        self.assertEqual(login_response.status_code, 200)
+        self.assertContains(login_response, '<button class="btn btn--primary" type="submit">Войти</button>')
+        self.assertNotContains(login_response, f'href="{reverse("login")}"')
         self.assertEqual(self.client.get("/accounts/logout/").status_code, 405)
         for path in (
             "/accounts/password_reset/",

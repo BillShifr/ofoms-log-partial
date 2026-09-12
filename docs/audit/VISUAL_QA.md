@@ -2,6 +2,8 @@
 
 Скрипт `scripts/visual_qa.mjs` запускает отдельный headless Chrome, входит под локальной
 QA-учётной записью и сохраняет снимки и JSON-отчёт в `.artifacts/visual-qa/`.
+До авторизации он отдельно проверяет форму входа во всех 15 режимах, затем продолжает
+закрытые маршруты в той же browser-сессии.
 
 ```bash
 QA_USERNAME='<local-user>' QA_PASSWORD='<local-password>' node scripts/visual_qa.mjs

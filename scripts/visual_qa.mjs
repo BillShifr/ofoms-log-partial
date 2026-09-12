@@ -282,6 +282,52 @@ try {
   await command("Runtime.enable");
   await command("Log.enable");
 
+  const results = [];
+  async function captureLogin(width, height, theme, font, contrast) {
+    await command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    const errorStart = browserErrors.length;
+    await navigate(`${baseUrl}/accounts/login/`);
+    await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}; document.documentElement.dataset.font=${JSON.stringify(font)}; document.documentElement.dataset.contrast=${JSON.stringify(contrast)}`);
+    await settleAnimations();
+    const metrics = await evaluate(`(() => ({
+      path: location.pathname,
+      title: document.title,
+      httpStatus: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
+      forbidden: false,
+      documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      navOverflow: false,
+      appliedMode: {
+        theme: document.documentElement.dataset.theme || null,
+        font: document.documentElement.dataset.font || null,
+        contrast: document.documentElement.dataset.contrast || null
+      },
+      activeAnimations: document.getAnimations().filter((animation) => animation.playState === 'running').length,
+      tablePalette: [],
+      width: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }))()`);
+    metrics.journalLayout = null;
+    metrics.taskLayout = null;
+    metrics.responsiveTable = null;
+    metrics.browserErrors = browserErrors.slice(errorStart);
+    const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
+    const suffix = theme === "light" && font === "base" && contrast === "default"
+      ? "light"
+      : `${theme}-${font}-${contrast}`;
+    const filename = `login-${width}x${height}-${suffix}.png`;
+    await writeFile(join(outputDir, filename), Buffer.from(shot.data, "base64"));
+    results.push({ name: "login", viewport: `${width}x${height}`, theme, font, contrast, ...metrics, screenshot: filename });
+  }
+
+  for (const [width, height] of viewports) {
+    await captureLogin(width, height, "light", "base", "default");
+  }
+  for (const [theme, font, contrast] of [["dark", "base", "default"], ["light", "a-plus-plus", "default"], ["light", "a", "black"]]) {
+    for (const [width, height] of [[694, 869], [1024, 768], [1920, 1080]]) {
+      await captureLogin(width, height, theme, font, contrast);
+    }
+  }
+
   await navigate(`${baseUrl}/accounts/login/`);
   const loginFormReady = await evaluate(`Boolean(
     document.querySelector('[name="username"]') &&
@@ -313,7 +359,6 @@ try {
     for (const route of routes) route[1] = route[1].replaceAll("{journalId}", journalMatch[1]);
   }
 
-  const results = [];
   for (const [width, height] of viewports) {
     await command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
     for (const [name, path] of routes) {
@@ -424,7 +469,8 @@ try {
     cases: results.length,
     expectedForbidden: [...expectedForbidden],
     failures: checkedResults.filter((item) =>
-      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") ||
+      item.documentOverflow || (item.width >= 1024 && item.navOverflow) ||
+      (item.name !== "login" && item.path.includes("login")) ||
       (item.httpStatus >= 400 && !(item.expectedForbidden && item.httpStatus === 403)) ||
       item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch ||
       item.journalLayoutMismatch || item.taskLayoutMismatch || item.responsiveTableMismatch || item.activeAnimations

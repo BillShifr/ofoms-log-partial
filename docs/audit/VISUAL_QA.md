@@ -35,7 +35,7 @@ QA_OUTPUT_DIR='.artifacts/visual-qa-op' node scripts/visual_qa.mjs
 grid-компоновку. Для задач на viewport до 1100 px проверяются скрытая табличная шапка,
 двухколоночная карточка и полная видимость панели действий. Для событий, пользователей
 журнала обмена и отдельных extra-route `exchange-protocol`, `report-detail`,
-`journal-history`, `task-history`, `table-prefs` до 900 px проверяется общий card grid без
+`journal-history`, `task-history`, `table-prefs`, `user-form` до 900 px проверяется общий card grid без
 горизонтального scroll и с доступными actions; заполненные состояния требуют локальных
 тестовых записей, а протокол ФЛК — корректной XML-декларации кодировки.
 Горизонтальная

@@ -369,6 +369,9 @@ class UserManagementTests(BaseSystemTestCase):
         self.assertContains(response, "Матрица прав ролей")
         self.assertContains(response, "Регистрация обращений")
         self.assertContains(response, "СП3 — страховой представитель 3 уровня")
+        self.assertContains(response, 'class="data data--responsive data--capabilities"')
+        self.assertContains(response, 'class="responsive-row"')
+        self.assertContains(response, 'scope="row" data-label="Роль"')
 
     def test_block_and_unblock(self):
         self.client.force_login(self.admin)

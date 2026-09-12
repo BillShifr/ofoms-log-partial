@@ -46,6 +46,7 @@ const routes = [
 const responsiveRouteNames = new Set([
   "events", "users", "exchange", "exchange-protocol",
   "report-detail", "journal-history", "task-history", "table-prefs",
+  "user-form",
 ]);
 if (process.env.QA_EXTRA_ROUTES) {
   const extraRoutes = JSON.parse(process.env.QA_EXTRA_ROUTES);
@@ -113,6 +114,17 @@ async function evaluate(expression) {
     throw new Error(description);
   }
   return result.result.value;
+}
+
+async function prepareRoute(name) {
+  if (name !== "user-form") return;
+  await evaluate(`(() => {
+    const table = document.querySelector('.data--capabilities');
+    const details = table?.closest('details');
+    if (!details) return;
+    details.open = true;
+    details.scrollIntoView({ block: 'start' });
+  })()`);
 }
 
 async function settleAnimations() {
@@ -285,6 +297,7 @@ try {
       const errorStart = browserErrors.length;
       await navigate(`${baseUrl}${path}`);
       await evaluate(`document.documentElement.dataset.theme='light'; document.documentElement.dataset.font='base'; document.documentElement.dataset.contrast='default'`);
+      await prepareRoute(name);
       await settleAnimations();
       const metrics = await evaluate(`(() => ({
         path: location.pathname,
@@ -325,6 +338,7 @@ try {
         const errorStart = browserErrors.length;
         await navigate(`${baseUrl}${path}`);
         await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}; document.documentElement.dataset.font=${JSON.stringify(font)}; document.documentElement.dataset.contrast=${JSON.stringify(contrast)}`);
+        await prepareRoute(name);
         await settleAnimations();
       const metrics = await evaluate(`(() => ({
           path: location.pathname,

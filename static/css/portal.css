@@ -996,7 +996,8 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
     background: color-mix(in srgb, var(--chip-yellow) 36%, var(--card));
   }
   .data--responsive tbody tr.responsive-row.row-total td { background: transparent; }
-  .data--responsive tbody tr.responsive-row td {
+  .data--responsive tbody tr.responsive-row td,
+  .data--responsive tbody tr.responsive-row th[scope="row"] {
     display: grid;
     min-width: 0;
     max-width: none;
@@ -1006,7 +1007,8 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
     overflow-wrap: anywhere;
     white-space: normal;
   }
-  .data--responsive tbody tr.responsive-row td::before {
+  .data--responsive tbody tr.responsive-row td::before,
+  .data--responsive tbody tr.responsive-row th[scope="row"]::before {
     content: attr(data-label);
     color: color-mix(in srgb, var(--ink) 58%, transparent);
     font-size: .66rem;
@@ -1015,6 +1017,15 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
     text-transform: uppercase;
   }
   .data--responsive .responsive-cell--wide { grid-column: 1 / -1; }
+  .data--responsive .badge { justify-self: start; }
+  .data--capabilities tbody tr.responsive-row th[scope="row"] {
+    position: static;
+    color: var(--ink);
+    background: transparent;
+    box-shadow: none;
+    text-align: left;
+    white-space: normal;
+  }
   .data--responsive .responsive-cell--actions .table-actions {
     flex-wrap: wrap;
     justify-content: flex-start;

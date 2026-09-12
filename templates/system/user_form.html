@@ -60,14 +60,14 @@
     <details class="collapsible" data-key="user-section-access-matrix">
       <summary class="collapsible__toggle">Матрица прав ролей</summary>
       <p class="text-muted">Матрица отражает фактическую серверную политику. Права нескольких назначенных ролей объединяются.</p>
-      <div class="table-wrap" tabindex="0" aria-label="Матрица прав; прокручивается по горизонтали">
-        <table class="data">
+      <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Матрица прав; на узком экране показана карточками">
+        <table class="data data--responsive data--capabilities">
           <thead><tr><th>Роль</th>{% for label in capability_headers %}<th>{{ label }}</th>{% endfor %}</tr></thead>
           <tbody>
           {% for row in capability_matrix %}
-            <tr><th scope="row">{{ row.role }}</th>
+            <tr class="responsive-row"><th class="responsive-cell--wide" scope="row" data-label="Роль">{{ row.role }}</th>
             {% for item in row.capabilities %}
-              <td aria-label="{{ item.label }}">{% if item.allowed %}<span class="badge badge--closed">Да</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td data-label="{{ item.label }}">{% if item.allowed %}<span class="badge badge--closed">Да</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
             {% endfor %}
             </tr>
           {% endfor %}

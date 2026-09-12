@@ -42,8 +42,8 @@
 
 {% if rows is not None %}
 <div class="card table-card">
-  <div class="table-wrap" tabindex="0" aria-label="Таблица отчёта; прокручивается по горизонтали">
-    <table class="data reports-table" data-client-sort>
+  <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Таблица отчёта; на узком экране показана карточками">
+    <table class="data reports-table data--responsive" data-client-sort>
       <thead>
         <tr>
           {% for label in report.labels %}<th>{{ label }}</th>{% endfor %}
@@ -51,11 +51,11 @@
       </thead>
       <tbody>
         {% for row in rows %}
-        <tr {% if row.period == "ИТОГО" or row.type == "ИТОГО" or row.month == "ИТОГО" or row.theme == "ИТОГО" %}class="row-total"{% endif %}>
-          {% for key in report.keys %}<td>{{ row|get_item:key }}</td>{% endfor %}
+        <tr class="responsive-row{% if row.period == "ИТОГО" or row.type == "ИТОГО" or row.month == "ИТОГО" or row.theme == "ИТОГО" %} row-total{% endif %}">
+          {% for key, label in report.columns %}<td data-label="{{ label }}">{{ row|get_item:key }}</td>{% endfor %}
         </tr>
         {% empty %}
-        <tr><td colspan="{{ report.columns|length }}" class="text-muted">По заданным параметрам обращений не найдено.</td></tr>
+        <tr class="responsive-empty"><td colspan="{{ report.columns|length }}" class="text-muted">По заданным параметрам обращений не найдено.</td></tr>
         {% endfor %}
       </tbody>
     </table>

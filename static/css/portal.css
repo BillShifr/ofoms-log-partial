@@ -991,6 +991,11 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
     background: var(--card);
     box-shadow: none;
   }
+  .data--responsive tbody tr.responsive-row.row-total {
+    border-left: 3px solid color-mix(in srgb, var(--warn) 70%, var(--line));
+    background: color-mix(in srgb, var(--chip-yellow) 36%, var(--card));
+  }
+  .data--responsive tbody tr.responsive-row.row-total td { background: transparent; }
   .data--responsive tbody tr.responsive-row td {
     display: grid;
     min-width: 0;

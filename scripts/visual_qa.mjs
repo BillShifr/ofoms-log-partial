@@ -43,7 +43,10 @@ const routes = [
   ["events", "/system/events/"],
   ["exchange", "/exchange/logs/"],
 ];
-const responsiveRouteNames = new Set(["events", "users", "exchange", "exchange-protocol"]);
+const responsiveRouteNames = new Set([
+  "events", "users", "exchange", "exchange-protocol",
+  "report-detail", "journal-history", "task-history", "table-prefs",
+]);
 if (process.env.QA_EXTRA_ROUTES) {
   const extraRoutes = JSON.parse(process.env.QA_EXTRA_ROUTES);
   if (!Array.isArray(extraRoutes) || extraRoutes.some((item) =>

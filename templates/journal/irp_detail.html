@@ -145,17 +145,17 @@
 {% if history %}
 <section class="card record-section record-section--full">
   <div class="section-heading"><div><p class="section-heading__index">07</p><h2>История изменений</h2></div><span>Аудит карточки</span></div>
-  <div class="table-wrap" tabindex="0" aria-label="История изменений; прокручивается по горизонтали">
-    <table class="data" data-client-sort>
+  <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="История изменений; на узком экране показана карточками">
+    <table class="data data--responsive" data-client-sort>
       <thead><tr><th>Когда</th><th>Кем</th><th>Поле</th><th>Было</th><th>Стало</th></tr></thead>
       <tbody>
         {% for h in history %}
-        <tr>
-          <td>{{ h.changed_at|date:"d.m.Y H:i" }}</td>
-          <td>{{ h.user.full_name|default:"—" }}</td>
-          <td>{{ h.field_name }}</td>
-          <td>{{ h.old_value|default:"—" }}</td>
-          <td>{{ h.new_value|default:"—" }}</td>
+        <tr class="responsive-row">
+          <td data-label="Когда">{{ h.changed_at|date:"d.m.Y H:i" }}</td>
+          <td data-label="Кем">{{ h.user.full_name|default:"—" }}</td>
+          <td data-label="Поле">{{ h.field_name }}</td>
+          <td class="responsive-cell--wide" data-label="Было">{{ h.old_value|default:"—" }}</td>
+          <td class="responsive-cell--wide" data-label="Стало">{{ h.new_value|default:"—" }}</td>
         </tr>
         {% endfor %}
       </tbody>

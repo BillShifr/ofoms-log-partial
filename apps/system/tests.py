@@ -1823,6 +1823,27 @@ class TaskTests(BaseSystemTestCase):
         task = TaskJob.objects.get(name="Импорт")
         self.assertEqual(task.created_by, self.admin)
 
+    def test_task_run_history_uses_responsive_rows(self):
+        task = self._make_task()
+        finished_at = timezone.now()
+        TaskRun.objects.create(
+            task=task,
+            triggered_by=TaskRun.TriggeredBy.AUTO,
+            started_at=finished_at - datetime.timedelta(seconds=5),
+            finished_at=finished_at,
+            result=TaskRun.Result.OK,
+            log="Проверка завершена",
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("system:task_update", args=[task.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="data data--responsive"')
+        self.assertContains(response, 'class="responsive-row"')
+        self.assertContains(response, 'data-label="Лог"')
+        self.assertContains(response, "Проверка завершена")
+
     def test_task_create_rolls_back_when_audit_fails(self):
         self.client.force_login(self.admin)
 
@@ -2857,6 +2878,9 @@ class PrefTests(BaseSystemTestCase):
         )
         content = response.content.decode()
         self.assertLess(content.index('value="status"'), content.index('value="id"'))
+        self.assertContains(response, 'class="data data--responsive"')
+        self.assertContains(response, 'class="responsive-row"')
+        self.assertContains(response, 'data-label="Колонка"')
 
     def test_journal_uses_pref_sort(self):
         self._make_irp()

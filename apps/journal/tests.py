@@ -804,7 +804,10 @@ class JournalScreenTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Петров")
         self.assertContains(resp, irp.get_irp_type_display())
-        self.assertContains(resp, 'class="data" data-client-sort')
+        self.assertContains(resp, 'class="data data--responsive" data-client-sort')
+        self.assertContains(resp, 'class="responsive-row"')
+        self.assertContains(resp, 'data-label="Было"')
+        self.assertContains(resp, 'data-label="Стало"')
         self.assertTrue(
             EventLog.objects.filter(
                 event_type=EventLog.EventType.VIEW,

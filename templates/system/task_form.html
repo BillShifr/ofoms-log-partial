@@ -71,19 +71,19 @@
 
   <div class="tab-panel is-active" data-panel="runs">
     {% if runs %}
-    <div class="table-wrap" tabindex="0" aria-label="История запусков; прокручивается по горизонтали">
-      <table class="data">
+    <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="История запусков; на узком экране показана карточками">
+      <table class="data data--responsive">
         <thead>
           <tr><th>Начало</th><th>Завершение</th><th>Инициатор</th><th>Результат</th><th>Лог</th></tr>
         </thead>
         <tbody>
           {% for r in runs %}
-          <tr>
-            <td>{{ r.started_at|date:"d.m.Y H:i:s" }}</td>
-            <td>{{ r.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
-            <td>{% if r.triggered_by == "auto" %}Автоматически{% elif r.triggered_by == "legacy" %}Исторический запуск{% else %}Пользователь{% endif %}</td>
-            <td>{% if r.result == 'ok' %}<span class="badge badge--closed">успешно</span>{% elif r.result == 'failed' %}<span class="badge badge--overdue">ошибка</span>{% else %}<span class="badge badge--open">{{ r.result }}</span>{% endif %}</td>
-            <td class="mono cell-long" title="{{ r.log }}">{{ r.log|truncatechars:160 }}</td>
+          <tr class="responsive-row">
+            <td data-label="Начало">{{ r.started_at|date:"d.m.Y H:i:s" }}</td>
+            <td data-label="Завершение">{{ r.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
+            <td data-label="Инициатор">{% if r.triggered_by == "auto" %}Автоматически{% elif r.triggered_by == "legacy" %}Исторический запуск{% else %}Пользователь{% endif %}</td>
+            <td data-label="Результат">{% if r.result == 'ok' %}<span class="badge badge--closed">успешно</span>{% elif r.result == 'failed' %}<span class="badge badge--overdue">ошибка</span>{% else %}<span class="badge badge--open">{{ r.result }}</span>{% endif %}</td>
+            <td class="mono cell-long responsive-cell--wide" data-label="Лог" title="{{ r.log }}">{{ r.log|truncatechars:160 }}</td>
           </tr>
           {% endfor %}
         </tbody>

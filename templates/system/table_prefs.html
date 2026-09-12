@@ -6,20 +6,20 @@
   <form method="post" data-validate>
     {% csrf_token %}
     <h2 class="form-section">Колонки и порядок</h2>
-    <div class="table-wrap" tabindex="0" aria-label="Настройка колонок; прокручивается по горизонтали">
-      <table class="data">
+    <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Настройка колонок; на узком экране показана карточками">
+      <table class="data data--responsive">
         <thead>
           <tr><th></th><th>#</th><th>Колонка</th><th>Группа</th></tr>
         </thead>
         <tbody>
           {% for col in columns %}
-            <tr>
-              <td><label class="checkbox"><input type="checkbox" name="columns" value="{{ col.key }}" {% if col.key in current %}checked{% endif %}></label></td>
-              <td>
+            <tr class="responsive-row">
+              <td data-label="Показывать"><label class="checkbox"><input type="checkbox" name="columns" value="{{ col.key }}" {% if col.key in current %}checked{% endif %}></label></td>
+              <td data-label="Порядок">
                 <input class="input-order" type="number" name="order_{{ col.key }}" value="{{ forloop.counter }}" min="1" max="99">
               </td>
-              <td>{{ col.label }}</td>
-              <td class="text-muted">{{ col.group|default:"—" }}</td>
+              <td data-label="Колонка">{{ col.label }}</td>
+              <td class="text-muted" data-label="Группа">{{ col.group|default:"—" }}</td>
             </tr>
           {% endfor %}
         </tbody>

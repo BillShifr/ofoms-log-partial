@@ -64,6 +64,7 @@ POST-операции карточки автоматизированного з
 export VCS_REF=<полный SHA проверенного main-образа>
 docker compose config --quiet
 docker compose pull web
+sh scripts/verify_release_image.sh
 docker compose up -d --no-build
 docker compose ps
 docker compose logs --tail=200 web scheduler
@@ -85,6 +86,9 @@ Compose также требует `VCS_REF` и передаёт его всем 
 immutable `frozendevs/tfoms-ejournal:${VCS_REF}`. Команда `docker compose pull web` загружает
 этот общий образ, а `up --no-build` гарантирует, что production не подменит проверенный artifact
 локальной сборкой. `build` используется только для разработки и release-проверки исходников.
+Между pull и запуском `verify_release_image.sh` сверяет все четыре resolved image reference,
+OCI revision и hardened runtime-контракт. Несовпадение останавливает обновление до изменения
+работающих контейнеров.
 
 Для обновления сначала создайте резервную копию, затем:
 
@@ -92,6 +96,7 @@ immutable `frozendevs/tfoms-ejournal:${VCS_REF}`. Команда `docker compose
 git pull --ff-only
 export VCS_REF=<полный SHA нового проверенного main-образа>
 docker compose pull web
+sh scripts/verify_release_image.sh
 docker compose up -d --no-build
 docker compose ps
 ```

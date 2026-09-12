@@ -1183,3 +1183,12 @@
 - [x] Описать исполнимый rollback выбором предыдущего SHA.
 - [x] Проверить resolved Compose config: четыре application-сервиса разрешаются в один
   `frozendevs/tfoms-ejournal:<полный SHA>`; PostgreSQL остаётся отдельным digest-pinned image.
+
+## 2026-09-12 — preflight загруженного release-образа
+
+- [x] Проверять формат выбранного `VCS_REF` до обращения к Docker.
+- [x] Требовать ровно четыре application reference одного SHA в resolved Compose config.
+- [x] Повторно использовать hardened runtime gate для OCI label и container security.
+- [x] Разместить preflight между `pull` и `up --no-build` в deploy и rollback.
+- [x] Доказать positive run на локальном SHA-образе и отказ для невалидного формата
+  либо отсутствующего полного SHA-tag.

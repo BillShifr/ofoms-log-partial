@@ -762,6 +762,9 @@ class ProductionSettingsTests(TestCase):
         runtime_gate = (
             settings.BASE_DIR / "scripts" / "container_runtime_gate.sh"
         ).read_text()
+        release_gate = (
+            settings.BASE_DIR / "scripts" / "verify_release_image.sh"
+        ).read_text()
 
         build_index = workflow.index("- name: Build runtime image")
         verify_index = workflow.index("- name: Verify runtime image")
@@ -801,6 +804,10 @@ class ProductionSettingsTests(TestCase):
             ),
             4,
         )
+        self.assertIn("docker compose config --images", release_gate)
+        self.assertIn('application_count" -ne 4', release_gate)
+        self.assertIn('container_runtime_gate.sh" "$image_name" "$expected_revision"', release_gate)
+        self.assertIn('image_name="frozendevs/tfoms-ejournal:$expected_revision"', release_gate)
 
     def test_ci_uses_least_privilege_and_bounded_jobs(self):
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()

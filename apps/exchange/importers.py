@@ -422,6 +422,19 @@ class IrpXMLFile(XsdExchangeFile):
         header = elem2dict(nodes[0])
         header["real_filename"] = str(self.real_file)
         header.setdefault("filename", self.basename)
+        try:
+            header_org = int(header.get("smo"))
+        except (TypeError, ValueError):
+            header_org = None
+        if header_org != self.org:
+            self.errors.append(
+                flc.error_result(
+                    "SMO",
+                    "Организация в заголовке не соответствует каналу загрузки",
+                    "ZGLV",
+                )
+            )
+            return None
         x = XmlFiles(**header)
         try:
             x.full_clean()

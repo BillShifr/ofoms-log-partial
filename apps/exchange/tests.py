@@ -67,7 +67,7 @@ def _irp_xml(theme_code: str, emp_guid: str, n_irp: str | None = None) -> bytes:
     <year>2026</year>
     <month>05</month>
     <day>14</day>
-    <smo>81001</smo>
+    <smo>81000</smo>
   </ZGLV>
   <IRP>
     <n_irp>{n_irp or uuid.uuid4()}</n_irp>
@@ -454,6 +454,22 @@ class IrpImportTests(ExchangeTestMixin, TestCase):
         self.assertFalse(out.ok)
         self.assertIn("41", [e["OSHIB"] for e in out.errors])
         self.assertEqual(Irp.objects.count(), 0)
+
+    def test_header_organization_must_match_upload_channel(self):
+        path = Path(self.in_dir) / "G1R_foreign_header.xml"
+        content = _irp_xml("TT.01", str(self.emp1.guid)).replace(
+            b"<smo>81000</smo>",
+            b"<smo>81001</smo>",
+        )
+        path.write_bytes(content)
+
+        result = IrpXMLFile(81000, path, **self._imp_kwargs()).process()
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.rows, 0)
+        self.assertTrue(any(error["IM_POL"] == "SMO" for error in result.errors))
+        self.assertFalse(Irp.objects.exists())
+        self.assertFalse(XmlFiles.objects.exists())
 
     def test_unknown_theme_rejected(self):
         from pathlib import Path

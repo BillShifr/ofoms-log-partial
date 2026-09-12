@@ -108,32 +108,32 @@ docker compose ps
 
 ## Резервное копирование
 
-Согласованной единицей копии являются дамп PostgreSQL и архивы именованных volumes `media` и `exchange`, снятые в одном окне обслуживания. Пример дампа БД в custom-формате:
+Согласованной единицей копии являются дамп PostgreSQL и архивы именованных volumes `media` и
+`exchange`, снятые в коротком окне без writers. Скрипт останавливает `web/scheduler`, обращается
+к данным через штатные Compose mounts без предположений о физических именах volumes, создаёт
+приватный timestamp-каталог и возобновляет сервисы даже при ошибке копирования:
 
 ```bash
-mkdir -p ./backups
-docker compose exec -T db pg_dump -U ejournal -d ejournal -Fc > ./backups/ejournal.dump
-docker run --rm -v ofoms-log-partial_media:/data -v "$PWD/backups:/backup" alpine tar -C /data -czf /backup/media.tar.gz .
-docker run --rm -v ofoms-log-partial_exchange:/data -v "$PWD/backups:/backup" alpine tar -C /data -czf /backup/exchange.tar.gz .
-sha256sum ./backups/ejournal.dump ./backups/media.tar.gz ./backups/exchange.tar.gz > ./backups/SHA256SUMS
+sh scripts/backup_release.sh ./backups
 ```
 
-Имя volume уточняйте через `docker compose config --volumes`. Копии шифруются, размещаются вне application host и проверяются пробным восстановлением. Рекомендуемый минимум: ежедневная копия, хранение 30 дней; окончательные RPO/RTO и срок хранения утверждает заказчик.
+Копии шифруются, размещаются вне application host и проверяются пробным восстановлением.
+Рекомендуемый минимум: ежедневная копия, хранение 30 дней; окончательные RPO/RTO, допустимое
+окно остановки writers и срок хранения утверждает заказчик.
 
 ## Восстановление
 
 Восстановление уничтожает текущее содержимое целевой БД, поэтому выполняется только в объявленное окно и после контрольной копии текущего состояния.
 
 ```bash
-sha256sum -c ./backups/SHA256SUMS
-docker compose stop web scheduler
-docker compose exec -T db dropdb -U ejournal --if-exists ejournal
-docker compose exec -T db createdb -U ejournal -O ejournal ejournal
-docker compose exec -T db pg_restore -U ejournal -d ejournal --clean --if-exists < ./backups/ejournal.dump
-docker run --rm -v ofoms-log-partial_media:/data -v "$PWD/backups:/backup" alpine sh -c 'rm -rf /data/* && tar -C /data -xzf /backup/media.tar.gz'
-docker run --rm -v ofoms-log-partial_exchange:/data -v "$PWD/backups:/backup" alpine sh -c 'rm -rf /data/* && tar -C /data -xzf /backup/exchange.tar.gz'
-docker compose up -d
+RESTORE_CONFIRM=replace-current-state \
+  sh scripts/restore_release.sh ./backups/<timestamp>
 ```
+
+Restore до удаления данных проверяет наличие всех четырёх artifacts, SHA-256 и читаемость обоих
+tar-архивов. При ошибке после начала destructive phase `web/scheduler` намеренно остаются
+остановленными: сначала устраните причину и повторите полное восстановление. После загрузки
+данных скрипт применяет миграции текущего выбранного image и только затем запускает writers.
 
 После восстановления проверьте `/healthz`, вход, открытие обращения и защищённое скачивание вложения, затем зафиксируйте результат и время восстановления.
 

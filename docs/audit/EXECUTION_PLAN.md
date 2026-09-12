@@ -1192,3 +1192,12 @@
 - [x] Разместить preflight между `pull` и `up --no-build` в deploy и rollback.
 - [x] Доказать positive run на локальном SHA-образе и отказ для невалидного формата
   либо отсутствующего полного SHA-tag.
+
+## 2026-09-12 — согласованный backup/restore
+
+- [x] Останавливать все application writers на время снимка БД и файловых volumes.
+- [x] Исключить зависимость от физического Compose project/volume name.
+- [x] Проверять полный комплект, checksums и tar-контейнеры до destructive restore.
+- [x] Требовать явное подтверждение замены состояния и fail closed после начала restore.
+- [x] Выполнить изолированный round-trip: БД и оба volume вернули исходные маркеры,
+  поздние данные исчезли, readiness=200; аварийный backup возобновил те же container ID.

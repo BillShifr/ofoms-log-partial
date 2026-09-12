@@ -817,6 +817,34 @@ class ProductionSettingsTests(TestCase):
         self.assertEqual(workflow.count("persist-credentials: false"), 2)
         self.assertIn("cancel-in-progress: true", workflow)
 
+    def test_release_backup_and_restore_are_consistent_and_fail_closed(self):
+        backup = (settings.BASE_DIR / "scripts" / "backup_release.sh").read_text()
+        restore = (settings.BASE_DIR / "scripts" / "restore_release.sh").read_text()
+
+        self.assertIn("docker compose stop web scheduler", backup)
+        self.assertIn("web_container=$(docker compose ps -q web)", backup)
+        self.assertIn("scheduler_container=$(docker compose ps -q scheduler)", backup)
+        self.assertEqual(
+            backup.count('docker start "$web_container" "$scheduler_container"'), 2
+        )
+        self.assertNotIn("docker compose up", backup)
+        self.assertIn("trap cleanup EXIT HUP INT TERM", backup)
+        self.assertIn("trap - EXIT HUP INT TERM", backup)
+        self.assertIn("docker compose exec -T db pg_dump", backup)
+        self.assertEqual(backup.count("docker compose run --rm --no-deps"), 2)
+        self.assertIn("sha256sum database.dump media.tar.gz exchange.tar.gz", backup)
+        self.assertNotIn("ofoms-log-partial_media", backup)
+        self.assertIn('RESTORE_CONFIRM:-}', restore)
+        self.assertLess(restore.index("sha256sum -c"), restore.index("dropdb"))
+        self.assertLess(restore.index("tar -tzf"), restore.index("dropdb"))
+        self.assertIn("dropdb", restore)
+        self.assertIn("--if-exists --force", restore)
+        self.assertIn("docker compose run --rm --no-deps migrate", restore)
+        self.assertIn(
+            "docker compose up -d --no-deps --no-build web scheduler", restore
+        )
+        self.assertNotIn("trap", restore)
+
     def test_application_image_uses_unprivileged_runtime_user(self):
         dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()
         compose = (settings.BASE_DIR / "docker-compose.yml").read_text()

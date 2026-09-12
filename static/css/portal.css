@@ -647,7 +647,21 @@ tbody tr.js-event-row { cursor: pointer; }
 .checkbox:hover input[type="checkbox"] { outline: 2px solid rgba(11, 83, 148, .35); outline-offset: 2px; border-radius: 4px; }
 .paper, .print-sheet { background: #fff; color: #222; border: 1px solid #d7dde2; border-radius: 4px; padding: 44px 52px; max-width: 900px; margin: 0 auto; box-shadow: 0 14px 38px rgba(14,36,51,.12); }
 .paper .data th, .paper .data td { text-align: left; }
-.print-sheet--wide { max-width: 1400px; }
+.print-page { min-height: 100vh; padding: 24px; background: var(--bg); }
+.print-page--registry { padding: 20px; background: #fff; }
+.print-page .print-meta { margin-bottom: 16px; }
+.print-page .print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--ink);
+}
+.print-page .print-header h1 { margin: 0; font-family: var(--font-display); font-size: 18px; }
+.print-sheet--wide { width: 100%; min-width: 0; max-width: 1400px; }
+.print-page--registry .table-wrap { min-width: 0; max-width: 100%; }
 .print-toolbar { display: flex; justify-content: center; gap: 10px; margin: 0 auto 18px; }
 .print-preview-note { margin: -20px 0 28px; padding-bottom: 10px; border-bottom: 1px solid #d7dde2; color: #5e6c77; font-size: .78rem; text-align: center; text-transform: uppercase; letter-spacing: .08em; }
 .letter-recipient { max-width: 55%; margin: 0 0 36px auto; text-align: right; }
@@ -661,6 +675,12 @@ tbody tr.js-event-row { cursor: pointer; }
   .no-print, .no-print *, .header, .nav, .footer, .toast-container { display: none !important; }
   .main { max-width: none; padding: 0; }
   .paper, .print-sheet { border: none; box-shadow: none; max-width: none; margin: 0; padding: 0; }
+  .print-page { padding: 0; background: #fff; }
+  .print-page .print-header { border-bottom-color: #000; }
+  .print-page--card .card { border: 1px solid #000; box-shadow: none !important; break-inside: avoid; }
+  .print-page--registry table.data { font-size: 9pt; }
+  .print-page--registry table.data th,
+  .print-page--registry table.data td { padding: 5px; }
   .card, .content { box-shadow: none; }
   .card { break-inside: avoid; }
   table.data th { position: static; }

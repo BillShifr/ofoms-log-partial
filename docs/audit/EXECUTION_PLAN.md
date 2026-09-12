@@ -1140,3 +1140,11 @@
 - [x] Не отправлять ошибочный пароль и не изменять lockout state QA-principal.
 - [x] Прогнать объединённую anonymous + authenticated матрицу и просмотреть mobile login.
 - [x] Убрать дублирующую header-ссылку «Войти» непосредственно со страницы входа.
+
+## 2026-09-12 — CSP-safe печатные формы
+
+- [x] Удалить inline `<style>` из печати реестра и карточки обращения.
+- [x] Перенести screen preview и `@media print` правила в общий `portal.css`.
+- [x] Разделить варианты явными `print-page--registry` / `print-page--card` классами.
+- [x] Проверить обе страницы живым браузером без CSP console errors.
+- [x] Удержать wide registry внутри собственного scroll-контейнера на 694/1024 px.

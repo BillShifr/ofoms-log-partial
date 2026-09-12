@@ -725,6 +725,8 @@ class JournalScreenTests(TestCase):
         self.assertNotContains(response, hidden_by_filter.n_irp)
         self.assertNotContains(response, foreign.n_irp)
         self.assertContains(response, "лимит 500")
+        self.assertContains(response, '<body class="print-page print-page--registry">')
+        self.assertNotContains(response, "<style>")
 
     def test_print_list_requires_journal_role(self):
         user = Employee.objects.create_user(
@@ -1131,6 +1133,8 @@ class JournalScreenTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Петров")
         self.assertContains(resp, "Печать")
+        self.assertContains(resp, '<body class="print-page print-page--card">')
+        self.assertNotContains(resp, "<style>")
         self.assertTrue(
             EventLog.objects.filter(
                 event_type=EventLog.EventType.PRINT,

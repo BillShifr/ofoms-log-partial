@@ -1,6 +1,6 @@
 """Администрирование сотрудников (пользователей) — перенос из v1."""
 
-from apps.core.models import EventLog
+from apps.core.models import EventLog, log_event
 from apps.core.roles import GROUP_ROLE_MAP, ROLE_GROUP_MAP, SMO_ROLES, TFOMS_ROLES
 from apps.employee.models import TFOMS, Employee, GroupProxy
 from django.contrib import admin
@@ -8,6 +8,7 @@ from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
+from django.db import transaction
 
 
 class EmployeeChangeForm(UserChangeForm):
@@ -51,17 +52,21 @@ class EmployeeCreationForm(UserCreationForm):
 @admin.action(description="Разблокировать доступ (сбросить счётчик попыток)")
 def unlock_accounts(modeladmin, request, queryset):
     n = 0
-    for emp in queryset:
-        if emp.lock_until or emp.failed_attempts:
-            emp.reset_failed_logins()
-            EventLog.objects.create(
-                module="employee",
-                event_type=EventLog.EventType.UNBLOCK,
-                user=request.user,
-                target=f"employee:{emp.pk}:{emp.username}",
-                ip=request.META.get("REMOTE_ADDR"),
-            )
-            n += 1
+    with transaction.atomic():
+        employees = Employee.objects.select_for_update().filter(
+            pk__in=queryset.values_list("pk", flat=True)
+        )
+        for emp in employees:
+            if emp.lock_until or emp.failed_attempts:
+                emp.reset_failed_logins()
+                log_event(
+                    module="employee",
+                    event_type=EventLog.EventType.UNBLOCK,
+                    user=request.user,
+                    target=f"employee:{emp.pk}:{emp.username}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
+                n += 1
     modeladmin.message_user(request, f"Разблокировано учётных записей: {n}")
 
 
@@ -88,6 +93,31 @@ class EmployeeAdmin(UserAdmin):
         ),
     )
     readonly_fields = ("guid", "failed_attempts", "lock_until")
+
+    def save_model(self, request, obj, form, change):
+        obj._admin_audit_event_type = (
+            EventLog.EventType.UPDATE if change else EventLog.EventType.CREATE
+        )
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        """Фиксирует поля и M2M-роли внутри транзакции change form Admin."""
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        event_type = getattr(
+            obj,
+            "_admin_audit_event_type",
+            EventLog.EventType.UPDATE if change else EventLog.EventType.CREATE,
+        )
+        log_event(
+            module="employee",
+            event_type=event_type,
+            user=request.user,
+            target=f"admin:employee:{obj.pk}:{event_type}",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+        if hasattr(obj, "_admin_audit_event_type"):
+            del obj._admin_audit_event_type
 
     def get_readonly_fields(self, request, obj=None):
         fields = super().get_readonly_fields(request, obj)

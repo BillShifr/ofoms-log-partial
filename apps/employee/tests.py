@@ -1,15 +1,23 @@
 """Тесты employee: модель Employee и GroupProxy."""
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
+from apps.core.models import EventLog
 from apps.core.roles import ROLE_GROUP_MAP, ensure_role_groups
-from apps.employee.admin import EmployeeAdmin, EmployeeChangeForm, RoleGroupAdmin
+from apps.employee.admin import (
+    EmployeeAdmin,
+    EmployeeChangeForm,
+    RoleGroupAdmin,
+    unlock_accounts,
+)
 from apps.employee.models import Employee, GroupProxy
 from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.urls import reverse
 
 User = get_user_model()
 
@@ -142,6 +150,143 @@ class EmployeeAdminPolicyTests(TestCase):
             {"is_active", "is_staff", "is_superuser", "groups", "user_permissions"}
             <= set(fields)
         )
+
+    def test_admin_change_records_subject_audit_after_roles(self):
+        actor = Employee.objects.create_superuser(
+            username="employee_admin_actor",
+            password="GoodPass!1",
+            org=81000,
+        )
+        target = Employee.objects.create_user(
+            username="employee_admin_target",
+            password="GoodPass!1",
+            org=81000,
+            last_name="До",
+        )
+        operator_group = Group.objects.get(name="ОП1")
+        self.client.force_login(actor)
+
+        response = self.client.post(
+            reverse("admin:employee_employee_change", args=[target.pk]),
+            {
+                "username": target.username,
+                "last_name": "После",
+                "first_name": "",
+                "email": "",
+                "org": "81000",
+                "date_joined_0": target.date_joined.strftime("%Y-%m-%d"),
+                "date_joined_1": target.date_joined.strftime("%H:%M:%S"),
+                "is_active": "on",
+                "groups": [operator_group.pk],
+                "_save": "Сохранить",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        target.refresh_from_db()
+        self.assertEqual(target.last_name, "После")
+        self.assertTrue(target.groups.filter(pk=operator_group.pk).exists())
+        event = EventLog.objects.get(target=f"admin:employee:{target.pk}:update")
+        self.assertEqual(event.event_type, EventLog.EventType.UPDATE)
+        self.assertEqual(event.user, actor)
+
+    def test_admin_create_records_subject_audit(self):
+        actor = Employee.objects.create_superuser(
+            username="employee_admin_create_actor",
+            password="GoodPass!1",
+            org=81000,
+        )
+        self.client.force_login(actor)
+
+        response = self.client.post(
+            reverse("admin:employee_employee_add"),
+            {
+                "username": "employee_created_in_admin",
+                "password1": "AnotherGoodPass!2",
+                "password2": "AnotherGoodPass!2",
+                "org": "81000",
+                "_save": "Сохранить",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        created = Employee.objects.get(username="employee_created_in_admin")
+        event = EventLog.objects.get(target=f"admin:employee:{created.pk}:create")
+        self.assertEqual(event.event_type, EventLog.EventType.CREATE)
+        self.assertEqual(event.user, actor)
+
+    def test_admin_change_rolls_back_fields_and_roles_when_audit_fails(self):
+        actor = Employee.objects.create_superuser(
+            username="employee_admin_rollback_actor",
+            password="GoodPass!1",
+            org=81000,
+        )
+        target = Employee.objects.create_user(
+            username="employee_admin_rollback_target",
+            password="GoodPass!1",
+            org=81000,
+            last_name="Исходное",
+        )
+        operator_group = Group.objects.get(name="ОП1")
+        self.client.force_login(actor)
+
+        with (
+            patch("apps.employee.admin.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("admin:employee_employee_change", args=[target.pk]),
+                {
+                    "username": target.username,
+                    "last_name": "Не должно сохраниться",
+                    "first_name": "",
+                    "email": "",
+                    "org": "81000",
+                    "date_joined_0": target.date_joined.strftime("%Y-%m-%d"),
+                    "date_joined_1": target.date_joined.strftime("%H:%M:%S"),
+                    "is_active": "on",
+                    "groups": [operator_group.pk],
+                    "_save": "Сохранить",
+                },
+            )
+
+        target.refresh_from_db()
+        self.assertEqual(target.last_name, "Исходное")
+        self.assertFalse(target.groups.exists())
+
+    def test_bulk_unlock_rolls_back_entire_batch_when_audit_fails(self):
+        first = Employee.objects.create_user(
+            username="bulk_unlock_first",
+            password="GoodPass!1",
+            org=81000,
+            failed_attempts=5,
+        )
+        second = Employee.objects.create_user(
+            username="bulk_unlock_second",
+            password="GoodPass!1",
+            org=81000,
+            failed_attempts=7,
+        )
+        request = SimpleNamespace(user=self.user, META={})
+        model_admin = admin.site._registry[Employee]
+
+        with (
+            patch(
+                "apps.employee.admin.log_event",
+                side_effect=[None, RuntimeError("audit")],
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            unlock_accounts(
+                model_admin,
+                request,
+                Employee.objects.filter(pk__in=(first.pk, second.pk)).order_by("pk"),
+            )
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.failed_attempts, 5)
+        self.assertEqual(second.failed_attempts, 7)
 
 
 class GroupProxyTests(TestCase):

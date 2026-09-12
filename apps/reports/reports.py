@@ -51,7 +51,7 @@ class ReportFilters:
 
     def scoped(self, qs, org: int):
         if org != TFOMS:
-            qs = qs.filter(otv_kon=org)
+            qs = qs.filter(employee_one__org=org)
         return qs
 
 

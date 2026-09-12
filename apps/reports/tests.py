@@ -91,6 +91,22 @@ class ReportQueriesTests(BaseReportTestCase):
         rows = REPORT_INDEX["r4_complaints"].build(self.smo_user.org, self._filters())
         self.assertEqual(rows[0]["total"], 1)
 
+    def test_scope_uses_immutable_owner_not_mutable_responsible_org(self):
+        own = self._make(owner=self.smo_user, irp_type=2)
+        own.otv_kon = self.tfoms_user.org
+        own.save(update_fields=["otv_kon"])
+        foreign = self._make(owner=self.tfoms_user, irp_type=2)
+        foreign.otv_kon = self.smo_user.org
+        foreign.save(update_fields=["otv_kon"])
+
+        for report in REPORTS:
+            with self.subTest(report=report.slug):
+                rows = report.build(self.smo_user.org, self._filters())
+                if report.slug == "r4_complaints":
+                    self.assertEqual(rows[-1]["total"], 1)
+                elif report.slug == "r9_personal":
+                    self.assertEqual([row["n_irp"] for row in rows], [own.n_irp])
+
     def test_tfoms_sees_all(self):
         self._make(irp_type=2)
         self._make(owner=self.smo_user, irp_type=2)
@@ -303,6 +319,31 @@ class ReportScreenTests(BaseReportTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "application/pdf")
         self.assertTrue(resp.content.startswith(b"%PDF"))
+
+    def test_smo_personal_export_cannot_cross_owner_scope_after_redirect(self):
+        own = self._make(owner=self.smo_user)
+        own.otv_kon = self.tfoms_user.org
+        own.save(update_fields=["otv_kon"])
+        foreign = self._make(owner=self.tfoms_user)
+        foreign.otv_kon = self.smo_user.org
+        foreign.save(update_fields=["otv_kon"])
+        self.client.force_login(self.smo_user)
+
+        response = self.client.get(
+            reverse("reports:export", args=["r9_personal", "xlsx"]),
+            {"date_from": datetime.date.today().isoformat()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        worksheet = load_workbook(io.BytesIO(response.content)).active
+        headers = [cell.value for cell in worksheet[1]]
+        number_column = headers.index("№ обращения") + 1
+        numbers = [
+            worksheet.cell(row=row, column=number_column).value
+            for row in range(2, worksheet.max_row + 1)
+        ]
+        self.assertEqual(numbers, [own.n_irp])
+        self.assertNotIn(foreign.n_irp, numbers)
 
     def test_export_invalid_fmt_404(self):
         self.client.force_login(self.tfoms_user)

@@ -512,12 +512,31 @@ class ProductionSettingsTests(TestCase):
         self.assertEqual(compose.count("restart: unless-stopped"), 3)
         self.assertEqual(compose.count("stop_grace_period: 75s"), 2)
         self.assertEqual(compose.count("init: true"), 2)
-        self.assertIn("exec .venv/bin/gunicorn", compose)
+        self.assertIn(
+            'command: [".venv/bin/gunicorn", "config.wsgi:application"', compose
+        )
         self.assertIn(
             'command: [".venv/bin/python", "manage.py", "run_scheduler", "--interval", "60"]',
             compose,
         )
         self.assertNotIn("while true", compose)
+
+    def test_compose_runs_schema_migrations_once_before_web(self):
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+
+        self.assertIn("  migrate:\n    <<: *app-security", compose)
+        self.assertIn(
+            'command: [".venv/bin/python", "manage.py", "migrate", "--noinput"]',
+            compose,
+        )
+        self.assertEqual(compose.count("condition: service_completed_successfully"), 2)
+        self.assertRegex(
+            compose,
+            r"(?s)  web:.*?depends_on:.*?migrate:\n\s+condition: "
+            r"service_completed_successfully.*?  migrate:",
+        )
+        web_block = compose[compose.index("  web:") : compose.index("  migrate:")]
+        self.assertNotIn("manage.py migrate", web_block)
 
     def test_compose_rotates_all_service_logs(self):
         compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
@@ -526,7 +545,7 @@ class ProductionSettingsTests(TestCase):
         self.assertIn('max-size: "10m"', compose)
         self.assertIn('max-file: "5"', compose)
         self.assertIn('compress: "true"', compose)
-        self.assertEqual(compose.count("logging: *default-logging"), 4)
+        self.assertEqual(compose.count("logging: *default-logging"), 5)
 
     def test_compose_hardens_long_running_application_services(self):
         from apps.system.validators import VIDEO_MAX_SIZE_MB
@@ -534,7 +553,7 @@ class ProductionSettingsTests(TestCase):
         compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
 
         self.assertIn("x-app-security: &app-security", compose)
-        self.assertEqual(compose.count("<<: *app-security"), 2)
+        self.assertEqual(compose.count("<<: *app-security"), 3)
         self.assertIn("read_only: true", compose)
         self.assertIn("no-new-privileges:true", compose)
         self.assertIn("cap_drop:\n    - ALL", compose)

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Настройки таблицы{% endblock %}
 {% block content %}
 <header class="module-heading"><a class="module-heading__back" href="{% url 'system:prefs' %}">← Настройки интерфейса</a><p class="page-heading__eyebrow">Рабочая таблица</p><h1>{{ meta.title }}</h1><p>Выберите видимые колонки, их порядок и начальную сортировку.</p></header>
@@ -6,8 +7,7 @@
   <form method="post" data-validate>
     {% csrf_token %}
     <h2 class="form-section">Колонки и порядок</h2>
-    <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Настройка колонок; на узком экране показана карточками">
-      <table class="data data--responsive">
+    {% data_table responsive=True label="Настройка колонок; на узком экране показана карточками" %}
         <thead>
           <tr><th></th><th>#</th><th>Колонка</th><th>Группа</th></tr>
         </thead>
@@ -23,8 +23,7 @@
             </tr>
           {% endfor %}
         </tbody>
-      </table>
-    </div>
+    {% end_data_table %}
 
     <div class="filters mt-1">
       <div class="field">

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Журнал загрузок обмена{% endblock %}
 {% block content %}
 <header class="page-heading page-heading--action">
@@ -7,8 +8,7 @@
 </header>
 
 <div class="card table-card">
-  <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Таблица загрузок; на узком экране показана карточками">
-    <table class="data data--exchange data--responsive" data-client-sort>
+  {% data_table variant="exchange" responsive=True sortable=True label="Таблица загрузок; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th>Файл</th><th>Организация</th><th>Тип</th><th>Статус</th>
@@ -32,7 +32,6 @@
         <tr class="responsive-empty"><td colspan="7" class="text-muted table-empty">Загрузок ещё не было.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 </div>
 {% endblock %}

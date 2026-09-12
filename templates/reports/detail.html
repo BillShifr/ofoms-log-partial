@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load report_filters %}
+{% load report_filters ui_components %}
 {% block title %}{{ report.title }}{% endblock %}
 {% block content %}
 <header class="module-heading">
@@ -42,8 +42,7 @@
 
 {% if rows is not None %}
 <div class="card table-card">
-  <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Таблица отчёта; на узком экране показана карточками">
-    <table class="data reports-table data--responsive" data-client-sort>
+  {% data_table variant="reports" responsive=True sortable=True label="Таблица отчёта; на узком экране показана карточками" %}
       <thead>
         <tr>
           {% for label in report.labels %}<th>{{ label }}</th>{% endfor %}
@@ -58,8 +57,7 @@
         <tr class="responsive-empty"><td colspan="{{ report.columns|length }}" class="text-muted">По заданным параметрам обращений не найдено.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 </div>
 {% else %}
 <div class="card">

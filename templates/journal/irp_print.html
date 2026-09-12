@@ -1,4 +1,4 @@
-{% load static %}
+{% load static ui_components %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -83,8 +83,7 @@
   {% if history %}
   <div class="card">
     <h2>История изменений</h2>
-    <div class="table-wrap">
-      <table class="data">
+    {% data_table label="История изменений обращения" %}
         <thead><tr><th>Когда</th><th>Кем</th><th>Поле</th><th>Было</th><th>Стало</th></tr></thead>
         <tbody>
           {% for h in history %}
@@ -97,8 +96,7 @@
           </tr>
           {% endfor %}
         </tbody>
-      </table>
-    </div>
+    {% end_data_table %}
   </div>
   {% endif %}
 

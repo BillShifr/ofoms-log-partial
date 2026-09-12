@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load system_filters %}
+{% load system_filters ui_components %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
 <header class="module-heading module-heading--actions">
@@ -71,8 +71,7 @@
 
   <div class="tab-panel is-active" data-panel="runs">
     {% if runs %}
-    <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="История запусков; на узком экране показана карточками">
-      <table class="data data--responsive">
+    {% data_table responsive=True label="История запусков; на узком экране показана карточками" %}
         <thead>
           <tr><th>Начало</th><th>Завершение</th><th>Инициатор</th><th>Результат</th><th>Лог</th></tr>
         </thead>
@@ -87,8 +86,7 @@
           </tr>
           {% endfor %}
         </tbody>
-      </table>
-    </div>
+    {% end_data_table %}
     {% else %}
     <p class="text-muted">Запусков ещё не было.</p>
     {% endif %}

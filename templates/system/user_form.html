@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
 <header class="module-heading"><a class="module-heading__back" href="{% url 'system:users' %}">← Все учётные записи</a><p class="page-heading__eyebrow">Управление доступом</p><h1>{{ title }}</h1><p>Личные данные, организация и набор разрешённых ролей.</p></header>
@@ -60,8 +61,7 @@
     <details class="collapsible" data-key="user-section-access-matrix">
       <summary class="collapsible__toggle">Матрица прав ролей</summary>
       <p class="text-muted">Матрица отражает фактическую серверную политику. Права нескольких назначенных ролей объединяются.</p>
-      <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Матрица прав; на узком экране показана карточками">
-        <table class="data data--responsive data--capabilities">
+      {% data_table variant="capabilities" responsive=True label="Матрица прав; на узком экране показана карточками" %}
           <thead><tr><th>Роль</th>{% for label in capability_headers %}<th>{{ label }}</th>{% endfor %}</tr></thead>
           <tbody>
           {% for row in capability_matrix %}
@@ -72,8 +72,7 @@
             </tr>
           {% endfor %}
           </tbody>
-        </table>
-      </div>
+      {% end_data_table %}
     </details>
 
     <div class="form-actions form-actions--sticky">

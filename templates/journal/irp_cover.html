@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Сопроводительное письмо № {{ irp.n_irp }}{% endblock %}
 {% block content %}
 <div class="print-toolbar no-print"><a class="btn btn--ghost" href="{% url 'journal:detail' irp.pk %}">← К обращению</a><button class="btn btn--primary" type="button" data-ui-action="print">Печать</button></div>
@@ -17,7 +18,7 @@
     застрахованных лиц в сфере обязательного медицинского страхования направляем
     Вам для рассмотрения и подготовки ответа обращение застрахованного лица:</p>
 
-  <table class="data letter-table">
+  {% data_table variant="letter" scrollable=False %}
     <tbody>
       <tr><th>Номер обращения</th><td>{{ irp.n_irp }}</td></tr>
       <tr><th>Дата поступления</th><td>{{ irp.date_create|date:"d.m.Y" }}</td></tr>
@@ -28,7 +29,7 @@
       <tr><th>Признак направления</th><td>{{ irp.get_pr_out_display|default:"—" }}</td></tr>
       <tr><th>Дата направления</th><td>{{ irp.date_cross|date:"d.m.Y"|default:"—" }}</td></tr>
     </tbody>
-  </table>
+  {% end_data_table %}
 
   <p>Просим рассмотреть обращение в установленный срок — до
     {{ irp.data_plan|date:"d.m.Y" }} — и направить результат рассмотрения

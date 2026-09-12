@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Пользователи{% endblock %}
 {% block content %}
 <header class="page-heading page-heading--action">
@@ -22,8 +23,7 @@
 </div>
 
 <div class="card table-card">
-  <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Таблица пользователей; на узком экране показана карточками">
-    <table class="data data--users data--responsive" data-client-sort>
+  {% data_table variant="users" responsive=True sortable=True label="Таблица пользователей; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th>ФИО</th>
@@ -64,8 +64,7 @@
         <tr class="responsive-empty"><td colspan="7" class="text-muted table-empty">Пользователи не найдены.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 
   {% if page.paginator.num_pages > 1 %}
   <div class="pagination">

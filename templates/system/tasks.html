@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% load system_filters %}
 {% block title %}Задачи{% endblock %}
 {% block content %}
@@ -8,8 +9,7 @@
 </header>
 
 <div class="card table-card">
-  <div class="table-wrap table-wrap--tasks" tabindex="0" aria-label="Таблица заданий; на узком экране показана карточками">
-    <table class="data data--tasks" data-client-sort>
+  {% data_table variant="tasks" wrap_variant="tasks" sortable=True label="Таблица заданий; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th>Наименование</th>
@@ -61,7 +61,6 @@
         <tr><td colspan="8" class="text-muted table-empty">Заданий не создано.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 </div>
 {% endblock %}

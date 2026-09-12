@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Журнал событий{% endblock %}
 {% block content %}
 <header class="page-heading">
@@ -37,8 +38,7 @@
 </div>
 
 <div class="card table-card">
-  <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Таблица событий; на узком экране показана карточками">
-    <table class="data data--events data--responsive" data-client-sort>
+  {% data_table variant="events" responsive=True sortable=True label="Таблица событий; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th data-type="num">ID</th>
@@ -78,8 +78,7 @@
         <tr class="responsive-empty"><td colspan="10" class="text-muted">Событий не найдено.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 
   {% if page.paginator.num_pages > 1 %}
   <div class="pagination">

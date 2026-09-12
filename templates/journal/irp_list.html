@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static ui_components %}
 {% block title %}Журнал обращений{% endblock %}
 {% block content %}
 <div class="page-heading">
@@ -46,8 +46,7 @@
 </div>
 
 <div class="card table-card">
-  <div class="table-wrap table-wrap--journal" tabindex="0" aria-label="Таблица обращений; на узком экране показана карточками">
-    <table class="data data--wide data--journal {% if fixed_first %}th-sticky{% endif %}">
+  {% data_table variant="wide journal" wrap_variant="journal" fixed_first=fixed_first label="Таблица обращений; на узком экране показана карточками" %}
       <colgroup>
         {% for col in cols %}<col class="col-{{ col.key }}">{% endfor %}
       </colgroup>
@@ -97,8 +96,7 @@
         <tr><td colspan="{{ cols|length }}" class="text-muted">Обращений не найдено.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 
   {% if page.paginator.num_pages > 1 %}
   <div class="infinite-scroll"

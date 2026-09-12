@@ -20,6 +20,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadhandler import StopUpload
 from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.db.models.deletion import ProtectedError
+from django.template import Context, Template, TemplateSyntaxError
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -1784,6 +1785,47 @@ class ErrorPageTests(TestCase):
 
 
 class TemplateHygieneTests(TestCase):
+    def test_all_product_tables_use_shared_component(self):
+        templates_root = Path(settings.BASE_DIR) / "templates"
+        violations = []
+        for template_path in templates_root.rglob("*.html"):
+            text = template_path.read_text(encoding="utf-8-sig")
+            if re.search(r"<\s*/?\s*table\b", text, re.IGNORECASE):
+                violations.append(str(template_path.relative_to(templates_root)))
+        self.assertEqual(violations, [])
+
+    def test_data_table_component_renders_shared_accessible_shell(self):
+        rendered = Template(
+            "{% load ui_components %}"
+            "{% data_table variant='users wide' responsive=True sortable=True "
+            "fixed_first=fixed label=label %}"
+            "<thead><tr><th>ФИО</th></tr></thead>"
+            "<tbody><tr><td>Иванов</td></tr></tbody>"
+            "{% end_data_table %}"
+        ).render(Context({"fixed": True, "label": 'Сотрудники "ТФОМС"'}))
+
+        self.assertIn('class="table-wrap table-wrap--responsive"', rendered)
+        self.assertIn('tabindex="0"', rendered)
+        self.assertIn('aria-label="Сотрудники &quot;ТФОМС&quot;"', rendered)
+        self.assertIn(
+            'class="data data--users data--wide data--responsive th-sticky"',
+            rendered,
+        )
+        self.assertIn("data-client-sort", rendered)
+        self.assertEqual(rendered.count("<table"), 1)
+        self.assertEqual(rendered.count("</table>"), 1)
+
+    def test_data_table_component_rejects_undeclared_variant(self):
+        component = Template(
+            "{% load ui_components %}"
+            "{% data_table variant='one-off' %}{% end_data_table %}"
+        )
+        with self.assertRaisesMessage(
+            TemplateSyntaxError,
+            "unknown data_table variant: one-off",
+        ):
+            component.render(Context())
+
     def test_templates_do_not_embed_style_or_event_attributes(self):
         templates_root = Path(settings.BASE_DIR) / "templates"
         violations = []

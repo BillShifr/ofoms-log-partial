@@ -675,10 +675,10 @@ tbody tr.js-event-row { cursor: pointer; }
 .print-preview-note { margin: -20px 0 28px; padding-bottom: 10px; border-bottom: 1px solid #d7dde2; color: #5e6c77; font-size: .78rem; text-align: center; text-transform: uppercase; letter-spacing: .08em; }
 .letter-recipient { max-width: 55%; margin: 0 0 36px auto; text-align: right; }
 .letter-title { margin: 30px 0; font-family: var(--font-main); font-size: 1.35rem; text-align: center; }
-.letter-table { min-width: 0 !important; margin: 22px 0; }
-table.data.letter-table th,
-table.data.letter-table td { background: #fff; color: #222; }
-table.data.letter-table th {
+.data--letter { min-width: 0 !important; margin: 22px 0; }
+table.data.data--letter th,
+table.data.data--letter td { background: #fff; color: #222; }
+table.data.data--letter th {
   width: 35%;
   background: #f4f6f8;
   color: #425466;
@@ -758,7 +758,7 @@ table.data.letter-table th {
 .collapsible__toggle::-webkit-details-marker { display: none; }
 .collapsible__toggle::before { content: "▸ "; margin-right: 6px; font-weight: 600; }
 .collapsible[open] > .collapsible__toggle::before { content: "▾ "; }
-.reports-table th { white-space: nowrap; }
+.data--reports th { white-space: nowrap; }
 .row-total td { font-weight: 600; background: var(--chip-yellow); }
 
 /* ---------- Версия для слабовидящих (А/А+/А++) ---------- */

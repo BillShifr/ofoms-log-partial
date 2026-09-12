@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Протокол обработки {{ log.filename }}{% endblock %}
 {% block content %}
 <header class="module-heading module-heading--actions">
@@ -26,8 +27,7 @@
     Протокол контроля отсутствует или повреждён. Нельзя подтвердить отсутствие нарушений; повторите обработку файла или обратитесь к администратору.
   </div>
   {% else %}
-  <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Протокол ФЛК; на узком экране показан карточками">
-    <table class="data data--protocol data--responsive" data-client-sort>
+  {% data_table variant="protocol" responsive=True sortable=True label="Протокол ФЛК; на узком экране показан карточками" %}
       <thead><tr><th>Код</th><th>Поле</th><th data-type="num">Обращение</th><th>Комментарий</th></tr></thead>
       <tbody>
         {% for pr in prs %}
@@ -42,8 +42,7 @@
         <tr class="responsive-empty"><td colspan="4" class="table-empty">Нарушений не зафиксировано.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
   {% endif %}
 </div>
 {% endblock %}

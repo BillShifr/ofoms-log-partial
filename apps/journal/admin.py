@@ -51,8 +51,11 @@ class ScopedEmployeeFilter(SimpleListFilter):
         ]
 
     def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(employee_one_id=self.value())
+        value = self.value()
+        if value:
+            if not value.isascii() or not value.isdecimal() or int(value) < 1:
+                return queryset.none()
+            return queryset.filter(employee_one_id=int(value))
         return queryset
 
 

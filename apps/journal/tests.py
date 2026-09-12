@@ -542,6 +542,23 @@ class JournalScreenTests(TestCase):
         self.assertContains(response, "ВидимыйСотрудник")
         self.assertNotContains(response, "СкрытыйСотрудник")
 
+    def test_admin_employee_filter_rejects_invalid_identifier_without_500(self):
+        self._make_irp(owner=self.smo_user)
+        self.smo_user.is_staff = True
+        self.smo_user.user_permissions.add(
+            Permission.objects.get(codename="view_irp")
+        )
+        self.smo_user.save(update_fields=["is_staff"])
+        self.client.force_login(self.smo_user)
+
+        response = self.client.get(
+            reverse("admin:journal_irp_changelist"),
+            {"employee_one": "not-a-primary-key"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "0 результатов")
+
     def test_list_requires_login(self):
         resp = self.client.get(reverse("journal:list"))
         self.assertEqual(resp.status_code, 302)

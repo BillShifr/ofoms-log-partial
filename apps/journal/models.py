@@ -322,6 +322,28 @@ class Irp(models.Model):
             ),
             models.CheckConstraint(
                 condition=(
+                    models.Q(irp_type=2)
+                    | models.Q(zh_d__isnull=True)
+                    | models.Q(zh_d="")
+                ),
+                name="irp_complaint_details_match_type",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(pr_out__isnull=False)
+                    | models.Q(date_cross__isnull=True, time_cross__isnull=True)
+                ),
+                name="irp_redirect_details_match_flag",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(time_cross__isnull=True)
+                    | models.Q(date_cross__isnull=False)
+                ),
+                name="irp_redirect_time_has_date",
+            ),
+            models.CheckConstraint(
+                condition=(
                     models.Q(
                         status="closed",
                         date_close__isnull=False,
@@ -358,6 +380,23 @@ class Irp(models.Model):
 
     def clean(self):
         super().clean()
+        if self.irp_type != 2 and self.zh_d:
+            raise ValidationError(
+                {"zh_d": "Сведения о жалобе допустимы только для жалобы."}
+            )
+        if not self.pr_out and (self.date_cross or self.time_cross):
+            raise ValidationError(
+                {
+                    "pr_out": (
+                        "Дата и время направления допустимы только при наличии "
+                        "признака направления."
+                    )
+                }
+            )
+        if self.time_cross and not self.date_cross:
+            raise ValidationError(
+                {"date_cross": "Для времени направления укажите дату направления."}
+            )
         if self.way == 5 and not self.way_n:
             raise ValidationError({"way_n": "Укажите организацию"})
         if bool(self.date_close) != bool(self.result):

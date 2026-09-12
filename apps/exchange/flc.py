@@ -115,6 +115,15 @@ def _check_record(
             c for c, _ in ZH_TYPES
         ]:
             err("zh_d", "Сведения о жалобе вне справочника")
+        if d.get("irp_type") != 2 and d.get("zh_d") not in [None, ""]:
+            err("zh_d", "Сведения о жалобе допустимы только для жалобы")
+        if not d.get("pr_out") and (d.get("date_cross") or d.get("time_cross")):
+            err(
+                "pr_out",
+                "Дата и время направления требуют признака направления",
+            )
+        if d.get("time_cross") and not d.get("date_cross"):
+            err("date_cross", "Время направления требует даты направления")
         theme_txt = d.get("theme")
         if theme_txt:
             theme_exists = IrpTheme.objects.filter(

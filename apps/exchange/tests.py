@@ -613,6 +613,40 @@ class FlcValidationTests(ExchangeTestMixin, TestCase):
 
         self.assertTrue(any(error["IM_POL"] == "N_IRP" for error in errors))
 
+    def test_inapplicable_conditional_details_are_reported(self):
+        from apps.exchange.flc import validate_irp_record
+
+        base = {
+            "n_irp": "conditional-details",
+            "irp_type": 1,
+            "date_create": "2026-05-14",
+            "way": 1,
+            "how": 2,
+            "theme": "TT.01",
+            "otv_t": 1,
+            "otv_kon": 81000,
+            "data_plan": "2026-06-13",
+            "employee_1": str(self.emp1.guid),
+        }
+
+        complaint_errors = validate_irp_record({**base, "zh_d": "1"})
+        redirect_errors = validate_irp_record(
+            {**base, "date_cross": "2026-05-15", "time_cross": "12:00"}
+        )
+        date_errors = validate_irp_record(
+            {**base, "pr_out": 1, "time_cross": "12:00"}
+        )
+
+        self.assertTrue(
+            any(error["IM_POL"] == "ZH_D" for error in complaint_errors)
+        )
+        self.assertTrue(
+            any(error["IM_POL"] == "PR_OUT" for error in redirect_errors)
+        )
+        self.assertTrue(
+            any(error["IM_POL"] == "DATE_CROSS" for error in date_errors)
+        )
+
 
 class ExcelImportTests(ExchangeTestMixin, TestCase):
     def test_excel_import(self):

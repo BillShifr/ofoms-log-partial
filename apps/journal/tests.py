@@ -155,6 +155,66 @@ class IrpIdentityConstraintMigrationTests(TransactionTestCase):
         executor.migrate(self.migrate_to)
 
 
+class IrpConditionalDetailsMigrationTests(TransactionTestCase):
+    migrate_from = [("journal", "0010_enforce_irp_identity")]
+    migrate_to = [("journal", "0011_enforce_conditional_irp_details")]
+
+    def test_migration_fails_closed_on_inconsistent_legacy_details(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        OldEmployee = old_apps.get_model("employee", "Employee")
+        OldTheme = old_apps.get_model("journal", "IrpTheme")
+        OldIrp = old_apps.get_model("journal", "Irp")
+        employee = OldEmployee.objects.create(
+            username="legacy_inconsistent_irp_owner",
+            password="!",
+            org=81000,
+        )
+        theme = OldTheme.objects.create(
+            code_name="LEGACY-COND", title="Legacy conditional", version=3
+        )
+        common = {
+            "irp_type": 1,
+            "date_create": datetime.date(2026, 9, 12),
+            "way": 1,
+            "how": 1,
+            "theme": theme,
+            "otv_t": 1,
+            "otv_kon": 81000,
+            "employee_one": employee,
+            "data_plan": datetime.date(2026, 10, 12),
+        }
+        invalid_rows = [
+            OldIrp.objects.create(
+                n_irp="legacy-invalid-complaint",
+                zh_d="1",
+                **common,
+            ),
+            OldIrp.objects.create(
+                n_irp="legacy-invalid-redirect-date",
+                date_cross=datetime.date(2026, 9, 13),
+                **common,
+            ),
+            OldIrp.objects.create(
+                n_irp="legacy-invalid-redirect-time",
+                pr_out=1,
+                time_cross=datetime.time(12, 0),
+                **common,
+            ),
+        ]
+
+        executor = MigrationExecutor(connection)
+        with self.assertRaises(RuntimeError) as error:
+            executor.migrate(self.migrate_to)
+        for invalid in invalid_rows:
+            self.assertIn(str(invalid.pk), str(error.exception))
+
+        OldIrp.objects.filter(pk__in=[item.pk for item in invalid_rows]).delete()
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+
+
 class IrpModelTests(TestCase):
     def setUp(self):
         self.theme = IrpTheme.objects.create(
@@ -191,6 +251,41 @@ class IrpModelTests(TestCase):
                 transaction.atomic(),
             ):
                 self._create_irp_with_number(value)
+
+    def test_database_rejects_inapplicable_conditional_details(self):
+        irp = self._create_irp()
+        invalid_updates = (
+            {"zh_d": "1"},
+            {"date_cross": datetime.date.today()},
+            {"pr_out": 1, "time_cross": datetime.time(12, 0)},
+        )
+        for values in invalid_updates:
+            with (
+                self.subTest(values=values),
+                self.assertRaises(IntegrityError),
+                transaction.atomic(),
+            ):
+                Irp.objects.filter(pk=irp.pk).update(**values)
+
+    def test_model_validation_rejects_inapplicable_conditional_details(self):
+        irp = self._create_irp()
+        irp.zh_d = "1"
+        with self.assertRaises(ValidationError) as complaint_error:
+            irp.full_clean()
+        self.assertIn("zh_d", complaint_error.exception.message_dict)
+
+        irp.zh_d = None
+        irp.date_cross = datetime.date.today()
+        with self.assertRaises(ValidationError) as redirect_error:
+            irp.full_clean()
+        self.assertIn("pr_out", redirect_error.exception.message_dict)
+
+        irp.pr_out = 1
+        irp.date_cross = None
+        irp.time_cross = datetime.time(12, 0)
+        with self.assertRaises(ValidationError) as date_error:
+            irp.full_clean()
+        self.assertIn("date_cross", date_error.exception.message_dict)
 
     def _create_irp_with_number(self, n_irp):
         return Irp.objects.create(
@@ -718,11 +813,6 @@ class JournalScreenTests(TestCase):
 
     def test_edit_clears_inapplicable_conditional_fields(self):
         irp = self._make_irp()
-        irp.zh_d = "1"
-        irp.pr_out = 1
-        irp.date_cross = datetime.date.today()
-        irp.time_cross = datetime.time(12, 0)
-        irp.save()
         self.client.force_login(self.tfoms_user)
 
         response = self.client.post(

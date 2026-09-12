@@ -26,6 +26,7 @@ from openpyxl import load_workbook
 from apps.core.models import EventLog
 from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
+from apps.journal.forms import IrpForm, IrpRedirectForm
 from apps.journal.models import (
     Irp,
     IrpAnswer,
@@ -629,6 +630,55 @@ class JournalScreenTests(TestCase):
             if "journal_irp" in query["sql"].lower()
         ]
         self.assertTrue(any("translate" in sql and "limit 8" in sql for sql in journal_queries))
+
+    def test_superuser_outside_tfoms_retains_global_journal_scope(self):
+        tfoms_irp = self._make_irp(owner=self.tfoms_user)
+        tfoms_irp.z_f = "ГЛОБАЛЬНЫЙ ТФОМС"
+        tfoms_irp.save(update_fields=["z_f"])
+        smo_irp = self._make_irp(owner=self.smo_user)
+        smo_irp.z_f = "ГЛОБАЛЬНЫЙ СМО"
+        smo_irp.save(update_fields=["z_f"])
+        root = Employee.objects.create_superuser(
+            username="journal_foreign_org_root",
+            password="GoodPass!1",
+            org=81007,
+        )
+        self.client.force_login(root)
+
+        listing = self.client.get(reverse("journal:list"))
+        detail = self.client.get(reverse("journal:detail", args=[tfoms_irp.pk]))
+        suggestions = self.client.get(
+            reverse("journal:suggest"),
+            {"field": "z_f", "q": "глобальный"},
+        )
+        create_form = IrpForm(user=root)
+        redirect_form = IrpRedirectForm(instance=tfoms_irp, user=root)
+
+        self.assertEqual(listing.status_code, 200)
+        self.assertContains(listing, tfoms_irp.n_irp)
+        self.assertContains(listing, smo_irp.n_irp)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(
+            set(suggestions.json()["suggestions"]),
+            {"ГЛОБАЛЬНЫЙ ТФОМС", "ГЛОБАЛЬНЫЙ СМО"},
+        )
+        expected_orgs = {81000, 81001, 81007, 81008}
+        self.assertEqual(
+            {code for code, _label in create_form.fields["otv_kon"].choices},
+            expected_orgs,
+        )
+        self.assertEqual(
+            {code for code, _label in redirect_form.fields["otv_kon"].choices},
+            expected_orgs,
+        )
+        self.assertTrue(
+            {self.tfoms_user.pk, self.smo_user.pk}
+            <= set(
+                create_form.fields["employee_it"].queryset.values_list(
+                    "pk", flat=True
+                )
+            )
+        )
 
     def test_print_list_preserves_filters_and_org_scope(self):
         own = self._make_irp(owner=self.smo_user)

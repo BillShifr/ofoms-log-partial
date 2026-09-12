@@ -391,3 +391,9 @@
 - Форма фильтров учитывает `is_superuser` отдельно от profile `org`, поэтому root principal видит полный список организаций.
 - Обычный пользователь СМО по-прежнему ограничен immutable owner organization и не может расширить scope параметрами фильтра.
 - Login/logout подключены явно с прежними именами, поэтому декораторы, redirects, шаблоны и аудит не меняют публичный контракт.
+
+## 2026-09-12 Глобальный journal scope superuser
+
+- Superuser и пользователь ТФОМС используют общий global-scope predicate в form querysets/choices; чтение дополнительно проверяет `is_superuser` перед tenant restriction.
+- Реестр, autocomplete и общий object loader согласованы, поэтому detail/edit/redirect/print/download не расходятся по recovery visibility.
+- При создании обращения immutable primary owner остаётся текущим principal и его profile organization; глобальный scope не переписывает provenance новой записи.

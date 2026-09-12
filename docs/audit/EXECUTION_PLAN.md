@@ -916,3 +916,10 @@
 - [x] Показывать root principal полный фильтр организаций.
 - [x] Проверить preview и реальный XLSX export с обращениями двух организаций.
 - [x] Сохранить SМО owner-scope regression.
+
+## 2026-09-12 — глобальный journal scope superuser
+
+- [x] Разрешить root principal видеть все строки реестра и autocomplete.
+- [x] Согласовать общий object loader для detail/edit/redirect/print/download.
+- [x] Расширить organization choices и assignable employees обеих форм.
+- [x] Проверить foreign-org superuser и сохранить SМО foreign denial.

@@ -62,7 +62,7 @@ def irp_suggest(request):
     if field not in ("n_irp", "z_f", "z_enp") or len(q) < 3:
         return JsonResponse({"suggestions": []})
     qs = Irp.objects.exclude(**{field: ""}).distinct()
-    if request.user.org != TFOMS:
+    if not request.user.is_superuser and request.user.org != TFOMS:
         qs = qs.filter(employee_one__org=request.user.org)
     qs = contains_folded(qs, field, q, "suggest_match")
     values = list(qs.order_by(field).values_list(field, flat=True).distinct()[:8])
@@ -77,7 +77,7 @@ def irp_list(request):
     qs = Irp.objects.select_related("theme", "employee_one", "employee_it")
 
     # СМО видят только свои обращения (принцип v1 get_queryset)
-    if request.user.org != TFOMS:
+    if not request.user.is_superuser and request.user.org != TFOMS:
         qs = qs.filter(employee_one__org=request.user.org)
 
     form = IrpFilterForm(request.GET or None)
@@ -496,7 +496,11 @@ def _get_irp_for_user(request, pk, *, for_update=False):
     if for_update:
         queryset = queryset.select_for_update()
     irp = get_object_or_404(queryset, pk=pk)
-    if request.user.org != TFOMS and irp.employee_one.org != request.user.org:
+    if (
+        not request.user.is_superuser
+        and request.user.org != TFOMS
+        and irp.employee_one.org != request.user.org
+    ):
         raise PermissionDenied
     return irp
 

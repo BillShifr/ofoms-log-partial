@@ -54,6 +54,11 @@ const routes = [
   ["prefs", "/system/prefs/"],
   ["table-prefs", "/system/prefs/journal/"],
 ];
+const printRoutes = [
+  ["print-journal-list", "/journal/print/"],
+  ["print-journal-card", "/journal/{journalId}/print/"],
+  ["print-journal-cover", "/journal/{journalId}/cover/"],
+];
 const responsiveRouteNames = new Set([
   "events", "users", "exchange", "exchange-protocol",
   "report-detail", "journal-history", "task-history", "table-prefs",
@@ -347,7 +352,7 @@ try {
     throw new Error(`Browser error during login: ${browserErrors.join(" | ")}`);
   }
 
-  if (routes.some(([, path]) => path.includes("{journalId}"))) {
+  if ([...routes, ...printRoutes].some(([, path]) => path.includes("{journalId}"))) {
     await navigate(`${baseUrl}/journal/`);
     const journalPath = await evaluate(
       "document.querySelector('a.table-row-link')?.getAttribute('href') || null",
@@ -357,6 +362,7 @@ try {
       throw new Error("Journal detail routes require at least one record visible to the QA account.");
     }
     for (const route of routes) route[1] = route[1].replaceAll("{journalId}", journalMatch[1]);
+    for (const route of printRoutes) route[1] = route[1].replaceAll("{journalId}", journalMatch[1]);
   }
 
   for (const [width, height] of viewports) {
@@ -443,6 +449,51 @@ try {
     }
   }
 
+  await command("Emulation.setEmulatedMedia", { media: "print" });
+  await command("Emulation.setDeviceMetricsOverride", { width: 1240, height: 1754, deviceScaleFactor: 1, mobile: false });
+  for (const [name, path] of printRoutes) {
+    const errorStart = browserErrors.length;
+    await navigate(`${baseUrl}${path}`);
+    await settleAnimations();
+    const metrics = await evaluate(`(() => {
+      const sheet = document.querySelector('.paper, .print-sheet');
+      const sheetStyle = sheet ? getComputedStyle(sheet) : null;
+      return {
+        path: location.pathname,
+        title: document.title,
+        httpStatus: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
+        forbidden: false,
+        documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+        navOverflow: false,
+        appliedMode: { theme: 'light', font: 'base', contrast: 'default' },
+        activeAnimations: document.getAnimations().filter((animation) => animation.playState === 'running').length,
+        tablePalette: [],
+        width: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        printLayout: {
+          screenControlsHidden: [...document.querySelectorAll('.no-print, .header, .nav, .footer')]
+            .every((element) => getComputedStyle(element).display === 'none'),
+          sheetReset: Boolean(sheetStyle) && sheetStyle.borderTopStyle === 'none' &&
+            sheetStyle.boxShadow === 'none' && sheetStyle.paddingTop === '0px',
+          tableHeadersStatic: [...document.querySelectorAll('table.data th')]
+            .every((element) => getComputedStyle(element).position === 'static'),
+          letterRowsNeutral: [...document.querySelectorAll('.letter-table th, .letter-table td')]
+            .every((element) => ['rgb(255, 255, 255)', 'rgb(244, 246, 248)']
+              .includes(getComputedStyle(element).backgroundColor))
+        }
+      };
+    })()`);
+    metrics.journalLayout = null;
+    metrics.taskLayout = null;
+    metrics.responsiveTable = null;
+    metrics.browserErrors = browserErrors.slice(errorStart);
+    const pdf = await command("Page.printToPDF", { printBackground: true, preferCSSPageSize: true });
+    const filename = `${name}.pdf`;
+    await writeFile(join(outputDir, filename), Buffer.from(pdf.data, "base64"));
+    results.push({ name, viewport: "print", theme: "light", font: "base", contrast: "default", ...metrics, pdf: filename });
+  }
+  await command("Emulation.setEmulatedMedia", { media: "screen" });
+
   const checkedResults = results.map((item) => ({
     ...item,
     expectedForbidden: expectedForbidden.has(item.name),
@@ -462,6 +513,9 @@ try {
       (!item.responsiveTable || !item.responsiveTable.compact ||
         !item.responsiveTable.headerHidden || !item.responsiveTable.cardGrid ||
         item.responsiveTable.horizontallyScrollable || !item.responsiveTable.actionsVisible),
+    printLayoutMismatch: item.name.startsWith("print-") && (!item.printLayout ||
+      !item.printLayout.screenControlsHidden || !item.printLayout.sheetReset ||
+      !item.printLayout.tableHeadersStatic || !item.printLayout.letterRowsNeutral),
   }));
   const report = {
     generatedAt: new Date().toISOString(),
@@ -473,7 +527,8 @@ try {
       (item.name !== "login" && item.path.includes("login")) ||
       (item.httpStatus >= 400 && !(item.expectedForbidden && item.httpStatus === 403)) ||
       item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch ||
-      item.journalLayoutMismatch || item.taskLayoutMismatch || item.responsiveTableMismatch || item.activeAnimations
+      item.journalLayoutMismatch || item.taskLayoutMismatch || item.responsiveTableMismatch ||
+      item.printLayoutMismatch || item.activeAnimations
     ),
     results: checkedResults,
   };

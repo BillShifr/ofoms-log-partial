@@ -160,6 +160,18 @@ class RoleGroupAdmin(GroupAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+    def save_related(self, request, form, formsets, change):
+        """Фиксирует изменение permission-набора внутри admin-транзакции."""
+        super().save_related(request, form, formsets, change)
+        role = form.instance
+        log_event(
+            module="employee",
+            event_type=EventLog.EventType.UPDATE,
+            user=request.user,
+            target=f"admin:role:{role.pk}:permissions",
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+
 
 admin.site.unregister(Group)
 admin.site.register(GroupProxy, RoleGroupAdmin)

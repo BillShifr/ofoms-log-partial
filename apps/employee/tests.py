@@ -14,7 +14,7 @@ from apps.employee.admin import (
 from apps.employee.models import Employee, GroupProxy
 from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
@@ -290,6 +290,11 @@ class EmployeeAdminPolicyTests(TestCase):
 
 
 class GroupProxyTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        ensure_role_groups()
+
     def test_proxy_model(self):
         GroupProxy.objects.get_or_create(name="Тестовая роль")
         self.assertTrue(GroupProxy.objects.filter(name="Тестовая роль").exists())
@@ -315,3 +320,52 @@ class GroupProxyTests(TestCase):
         self.assertFalse(model_admin.has_delete_permission(superuser_request))
         self.assertTrue(model_admin.has_change_permission(superuser_request))
         self.assertFalse(model_admin.has_change_permission(staff_request))
+
+    def test_admin_permission_change_records_subject_audit(self):
+        actor = Employee.objects.create_superuser(
+            username="role_admin_actor",
+            password="GoodPass!1",
+            org=81000,
+        )
+        role = GroupProxy.objects.get(name="ОП1")
+        role.permissions.clear()
+        permission = Permission.objects.order_by("pk").first()
+        self.client.force_login(actor)
+
+        response = self.client.post(
+            reverse("admin:employee_groupproxy_change", args=[role.pk]),
+            {"permissions": [permission.pk], "_save": "Сохранить"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(role.permissions.filter(pk=permission.pk).exists())
+        event = EventLog.objects.get(
+            target=f"admin:role:{role.pk}:permissions"
+        )
+        self.assertEqual(event.event_type, EventLog.EventType.UPDATE)
+        self.assertEqual(event.user, actor)
+
+    def test_admin_permission_change_rolls_back_when_audit_fails(self):
+        actor = Employee.objects.create_superuser(
+            username="role_admin_rollback_actor",
+            password="GoodPass!1",
+            org=81000,
+        )
+        role = GroupProxy.objects.get(name="ОП1")
+        permissions = list(Permission.objects.order_by("pk")[:2])
+        role.permissions.set([permissions[0]])
+        self.client.force_login(actor)
+
+        with (
+            patch("apps.employee.admin.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("admin:employee_groupproxy_change", args=[role.pk]),
+                {"permissions": [permissions[1].pk], "_save": "Сохранить"},
+            )
+
+        self.assertEqual(
+            set(role.permissions.values_list("pk", flat=True)),
+            {permissions[0].pk},
+        )

@@ -74,6 +74,8 @@ docker compose logs --tail=200 web scheduler
 
 Runtime image не содержит build-инструмент `uv`, тестовые каталоги или локальные кэши Ruff/pytest: pinned `uv` подключается к build step как ephemeral BuildKit mount. Не добавляйте package manager или диагностические credentials в финальный слой; аварийная диагностика выполняется отдельным одноразовым образом с тем же commit SHA.
 
+CI загружает собранный image в локальный Docker daemon runner, выполняет `scripts/container_runtime_gate.sh` и только после успешной проверки публикует tag из `main`. Gate подтверждает отсутствие build/test content, непривилегированность основного runtime, read-only rootfs, размер `/tmp`, а также минимальный `CHOWN`-контракт init-контейнера. Сборка без выполнения этого gate не считается готовой к публикации.
+
 Для обновления сначала создайте резервную копию, затем:
 
 ```bash

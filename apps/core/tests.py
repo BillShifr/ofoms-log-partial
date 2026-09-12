@@ -742,6 +742,28 @@ class ProductionSettingsTests(TestCase):
 
         for path in (".pytest_cache", ".ruff_cache", ".mypy_cache", ".tox", ".nox"):
             self.assertIn(path, dockerignore)
+        self.assertIn("scripts", dockerignore)
+
+    def test_ci_verifies_runtime_image_before_push(self):
+        workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()
+        runtime_gate = (
+            settings.BASE_DIR / "scripts" / "container_runtime_gate.sh"
+        ).read_text()
+
+        build_index = workflow.index("- name: Build runtime image")
+        verify_index = workflow.index("- name: Verify runtime image")
+        push_index = workflow.index("- name: Push verified runtime image")
+        self.assertLess(build_index, verify_index)
+        self.assertLess(verify_index, push_index)
+        self.assertIn("load: true", workflow[build_index:verify_index])
+        self.assertIn("push: false", workflow[build_index:verify_index])
+        self.assertIn(
+            "sh scripts/container_runtime_gate.sh frozendevs/tfoms-ejournal:latest",
+            workflow[verify_index:push_index],
+        )
+        self.assertIn("--cap-drop ALL", runtime_gate)
+        self.assertIn("--cap-add CHOWN", runtime_gate)
+        self.assertIn("test ! -e /usr/local/bin/uv", runtime_gate)
 
     def test_ci_uses_least_privilege_and_bounded_jobs(self):
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()

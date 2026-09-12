@@ -17,6 +17,7 @@ docs
 .tmp
 .artifacts
 tests
+scripts
 .github
 .idea
 .vscode

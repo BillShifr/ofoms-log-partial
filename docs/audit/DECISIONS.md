@@ -427,3 +427,9 @@
 - Pinned `uv` оформлен отдельным build stage и подключается к dependency-install step через BuildKit mount, поэтому executable не копируется в финальные layers.
 - `.dockerignore` исключает caches pytest, Ruff, mypy, tox и nox независимо от их наличия в локальном checkout.
 - Runtime image сохраняет только production dependencies, Django source/templates/static и обязательные пустые data paths; диагностические build tools не поставляются.
+
+## 2026-09-12 Runtime verification до публикации image
+
+- Docker build в CI всегда загружает single-platform image в daemon runner и запускает версионированный `container_runtime_gate.sh` до любого registry push.
+- Один gate проверяет app runtime и привилегированный только для `CHOWN` init-сценарий, включая capability masks, no-new-privileges, read-only rootfs и image hygiene.
+- На `main` отдельный `docker push` выполняется только после успешного probe; build action больше не объединяет непроверенную сборку и публикацию в один шаг.

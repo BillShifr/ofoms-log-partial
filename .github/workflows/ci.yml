@@ -98,8 +98,16 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build & push
+      - name: Build runtime image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          push: ${{ github.ref == 'refs/heads/main' }}
+          load: true
+          push: false
           tags: frozendevs/tfoms-ejournal:latest
+
+      - name: Verify runtime image
+        run: sh scripts/container_runtime_gate.sh frozendevs/tfoms-ejournal:latest
+
+      - name: Push verified runtime image
+        if: github.ref == 'refs/heads/main'
+        run: docker push frozendevs/tfoms-ejournal:latest

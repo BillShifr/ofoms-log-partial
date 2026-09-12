@@ -958,3 +958,10 @@
 - [x] Сохранить immutable digest build tool и frozen dependency install.
 - [x] Исключить локальные Python tool caches из build context.
 - [x] Проверить собранный image на отсутствие executable и cache directories.
+
+## 2026-09-12 — verified container release gate
+
+- [x] Загружать production image в Docker daemon CI runner.
+- [x] Выполнять versioned app и volume-init runtime probes на PR и main.
+- [x] Исключить test/diagnostic scripts из runtime image.
+- [x] Публиковать tag только отдельным шагом после успешной проверки.

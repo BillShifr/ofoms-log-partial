@@ -32,11 +32,11 @@ const viewports = [
 ];
 const routes = [
   ["journal", "/journal/"],
-  ["journal-detail", "/journal/1/"],
+  ["journal-detail", "/journal/{journalId}/"],
   ["journal-new", "/journal/new/"],
-  ["journal-edit", "/journal/1/edit/"],
-  ["journal-redirect", "/journal/1/redirect/"],
-  ["journal-cover", "/journal/1/cover/"],
+  ["journal-edit", "/journal/{journalId}/edit/"],
+  ["journal-redirect", "/journal/{journalId}/redirect/"],
+  ["journal-cover", "/journal/{journalId}/cover/"],
   ["tasks", "/system/tasks/"],
   ["task-new", "/system/tasks/new/"],
   ["messages", "/system/messages/"],
@@ -299,6 +299,18 @@ try {
   if ((await evaluate("location.pathname")).includes("login")) throw new Error("QA login failed");
   if (browserErrors.length) {
     throw new Error(`Browser error during login: ${browserErrors.join(" | ")}`);
+  }
+
+  if (routes.some(([, path]) => path.includes("{journalId}"))) {
+    await navigate(`${baseUrl}/journal/`);
+    const journalPath = await evaluate(
+      "document.querySelector('a.table-row-link')?.getAttribute('href') || null",
+    );
+    const journalMatch = journalPath?.match(/^\/journal\/(\d+)\/$/);
+    if (!journalMatch) {
+      throw new Error("Journal detail routes require at least one record visible to the QA account.");
+    }
+    for (const route of routes) route[1] = route[1].replaceAll("{journalId}", journalMatch[1]);
   }
 
   const results = [];

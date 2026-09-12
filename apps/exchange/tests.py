@@ -593,6 +593,26 @@ class FlcValidationTests(ExchangeTestMixin, TestCase):
         )
         self.assertTrue(any(e["IM_POL"] == "IRP_TYPE" for e in errors))
 
+    def test_whitespace_required_value_is_reported_as_missing(self):
+        from apps.exchange.flc import validate_irp_record
+
+        errors = validate_irp_record(
+            {
+                "n_irp": " \t ",
+                "irp_type": 1,
+                "date_create": "2026-05-14",
+                "way": 1,
+                "how": 2,
+                "theme": "TT.01",
+                "otv_t": 1,
+                "otv_kon": 81000,
+                "data_plan": "2026-06-13",
+                "employee_1": str(self.emp1.guid),
+            }
+        )
+
+        self.assertTrue(any(error["IM_POL"] == "N_IRP" for error in errors))
+
 
 class ExcelImportTests(ExchangeTestMixin, TestCase):
     def test_excel_import(self):
@@ -690,6 +710,29 @@ class ExcelImportTests(ExchangeTestMixin, TestCase):
         source_change = IrpHistory.objects.get(irp=irp, field_name="input_file")
         self.assertEqual(source_change.old_value, f"journal.XmlFiles:{source.pk}")
         self.assertEqual(source_change.new_value, "—")
+
+    def test_excel_whitespace_identity_is_replaced_with_generated_number(self):
+        importer = ExcelIrpFile(81000, Path(self.in_dir) / "blank-number.xlsx")
+
+        importer._import_one(
+            {
+                "n_irp": "   ",
+                "irp_type": 1,
+                "date_create": datetime.date(2026, 9, 12),
+                "way": 1,
+                "how": 2,
+                "theme": self.theme.code_name,
+                "otv_t": 1,
+                "otv_kon": 81000,
+                "employee_1": str(self.emp1.guid),
+                "data_plan": datetime.date(2026, 10, 12),
+            }
+        )
+
+        self.assertEqual(importer.errors, [])
+        imported = Irp.objects.get()
+        self.assertTrue(imported.n_irp.strip())
+        self.assertNotEqual(imported.n_irp, "   ")
 
     def test_excel_primary_employee_must_belong_to_sender_organization(self):
         foreign_employee = Employee.objects.create_user(

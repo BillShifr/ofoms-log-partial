@@ -70,6 +70,10 @@ def _check_record(
     def err(field, comment):
         errors.append(error_result(field, comment, n_zap))
 
+    def missing(field):
+        value = d.get(field)
+        return not value or (isinstance(value, str) and not value.strip())
+
     if is_irp:
         for f in (
             "n_irp",
@@ -83,7 +87,7 @@ def _check_record(
             "data_plan",
             "employee_1",
         ):
-            if not d.get(f):
+            if missing(f):
                 err(f, "Обязательное поле не заполнено")
         if d.get("irp_type") not in [c for c, _ in IRP_TYPES]:
             err("irp_type", "Вид обращения вне справочника")

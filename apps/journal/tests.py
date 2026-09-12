@@ -116,6 +116,45 @@ class XmlFilesConstraintMigrationTests(TransactionTestCase):
         self.assertTrue(NewXmlFiles.objects.filter(pk=valid.pk).exists())
 
 
+class IrpIdentityConstraintMigrationTests(TransactionTestCase):
+    migrate_from = [("journal", "0009_enforce_xml_provenance_constraints")]
+    migrate_to = [("journal", "0010_enforce_irp_identity")]
+
+    def test_migration_fails_closed_on_blank_legacy_identity(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        OldEmployee = old_apps.get_model("employee", "Employee")
+        OldTheme = old_apps.get_model("journal", "IrpTheme")
+        OldIrp = old_apps.get_model("journal", "Irp")
+        employee = OldEmployee.objects.create(
+            username="legacy_blank_irp_owner",
+            password="!",
+            org=81000,
+        )
+        theme = OldTheme.objects.create(code_name="LEGACY", title="Legacy", version=3)
+        invalid = OldIrp.objects.create(
+            n_irp="   ",
+            irp_type=1,
+            date_create=datetime.date(2026, 9, 12),
+            way=1,
+            how=1,
+            theme=theme,
+            otv_t=1,
+            otv_kon=81000,
+            employee_one=employee,
+            data_plan=datetime.date(2026, 10, 12),
+        )
+
+        executor = MigrationExecutor(connection)
+        with self.assertRaisesRegex(RuntimeError, str(invalid.pk)):
+            executor.migrate(self.migrate_to)
+
+        OldIrp.objects.filter(pk=invalid.pk).delete()
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+
+
 class IrpModelTests(TestCase):
     def setUp(self):
         self.theme = IrpTheme.objects.create(
@@ -142,6 +181,29 @@ class IrpModelTests(TestCase):
             date_close=date_close,
             result=2 if date_close else None,
             status=Irp.Status.CLOSED if date_close else Irp.Status.REGISTERED,
+        )
+
+    def test_database_rejects_blank_unique_identity(self):
+        for value in ("", "   ", "\t\n"):
+            with (
+                self.subTest(value=repr(value)),
+                self.assertRaises(IntegrityError),
+                transaction.atomic(),
+            ):
+                self._create_irp_with_number(value)
+
+    def _create_irp_with_number(self, n_irp):
+        return Irp.objects.create(
+            n_irp=n_irp,
+            irp_type=1,
+            date_create=datetime.date.today(),
+            way=1,
+            how=1,
+            theme=self.theme,
+            otv_t=1,
+            otv_kon=self.employee.org,
+            employee_one=self.employee,
+            data_plan=datetime.date.today() + datetime.timedelta(days=30),
         )
 
     def test_is_closed(self):

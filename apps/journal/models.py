@@ -317,6 +317,10 @@ class Irp(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
+                condition=~models.Q(n_irp__regex=r"^\s*$"),
+                name="irp_n_irp_not_blank",
+            ),
+            models.CheckConstraint(
                 condition=(
                     models.Q(
                         status="closed",

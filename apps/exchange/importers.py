@@ -794,7 +794,13 @@ class ExcelIrpFile:
     def _import_one(self, rec: dict):
         import uuid
 
-        n_irp = rec.get("n_irp") or uuid.uuid4()
+        raw_n_irp = rec.get("n_irp")
+        n_irp = (
+            uuid.uuid4()
+            if raw_n_irp is None
+            or (isinstance(raw_n_irp, str) and not raw_n_irp.strip())
+            else raw_n_irp
+        )
         rec["n_irp"] = n_irp
         employee_one = Employee.objects.filter(guid=rec.get("employee_1")).first()
         if not employee_one:

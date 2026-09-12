@@ -171,11 +171,26 @@ async function measureJournalLayout() {
     const groupCoversTable = mobile || Boolean(firstGroupRect && lastGroupRect &&
       Math.abs(firstGroupRect.left - tableRect.left) <= 1 &&
       Math.abs(lastGroupRect.right - tableRect.right) <= 1);
+    const cardBackground = getComputedStyle(wrap.closest('.card')).backgroundColor;
+    const groupCellsNeutral = mobile || [...groupCells].every((cell) =>
+      getComputedStyle(cell).backgroundColor === cardBackground);
+    const groupLabelsBounded = mobile || [...table.querySelectorAll('.group-row__label')]
+      .every((label) => {
+        const labelRect = label.getBoundingClientRect();
+        const cellRect = label.closest('th').getBoundingClientRect();
+        return getComputedStyle(label).display === 'inline-flex' &&
+          labelRect.width < cellRect.width - 4;
+      });
+    const statusRowsNeutral = [...table.tBodies[0].querySelectorAll('tr.row--overdue, tr.row--open')]
+      .every((bodyRow) => getComputedStyle(bodyRow).backgroundColor === cardBackground);
     if (mobile) return {
       mobile,
       cardGrid: getComputedStyle(row).display === 'grid',
       headerHidden: getComputedStyle(table.tHead).display === 'none',
-      groupCoversTable
+      groupCoversTable,
+      groupCellsNeutral,
+      groupLabelsBounded,
+      statusRowsNeutral
     };
     wrap.scrollLeft = wrap.scrollWidth;
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -204,6 +219,9 @@ async function measureJournalLayout() {
         .filter((item) => item.rightOverflow > 1)
         .slice(0, 8),
       groupCoversTable,
+      groupCellsNeutral,
+      groupLabelsBounded,
+      statusRowsNeutral,
       firstPinned: getComputedStyle(firstCell).position === 'sticky' &&
         Math.abs(firstRect.left - wrapRect.left) <= 2,
       statusSticky,
@@ -502,6 +520,8 @@ try {
       item.appliedMode.contrast !== (item.contrast || "default"),
     journalLayoutMismatch: item.name === "journal" && (!item.journalLayout ||
       !item.journalLayout.groupCoversTable ||
+      !item.journalLayout.groupCellsNeutral || !item.journalLayout.groupLabelsBounded ||
+      !item.journalLayout.statusRowsNeutral ||
       (item.journalLayout.mobile
         ? (!item.journalLayout.cardGrid || !item.journalLayout.headerHidden)
         : (!item.journalLayout.firstPinned || !item.journalLayout.statusPinned ||

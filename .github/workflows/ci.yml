@@ -103,11 +103,19 @@ jobs:
         with:
           load: true
           push: false
-          tags: frozendevs/tfoms-ejournal:latest
+          build-args: VCS_REF=${{ github.sha }}
+          tags: |
+            frozendevs/tfoms-ejournal:${{ github.sha }}
+            frozendevs/tfoms-ejournal:latest
 
       - name: Verify runtime image
-        run: sh scripts/container_runtime_gate.sh frozendevs/tfoms-ejournal:latest
+        run: >-
+          sh scripts/container_runtime_gate.sh
+          frozendevs/tfoms-ejournal:${{ github.sha }}
+          ${{ github.sha }}
 
       - name: Push verified runtime image
         if: github.ref == 'refs/heads/main'
-        run: docker push frozendevs/tfoms-ejournal:latest
+        run: |
+          docker push frozendevs/tfoms-ejournal:${{ github.sha }}
+          docker push frozendevs/tfoms-ejournal:latest

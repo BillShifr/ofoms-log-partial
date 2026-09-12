@@ -965,3 +965,10 @@
 - [x] Выполнять versioned app и volume-init runtime probes на PR и main.
 - [x] Исключить test/diagnostic scripts из runtime image.
 - [x] Публиковать tag только отдельным шагом после успешной проверки.
+
+## 2026-09-12 — commit-addressable container releases
+
+- [x] Маркировать image полным commit SHA и OCI revision label.
+- [x] Проверять равенство revision label ожидаемому SHA до runtime probes.
+- [x] Публиковать SHA-tag раньше совместимого `latest`.
+- [x] Документировать использование SHA-tag для deploy и rollback.

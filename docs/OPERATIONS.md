@@ -76,6 +76,8 @@ Runtime image не содержит build-инструмент `uv`, тесто�
 
 CI загружает собранный image в локальный Docker daemon runner, выполняет `scripts/container_runtime_gate.sh` и только после успешной проверки публикует tag из `main`. Gate подтверждает отсутствие build/test content, непривилегированность основного runtime, read-only rootfs, размер `/tmp`, а также минимальный `CHOWN`-контракт init-контейнера. Сборка без выполнения этого gate не считается готовой к публикации.
 
+Каждая проверенная сборка `main` публикуется одновременно как `frozendevs/tfoms-ejournal:<полный-git-sha>` и `latest`. Для установки и rollback используйте SHA-tag; `latest` предназначен только как указатель на последнюю проверенную версию. OCI label `org.opencontainers.image.revision` обязан совпадать с SHA-tag и проверяется до push: `docker image inspect frozendevs/tfoms-ejournal:<sha> --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'`.
+
 Для обновления сначала создайте резервную копию, затем:
 
 ```bash

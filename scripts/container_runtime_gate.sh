@@ -2,6 +2,12 @@
 set -eu
 
 image_name=${1:?Usage: container_runtime_gate.sh IMAGE}
+expected_revision=${2:?Usage: container_runtime_gate.sh IMAGE EXPECTED_REVISION}
+
+actual_revision=$(docker image inspect \
+  --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+  "$image_name")
+test "$actual_revision" = "$expected_revision"
 
 docker run --rm \
   --network none \

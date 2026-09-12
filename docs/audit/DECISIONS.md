@@ -433,3 +433,9 @@
 - Docker build в CI всегда загружает single-platform image в daemon runner и запускает версионированный `container_runtime_gate.sh` до любого registry push.
 - Один gate проверяет app runtime и привилегированный только для `CHOWN` init-сценарий, включая capability masks, no-new-privileges, read-only rootfs и image hygiene.
 - На `main` отдельный `docker push` выполняется только после успешного probe; build action больше не объединяет непроверенную сборку и публикацию в один шаг.
+
+## 2026-09-12 Commit-addressable container release
+
+- CI передаёт полный `github.sha` как `VCS_REF`, записывает его в OCI revision label и использует тот же SHA в version tag.
+- Runtime gate сравнивает label с ожидаемым commit до функциональных probes и registry push, исключая ошибочно перетегированный image.
+- На `main` сначала публикуется SHA-tag для воспроизводимого deploy/rollback, затем совместимый указатель `latest`; внешняя registry policy должна запрещать перезапись SHA-tags.

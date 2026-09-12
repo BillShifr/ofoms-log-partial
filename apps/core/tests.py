@@ -758,12 +758,23 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("load: true", workflow[build_index:verify_index])
         self.assertIn("push: false", workflow[build_index:verify_index])
         self.assertIn(
-            "sh scripts/container_runtime_gate.sh frozendevs/tfoms-ejournal:latest",
+            "sh scripts/container_runtime_gate.sh",
             workflow[verify_index:push_index],
+        )
+        self.assertIn("frozendevs/tfoms-ejournal:${{ github.sha }}", workflow)
+        self.assertIn("build-args: VCS_REF=${{ github.sha }}", workflow)
+        self.assertLess(
+            workflow.index("docker push frozendevs/tfoms-ejournal:${{ github.sha }}"),
+            workflow.index("docker push frozendevs/tfoms-ejournal:latest"),
         )
         self.assertIn("--cap-drop ALL", runtime_gate)
         self.assertIn("--cap-add CHOWN", runtime_gate)
         self.assertIn("test ! -e /usr/local/bin/uv", runtime_gate)
+        self.assertIn("org.opencontainers.image.revision", runtime_gate)
+
+        dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()
+        self.assertIn("ARG VCS_REF=unknown", dockerfile)
+        self.assertIn("org.opencontainers.image.revision=\"${VCS_REF}\"", dockerfile)
 
     def test_ci_uses_least_privilege_and_bounded_jobs(self):
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()

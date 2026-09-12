@@ -17,6 +17,7 @@ from apps.core.policy import EXCHANGE_READ, EXCHANGE_UPLOAD, user_has_capability
 from apps.employee.models import ORGS, TFOMS
 from apps.exchange.forms import UploadFileForm
 from apps.exchange.importers import (
+    ArtifactRollback,
     EmployeeXMLFile,
     ExcelIrpFile,
     IrpXMLFile,
@@ -48,8 +49,8 @@ def exchange_upload(request):
         if form.is_valid():
             org = int(form.cleaned_data["org"])
             uploaded = request.FILES["file"]
-            with transaction.atomic():
-                log = _process_upload(request.user, org, uploaded)
+            with ArtifactRollback() as artifacts, transaction.atomic():
+                log = _process_upload(request.user, org, uploaded, artifacts)
                 log_event(
                     module="exchange",
                     event_type=EventLog.EventType.CREATE,
@@ -65,13 +66,14 @@ def exchange_upload(request):
     )
 
 
-def _process_upload(user, org, uploaded) -> ImportLog:
+def _process_upload(user, org, uploaded, artifacts: ArtifactRollback) -> ImportLog:
     from django.conf import settings
 
     # Безопасное имя файла (без путей) — только имя
     safe_name = os.path.basename(uploaded.name or "file")
     in_org = settings.EXCHANGE_IN / str(org)
     dest = write_unique_artifact(in_org / safe_name, uploaded.chunks())
+    artifacts.track(dest)
 
     name_lower = safe_name.lower()
     if name_lower.startswith("users") and name_lower.endswith(".xml"):
@@ -86,7 +88,9 @@ def _process_upload(user, org, uploaded) -> ImportLog:
         )
 
     result = importer.process()
-    importer.write_flcp(result)
+    artifacts.track(importer.archived_path)
+    protocol_path = importer.write_flcp(result)
+    artifacts.track(protocol_path)
     log = ImportLog.objects.create(
         org=org,
         kind=result.kind,

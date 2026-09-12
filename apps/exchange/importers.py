@@ -39,6 +39,30 @@ SAFE_INTERNAL_IMPORT_ERROR = (
 logger = logging.getLogger(__name__)
 
 
+class ArtifactRollback:
+    """Удаляет созданные exchange artifacts при сбое окружающей операции."""
+
+    def __init__(self):
+        self.paths: list[Path] = []
+
+    def track(self, path: Path | None) -> None:
+        if path is not None:
+            self.paths.append(Path(path))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            return False
+        for path in reversed(self.paths):
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                logger.exception("Failed to roll back exchange artifact %s", path.name)
+        return False
+
+
 def ensure_private_directory(path: Path) -> None:
     """Создаёт/нормализует каталог artifacts для единственного runtime UID."""
     path.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -204,6 +228,7 @@ class XsdExchangeFile:
         self.rows = 0
         self.validated = False
         self.xml = None
+        self.archived_path: Path | None = None
         self._in_dir = Path(in_dir or settings.EXCHANGE_IN)
         self._out_dir = Path(out_dir or settings.EXCHANGE_OUT)
         self._archive_dir = Path(archive_dir or settings.EXCHANGE_ARCHIVE)
@@ -265,7 +290,7 @@ class XsdExchangeFile:
                 )
             if self.errors:
                 self.rows = 0
-        self._archive()
+        self.archived_path = self._archive()
         return ImportResult(
             filename=self.basename,
             org=self.org,
@@ -278,7 +303,7 @@ class XsdExchangeFile:
     # -- каталоги -----------------------------------------------------------
 
     def _archive(self):
-        archive_artifact(self.real_file, self._archive_dir, self.org)
+        return archive_artifact(self.real_file, self._archive_dir, self.org)
 
     def write_flcp(self, result: ImportResult) -> Path:
         org_dir = self._out_dir / str(self.org)
@@ -718,6 +743,7 @@ class ExcelIrpFile:
         self.basename = self.real_file.name
         self.errors = []
         self.rows = 0
+        self.archived_path: Path | None = None
         self._out_dir = Path(out_dir or settings.EXCHANGE_OUT)
         self._archive_dir = Path(archive_dir or settings.EXCHANGE_ARCHIVE)
 
@@ -763,7 +789,7 @@ class ExcelIrpFile:
                 wb.close()
         if self.errors:
             self.rows = 0
-        self._archive()
+        self.archived_path = self._archive()
         return ImportResult(
             filename=self.basename,
             org=self.org,
@@ -855,7 +881,7 @@ class ExcelIrpFile:
         self.rows += 1
 
     def _archive(self):
-        archive_artifact(self.real_file, self._archive_dir, self.org)
+        return archive_artifact(self.real_file, self._archive_dir, self.org)
 
     def write_flcp(self, result: ImportResult) -> Path:
         org_dir = self._out_dir / str(self.org)

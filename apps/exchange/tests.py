@@ -1041,8 +1041,9 @@ class UploadPostTests(ExchangeTestMixin, TestCase):
             ).exists()
         )
         self.assertFalse(ImportLog.objects.exists())
-        self.assertTrue((self._arch / "81000" / "users260514-audit.xml").exists())
-        self.assertTrue((self._out / "81000" / "users260514-audit.xml").exists())
+        self.assertFalse((self._in / "81000" / "users260514-audit.xml").exists())
+        self.assertFalse((self._arch / "81000" / "users260514-audit.xml").exists())
+        self.assertFalse((self._out / "81000" / "users260514-audit.xml").exists())
 
     def test_upload_valid_g1_file(self):
         resp = self._post(

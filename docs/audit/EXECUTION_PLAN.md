@@ -987,3 +987,9 @@
 - [x] Ограничить fallback ожидаемыми ошибками пользовательского номера страницы.
 - [x] Не маскировать и не повторять сбои БД/QuerySet.
 - [x] Проверить malformed, zero, negative, out-of-range и инфраструктурный error path.
+
+## 2026-09-12 — атомарные artifacts web-обмена
+
+- [x] Включить staging, archive и FLCP в компенсирующий rollback web upload.
+- [x] При сбое обязательного аудита не оставлять файл без `ImportLog` и portal ACL.
+- [x] Сохранить успешный archive/protocol и независимую commit-модель batch importer.

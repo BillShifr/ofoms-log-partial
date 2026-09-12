@@ -165,6 +165,12 @@ try {
         forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
         documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
         navOverflow: Boolean(document.querySelector('.nav__scroll')) && document.querySelector('.nav__scroll').scrollWidth > document.querySelector('.nav__scroll').clientWidth + 1,
+        appliedMode: {
+          theme: document.documentElement.dataset.theme || null,
+          font: document.documentElement.dataset.font || null,
+          contrast: document.documentElement.dataset.contrast || null
+        },
+        activeAnimations: document.getAnimations().filter((animation) => animation.playState === 'running').length,
         tablePalette: [...document.querySelectorAll('table.data tbody tr')].slice(0, 4).map((row) => ({
           row: getComputedStyle(row).backgroundColor,
           firstCell: row.cells[0] ? getComputedStyle(row.cells[0]).backgroundColor : null,
@@ -196,6 +202,12 @@ try {
           forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
           documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
           navOverflow: Boolean(document.querySelector('.nav__scroll')) && document.querySelector('.nav__scroll').scrollWidth > document.querySelector('.nav__scroll').clientWidth + 1,
+          appliedMode: {
+            theme: document.documentElement.dataset.theme || null,
+            font: document.documentElement.dataset.font || null,
+            contrast: document.documentElement.dataset.contrast || null
+          },
+          activeAnimations: document.getAnimations().filter((animation) => animation.playState === 'running').length,
           tablePalette: [...document.querySelectorAll('table.data tbody tr')].slice(0, 4).map((row) => ({
             row: getComputedStyle(row).backgroundColor,
             firstCell: row.cells[0] ? getComputedStyle(row.cells[0]).backgroundColor : null,
@@ -217,6 +229,9 @@ try {
   const checkedResults = results.map((item) => ({
     ...item,
     expectedForbidden: expectedForbidden.has(item.name),
+    modeMismatch: item.appliedMode.theme !== item.theme ||
+      item.appliedMode.font !== item.font ||
+      item.appliedMode.contrast !== (item.contrast || "default"),
   }));
   const report = {
     generatedAt: new Date().toISOString(),
@@ -224,7 +239,7 @@ try {
     cases: results.length,
     expectedForbidden: [...expectedForbidden],
     failures: checkedResults.filter((item) =>
-      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") || item.forbidden !== item.expectedForbidden || item.browserErrors.length
+      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") || item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch || item.activeAnimations
     ),
     results: checkedResults,
   };

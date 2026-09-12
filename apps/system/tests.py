@@ -2100,13 +2100,24 @@ class TaskTests(BaseSystemTestCase):
 
     def test_failed_command_logged(self):
         task = self._make_task()
-        with patch("apps.system.tasks.run_command", side_effect=RuntimeError("boom")):
+        secret = "postgresql://admin:do-not-expose@database/ejournal"
+        with patch("apps.system.tasks.run_command", side_effect=RuntimeError(secret)):
             run = task.run()
         self.assertEqual(run.result, EventLog.Result.FAILED)
         task.refresh_from_db()
         self.assertEqual(task.last_result, EventLog.Result.FAILED)
         run = TaskRun.objects.get(task=task)
         self.assertEqual(run.triggered_by, "auto")
+        event = EventLog.objects.get(
+            event_type=EventLog.EventType.TASK,
+            target=f"task:{task.pk}:{task.command}",
+        )
+        self.assertIn("Ошибка выполнения задания", task.last_log)
+        self.assertEqual(run.log, task.last_log)
+        self.assertEqual(event.detail, task.last_log)
+        self.assertNotIn(secret, task.last_log)
+        self.assertNotIn(secret, run.log)
+        self.assertNotIn(secret, event.detail)
 
     def test_database_rejects_invalid_task_command_and_schedule(self):
         with self.assertRaises(IntegrityError), transaction.atomic():

@@ -59,6 +59,11 @@ class TaskRunSuperseded(RuntimeError):
     """Запуск уже финализирован recovery или другим владельцем claim."""
 
 
+SAFE_TASK_FAILURE_LOG = (
+    "Ошибка выполнения задания. Подробности записаны в журнале сервера."
+)
+
+
 class NewsCategory(models.Model):
     """Категория/тема новости (PRD v3 §2.7)."""
 
@@ -600,7 +605,7 @@ class TaskJob(models.Model):
             ok = True
         except Exception as exc:  # noqa: BLE001 — любая ошибка задания фиксируется
             logger.exception("task %s failed", self.pk)
-            log = f"{type(exc).__name__}: {exc}"
+            log = f"{type(exc).__name__}: {SAFE_TASK_FAILURE_LOG}"
             ok = False
 
         finished_at = timezone.now()

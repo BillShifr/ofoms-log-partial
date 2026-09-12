@@ -1219,3 +1219,14 @@
 - [x] Сделать lock path настраиваемым для нескольких независимых инсталляций на одном хосте.
 - [x] Доказать в Linux-контейнере отказ обоих скриптов при удерживаемом lock без Docker side
   effects; отсутствие `flock` также завершается до вызова Docker.
+
+## 2026-09-12 — атомарная публикация backup
+
+- [x] Писать artifacts в уникальный для процесса `.partial`-каталог.
+- [x] Удалять staging при любой ошибке после его создания.
+- [x] Публиковать финальный timestamp только после manifest и checksums.
+- [x] Доказать success/failure filesystem contract в Linux: success публикует один полный каталог
+  с валидными checksums; ошибка dump удаляет staging и запускает те же captured writer IDs.
+- [x] Требовать исходно запущенные writers и активировать recovery до потенциально частичного stop.
+- [x] Доказать в Linux partial-stop recovery, независимое удаление staging при отказе restart и
+  ранний отказ при исходно остановленном writer без вызова Compose stop.

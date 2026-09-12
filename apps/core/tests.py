@@ -843,6 +843,21 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("command -v flock", restore)
         self.assertIn("flock -n 9", backup)
         self.assertIn("flock -n 9", restore)
+        self.assertIn("staging_dir=$backup_dir.partial.$$", backup)
+        self.assertIn('mv "$staging_dir" "$backup_dir"', backup)
+        self.assertIn('rm -rf -- "$staging_dir"', backup)
+        self.assertIn("Backup requires both web and scheduler to be running", backup)
+        self.assertLess(
+            backup.index("writers_stopped=1"),
+            backup.index("docker compose stop web scheduler"),
+        )
+        self.assertIn("Failed to restart application writers", backup)
+        self.assertIn("Failed to remove backup staging directory", backup)
+        self.assertLess(
+            backup.index('mv "$staging_dir" "$backup_dir"'),
+            backup.index('docker start "$web_container" "$scheduler_container"',
+                         backup.index('mv "$staging_dir" "$backup_dir"')),
+        )
         self.assertNotIn("ofoms-log-partial_media", backup)
         self.assertIn('RESTORE_CONFIRM:-}', restore)
         self.assertLess(restore.index("sha256sum -c"), restore.index("dropdb"))

@@ -172,6 +172,9 @@ class AccessTests(BaseSystemTestCase):
         self.assertContains(response, reverse("system:events"))
         self.assertContains(response, "/admin/")
         self.assertContains(response, "nav__menu-link--active")
+        self.assertContains(response, 'class="data data--users data--responsive"')
+        self.assertContains(response, 'class="responsive-row"')
+        self.assertContains(response, 'data-label="Действия"')
 
     def test_user_screens_for_regular_user(self):
         self.client.force_login(self.operator)
@@ -500,6 +503,13 @@ class EventLogScreenTests(BaseSystemTestCase):
         self.assertContains(resp, "irp:1")
         event = EventLog.objects.filter(target="irp:1").get()
         self.assertContains(resp, f'data-sort-group="event-{event.pk}"', count=2)
+        self.assertContains(
+            resp, 'class="data data--events data--responsive"'
+        )
+        self.assertContains(resp, 'class="js-event-row responsive-row"')
+        self.assertContains(resp, 'data-label="Длительность, мс"')
+        visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text()
+        self.assertIn("responsiveTableMismatch", visual_qa)
         resp = self.client.get(
             reverse("system:events"), {"module": "auth", "result": "failed"}
         )

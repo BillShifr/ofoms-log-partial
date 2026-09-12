@@ -22,8 +22,8 @@
 </div>
 
 <div class="card table-card">
-  <div class="table-wrap" tabindex="0" aria-label="Таблица пользователей; прокручивается по горизонтали">
-    <table class="data" data-client-sort>
+  <div class="table-wrap table-wrap--responsive" tabindex="0" aria-label="Таблица пользователей; на узком экране показана карточками">
+    <table class="data data--users data--responsive" data-client-sort>
       <thead>
         <tr>
           <th>ФИО</th>
@@ -37,19 +37,19 @@
       </thead>
       <tbody>
         {% for u in page.object_list %}
-        <tr data-href="{% url 'system:user_update' u.pk %}">
-          <td>{{ u.full_name }}</td>
-          <td class="mono">{{ u.username }}</td>
-          <td>{{ u.get_org_display }}</td>
-          <td>{{ u.job_title|default:"—" }}</td>
-          <td>
+        <tr class="responsive-row" data-href="{% url 'system:user_update' u.pk %}">
+          <td class="responsive-cell--wide" data-label="ФИО">{{ u.full_name }}</td>
+          <td class="mono" data-label="Логин">{{ u.username }}</td>
+          <td data-label="Организация">{{ u.get_org_display }}</td>
+          <td data-label="Должность">{{ u.job_title|default:"—" }}</td>
+          <td data-label="Роли">
             {% for g in u.groups.all %}<span class="badge badge--role">{{ g.name }}</span>{% empty %}<span class="text-muted">—</span>{% endfor %}
           </td>
-          <td>
+          <td data-label="Статус">
             {% if not u.is_active or u.is_locked %}<span class="badge badge--overdue">Заблокирован</span>
             {% else %}<span class="badge badge--closed">Активен</span>{% endif %}
           </td>
-          <td class="text-nowrap"><div class="table-actions">
+          <td class="text-nowrap responsive-cell--wide responsive-cell--actions" data-label="Действия"><div class="table-actions">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:user_update' u.pk %}">Изменить</a>
             {% if u.pk != request.user.pk %}
               {% if u.is_active and not u.is_locked %}
@@ -61,7 +61,7 @@
           </div></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-muted table-empty">Пользователи не найдены.</td></tr>
+        <tr class="responsive-empty"><td colspan="7" class="text-muted table-empty">Пользователи не найдены.</td></tr>
         {% endfor %}
       </tbody>
     </table>

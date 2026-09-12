@@ -1157,6 +1157,100 @@ class AuthenticationAuditTests(TestCase):
         self.assertEqual(event.event_type, EventLog.EventType.OTHER)
         self.assertEqual(event.result, EventLog.Result.OK)
         self.assertEqual(event.user, administrator)
+        category = NewsCategory.objects.get(slug="service")
+        subject_event = EventLog.objects.get(
+            target=f"admin:system.newscategory:{category.pk}:create"
+        )
+        self.assertEqual(subject_event.event_type, EventLog.EventType.CREATE)
+        self.assertEqual(subject_event.user, administrator)
+
+    def test_django_admin_catalog_create_rolls_back_when_subject_audit_fails(self):
+        administrator = User.objects.create_superuser(
+            username="catalog-create-rollback-admin",
+            password="GoodPass!1",
+            org=81000,
+        )
+        self.client.force_login(administrator)
+        url = reverse("admin:system_newscategory_add")
+
+        with (
+            mock.patch(
+                "apps.core.admin_utils.log_event",
+                side_effect=RuntimeError("audit"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                url,
+                {
+                    "name": "Не сохранится",
+                    "slug": "catalog-create-rollback",
+                    "_save": "Сохранить",
+                },
+            )
+
+        self.assertFalse(
+            NewsCategory.objects.filter(slug="catalog-create-rollback").exists()
+        )
+
+    def test_django_admin_catalog_delete_rolls_back_when_subject_audit_fails(self):
+        administrator = User.objects.create_superuser(
+            username="catalog-delete-rollback-admin",
+            password="GoodPass!1",
+            org=81000,
+        )
+        category = NewsCategory.objects.create(
+            name="Останется", slug="catalog-delete-rollback"
+        )
+        self.client.force_login(administrator)
+
+        with (
+            mock.patch(
+                "apps.core.admin_utils.log_event",
+                side_effect=RuntimeError("audit"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("admin:system_newscategory_delete", args=[category.pk]),
+                {"post": "yes"},
+            )
+
+        self.assertTrue(NewsCategory.objects.filter(pk=category.pk).exists())
+
+    def test_django_admin_bulk_catalog_delete_rolls_back_on_audit_failure(self):
+        administrator = User.objects.create_superuser(
+            username="catalog-bulk-delete-admin",
+            password="GoodPass!1",
+            org=81000,
+        )
+        categories = [
+            NewsCategory.objects.create(name=f"Batch {number}", slug=f"batch-{number}")
+            for number in range(2)
+        ]
+        self.client.force_login(administrator)
+        url = reverse("admin:system_newscategory_changelist")
+
+        with (
+            mock.patch(
+                "apps.core.admin_utils.log_event",
+                side_effect=RuntimeError("audit"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                url,
+                {
+                    "action": "delete_selected",
+                    "_selected_action": [item.pk for item in categories],
+                    "post": "yes",
+                },
+            )
+
+        self.assertEqual(
+            NewsCategory.objects.filter(pk__in=[item.pk for item in categories]).count(),
+            2,
+        )
 
     def test_django_admin_login_uses_authentication_event_type(self):
         administrator = User.objects.create_superuser(

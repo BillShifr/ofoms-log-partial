@@ -1,5 +1,58 @@
 """Общие ограничения для неизменяемых служебных записей в Django Admin."""
 
+from django.db import transaction
+
+from apps.core.models import EventLog, log_event
+
+
+class AuditedAdminMixin:
+    """Связывает CRUD справочника с предметным событием в admin-транзакции."""
+
+    audit_module = "admin"
+
+    def _audit_target(self, obj, action):
+        return f"admin:{obj._meta.label_lower}:{obj.pk}:{action}"
+
+    def _log_admin_change(self, request, obj, event_type, action):
+        log_event(
+            module=self.audit_module,
+            event_type=event_type,
+            user=request.user,
+            target=self._audit_target(obj, action),
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        event_type = EventLog.EventType.UPDATE if change else EventLog.EventType.CREATE
+        self._log_admin_change(request, obj, event_type, event_type)
+
+    def delete_model(self, request, obj):
+        target = self._audit_target(obj, EventLog.EventType.DELETE)
+        super().delete_model(request, obj)
+        log_event(
+            module=self.audit_module,
+            event_type=EventLog.EventType.DELETE,
+            user=request.user,
+            target=target,
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+
+    def delete_queryset(self, request, queryset):
+        with transaction.atomic():
+            targets = [
+                self._audit_target(obj, EventLog.EventType.DELETE) for obj in queryset
+            ]
+            super().delete_queryset(request, queryset)
+            for target in targets:
+                log_event(
+                    module=self.audit_module,
+                    event_type=EventLog.EventType.DELETE,
+                    user=request.user,
+                    target=target,
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
+
 
 class ReadOnlyAdminMixin:
     """Оставляет защищённые модели доступными в Admin только для просмотра."""

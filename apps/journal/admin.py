@@ -5,7 +5,7 @@ from django_admin_listfilter_dropdown.filters import RelatedDropdownFilter
 from import_export.admin import ExportMixin
 from rangefilter.filters import DateRangeFilterBuilder
 
-from apps.core.admin_utils import ReadOnlyAdminMixin
+from apps.core.admin_utils import AuditedAdminMixin, ReadOnlyAdminMixin
 from apps.core.exports import excel_safe_value
 from apps.core.models import EventLog, log_event
 from apps.employee.models import ORGS, TFOMS
@@ -145,8 +145,9 @@ class IrpAdmin(ReadOnlyAdminMixin, ExportMixin, admin.ModelAdmin):
 
 
 @admin.register(IrpTheme)
-class IrpThemeAdmin(admin.ModelAdmin):
+class IrpThemeAdmin(AuditedAdminMixin, admin.ModelAdmin):
     model = IrpTheme
+    audit_module = "journal"
     readonly_fields = ("version",)
     list_display = ("code_name", "title", "version")
     list_filter = ("version",)

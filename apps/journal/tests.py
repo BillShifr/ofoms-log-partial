@@ -44,6 +44,58 @@ class IrpThemeTests(TestCase):
         IrpTheme.objects.create(code_name="XX.XX", title="v2", version=2)
         self.assertEqual(IrpTheme.objects.count(), 2)
 
+    def test_admin_create_records_subject_audit(self):
+        actor = Employee.objects.create_superuser(
+            username="theme_admin_actor",
+            password="GoodPass!1",
+            org=81000,
+        )
+        self.client.force_login(actor)
+
+        response = self.client.post(
+            reverse("admin:journal_irptheme_add"),
+            {
+                "code_name": "AUDIT.01",
+                "title": "Аудируемая тема",
+                "_save": "Сохранить",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        theme = IrpTheme.objects.get(code_name="AUDIT.01", version=1)
+        event = EventLog.objects.get(
+            target=f"admin:journal.irptheme:{theme.pk}:create"
+        )
+        self.assertEqual(event.event_type, EventLog.EventType.CREATE)
+        self.assertEqual(event.user, actor)
+
+    def test_admin_update_rolls_back_when_subject_audit_fails(self):
+        actor = Employee.objects.create_superuser(
+            username="theme_admin_rollback_actor",
+            password="GoodPass!1",
+            org=81000,
+        )
+        self.client.force_login(actor)
+
+        with (
+            patch(
+                "apps.core.admin_utils.log_event",
+                side_effect=RuntimeError("audit"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("admin:journal_irptheme_change", args=[self.theme.pk]),
+                {
+                    "code_name": self.theme.code_name,
+                    "title": "Не сохранится",
+                    "_save": "Сохранить",
+                },
+            )
+
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.title, "Тестовая тема")
+
 
 class XmlFilesConstraintTests(TestCase):
     def _assert_rejected(self, **overrides):

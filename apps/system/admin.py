@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 
-from apps.core.admin_utils import ReadOnlyAdminMixin
+from apps.core.admin_utils import AuditedAdminMixin, ReadOnlyAdminMixin
 from apps.system.models import (
     Conversation,
     MessageAttachment,
@@ -18,7 +18,8 @@ from apps.system.models import (
 
 
 @admin.register(NewsCategory)
-class NewsCategoryAdmin(admin.ModelAdmin):
+class NewsCategoryAdmin(AuditedAdminMixin, admin.ModelAdmin):
+    audit_module = "system"
     list_display = ("name", "slug", "icon")
     prepopulated_fields = {"slug": ("name",)}
 

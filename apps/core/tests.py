@@ -14,6 +14,7 @@ import jwt
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.models import Group
 from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import ValidationError
 from django.core.files.uploadhandler import StopUpload
@@ -24,7 +25,9 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.auth import on_logged_in, on_login_failed
+from apps.core.context_processors import system_meta
 from apps.core.models import ConsumedToken, EventLog, log_event
+from apps.core.roles import ensure_role_groups, role_code_for_user
 from apps.core.storage import close_file_on_error
 from apps.core.tokens import (
     EmployeeRepository,
@@ -51,6 +54,43 @@ from apps.system.models import (
 )
 
 User = get_user_model()
+
+
+class SystemMetaContextTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        ensure_role_groups()
+
+    def test_all_roles_are_deterministic_and_admin_is_not_hidden(self):
+        user = User.objects.create_user(
+            username="multi-role-context",
+            password="GoodPass!1",
+            org=81000,
+        )
+        user.groups.set(
+            [Group.objects.get(name="Администратор"), Group.objects.get(name="ОП1")]
+        )
+
+        context = system_meta(mock.Mock(user=user))
+
+        self.assertEqual(context["SYSTEM_ROLE"], 1)
+        self.assertEqual(context["SYSTEM_ROLE_LABEL"], "ОП1, Администратор")
+        self.assertTrue(context["can_manage_system"])
+        self.assertEqual(role_code_for_user(user), 1)
+
+    def test_superuser_without_groups_has_explicit_label(self):
+        user = User.objects.create_superuser(
+            username="ungrouped-superuser-context",
+            password="GoodPass!1",
+            org=81000,
+        )
+
+        context = system_meta(mock.Mock(user=user))
+
+        self.assertIsNone(context["SYSTEM_ROLE"])
+        self.assertEqual(context["SYSTEM_ROLE_LABEL"], "Суперпользователь")
+        self.assertTrue(context["can_manage_system"])
 
 
 class PortalHttpMethodContractTests(TestCase):

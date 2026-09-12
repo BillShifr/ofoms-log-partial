@@ -46,7 +46,6 @@ from apps.journal.table import (
 from apps.system.models import UserTableViewPref
 
 PAGE_SIZE = 25
-PRINT_LIST_LIMIT = 500
 
 
 @login_required
@@ -182,7 +181,7 @@ def irp_list(request):
 @login_required
 @require_safe
 def irp_list_print(request):
-    """Печатное представление текущей выборки реестра (не более 500 строк)."""
+    """Печатное представление полной текущей выборки реестра."""
     mutable_query = request.GET.copy()
     mutable_query.pop("page", None)
     mutable_query["print_view"] = "1"
@@ -206,8 +205,10 @@ def _paginate_irp(request, qs):
     """Курсорная (keyset) пагинация по ключу (id)."""
     from django.core.paginator import EmptyPage, Paginator
 
-    page_size = PRINT_LIST_LIMIT if request.GET.get("print_view") == "1" else PAGE_SIZE
-    paginator = Paginator(qs, page_size)
+    if request.GET.get("print_view") == "1":
+        objects = list(qs)
+        return Paginator(objects, max(len(objects), 1)).page(1)
+    paginator = Paginator(qs, PAGE_SIZE)
     try:
         return paginator.page(int(request.GET.get("page", 1)))
     except (EmptyPage, ValueError):

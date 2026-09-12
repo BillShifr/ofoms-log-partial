@@ -724,9 +724,38 @@ class JournalScreenTests(TestCase):
         self.assertContains(response, own.n_irp)
         self.assertNotContains(response, hidden_by_filter.n_irp)
         self.assertNotContains(response, foreign.n_irp)
-        self.assertContains(response, "лимит 500")
+        self.assertContains(response, "Записей в текущей выборке: 1")
         self.assertContains(response, '<body class="print-page print-page--registry">')
         self.assertNotContains(response, "<style>")
+
+    def test_print_list_does_not_truncate_records_after_previous_limit(self):
+        import uuid
+
+        rows = [
+            Irp(
+                n_irp=str(uuid.uuid4()),
+                irp_type=1,
+                date_create=datetime.date.today(),
+                way=1,
+                how=1,
+                theme=self.theme,
+                otv_t=1,
+                otv_kon=self.tfoms_user.org,
+                employee_one=self.tfoms_user,
+                data_plan=datetime.date.today() + datetime.timedelta(days=30),
+                z_f=f"Печатная строка {index:03d}",
+            )
+            for index in range(501)
+        ]
+        Irp.objects.bulk_create(rows)
+        self.client.force_login(self.tfoms_user)
+
+        response = self.client.get(reverse("journal:list_print"), {"sort": "id"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["page"].object_list), 501)
+        self.assertContains(response, "Печатная строка 500")
+        self.assertContains(response, "Записей в текущей выборке: 501")
 
     def test_print_list_requires_journal_role(self):
         user = Employee.objects.create_user(

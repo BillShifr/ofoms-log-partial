@@ -4,7 +4,7 @@
 
 | Требование | Источник | Роли | Модуль/маршрут | Реализация | Проверка | Разрыв | Статус |
 |---|---|---|---|---|---|---|---|
-| Реестр, карточка, маркировка, поиск и сортировка | ТЗ 2.1 | ТФОМС, СМО | journal | models/views/templates/print list + progressive infinite scroll | Django/browser tests | Серверная пагинация остаётся доступным fallback; при JavaScript следующие страницы автоматически добавляются с сохранением query-state | реализовано |
+| Реестр, карточка, маркировка, поиск, сортировка и полная печать | ТЗ 2.1 | ТФОМС, СМО | journal | models/views/templates/full print list + progressive infinite scroll | Django/browser/PDF tests | Серверная пагинация остаётся доступным fallback; infinite scroll сохраняет query-state; печать материализует всю защищённую выборку без прежнего лимита 500 | реализовано |
 | 4 способа регистрации и единый ФЛК | ТЗ 2.2 | ТФОМС, СМО | journal/exchange | forms/importers/command | exchange tests | Импорт atomic; нет эталонного Приложения 10 для доказательства формата | частично |
 | История, результат, переадресация, предварительный ответ | ТЗ 2.3 | ОП/СП | journal | IrpHistory/answers/redirect + persisted FSM | routing/lifecycle tests | Детальные цепочки назначения по линиям требуют эталонной оргструктуры | частично |
 | Ролевой deny-by-default доступ | ТЗ 2.4, 3.1 | Admin, ОП, СП, СМО | core/journal/exchange/reports | capability policy + org scope + terminal-state guards | permission/lifecycle tests | Детальные destination rules зависят от оргструктуры | реализовано |

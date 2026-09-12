@@ -13,7 +13,7 @@
   </div>
   <main class="print-sheet print-sheet--wide">
   <h1>Единый электронный журнал обращений граждан</h1>
-  <p class="print-meta">Выбрано записей: {{ page.paginator.count }}. В печатную форму выводятся первые {{ page.object_list|length }} (лимит 500).</p>
+  <p class="print-meta">Записей в текущей выборке: {{ page.paginator.count }}.</p>
   <div class="table-wrap">
     <table class="data">
       <thead><tr>{% for col in cols %}<th>{{ col.label }}</th>{% endfor %}</tr></thead>

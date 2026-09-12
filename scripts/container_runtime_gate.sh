@@ -25,6 +25,10 @@ docker run --rm \
     test ! -e /app/tests
     test ! -e /app/scripts
     test ! -e /app/.git
+    test ! -e /app/.env
+    test ! -e /app/.env.example
+    test -z "$(find /app -name .DS_Store -print -quit)"
+    test -z "$(find /app/exchange -type f -print -quit)"
     size_mb=$(df -m /tmp | awk "NR==2 {print \$2}")
     test "$size_mb" -ge 256
     grep -q "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status

@@ -737,12 +737,24 @@ class ProductionSettingsTests(TestCase):
             [],
         )
 
-    def test_docker_context_excludes_local_tool_caches(self):
+    def test_docker_context_excludes_local_tools_secrets_and_runtime_data(self):
         dockerignore = (settings.BASE_DIR / ".dockerignore").read_text().splitlines()
 
         for path in (".pytest_cache", ".ruff_cache", ".mypy_cache", ".tox", ".nox"):
             self.assertIn(path, dockerignore)
-        self.assertIn("scripts", dockerignore)
+        for path in (
+            "scripts",
+            ".env*",
+            "*.pem",
+            "*.key",
+            "*.sqlite3",
+            "*.db",
+            ".DS_Store",
+            "media",
+            "exchange",
+            ".artifacts",
+        ):
+            self.assertIn(path, dockerignore)
 
     def test_ci_verifies_runtime_image_before_push(self):
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()
@@ -770,6 +782,9 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("--cap-drop ALL", runtime_gate)
         self.assertIn("--cap-add CHOWN", runtime_gate)
         self.assertIn("test ! -e /usr/local/bin/uv", runtime_gate)
+        self.assertIn("test ! -e /app/.env.example", runtime_gate)
+        self.assertIn("find /app -name .DS_Store", runtime_gate)
+        self.assertIn("find /app/exchange -type f", runtime_gate)
         self.assertIn("org.opencontainers.image.revision", runtime_gate)
 
         dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()

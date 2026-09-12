@@ -5,6 +5,21 @@ from django.db import transaction
 from apps.core.models import EventLog, log_event
 
 
+class OrganizationScopedAdminMixin:
+    """Ограничивает admin queryset организацией для любого non-superuser."""
+
+    organization_lookup = "org"
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        user = request.user
+        from apps.employee.models import TFOMS
+
+        if user.is_superuser or user.org == TFOMS:
+            return queryset
+        return queryset.filter(**{self.organization_lookup: user.org})
+
+
 class AuditedAdminMixin:
     """Связывает CRUD справочника с предметным событием в admin-транзакции."""
 

@@ -17,11 +17,12 @@ from threading import Barrier
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from django.contrib import admin
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connection, transaction
 from django.db.models import QuerySet
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from apps.core.models import EventLog
@@ -355,6 +356,66 @@ class ImportLogConstraintTests(TestCase):
 
     def test_unknown_import_status_is_rejected_by_database(self):
         self._assert_rejected(status="broken")
+
+
+class ImportLogAdminScopeTests(TestCase):
+    def setUp(self):
+        self.own = ImportLog.objects.create(
+            org=81001,
+            kind=ImportLog.Kind.IRP,
+            filename="own.xml",
+            status=ImportLog.Status.OK,
+        )
+        self.foreign = ImportLog.objects.create(
+            org=81000,
+            kind=ImportLog.Kind.IRP,
+            filename="foreign.xml",
+            status=ImportLog.Status.OK,
+        )
+
+    def _request_for(self, user):
+        request = RequestFactory().get("/admin/exchange/importlog/")
+        request.user = user
+        return request
+
+    def test_non_superuser_staff_sees_only_own_organization(self):
+        user = Employee.objects.create_user(
+            username="exchange-scoped-staff",
+            password="GoodPass!1",
+            org=81001,
+            is_staff=True,
+        )
+        model_admin = admin.site._registry[ImportLog]
+
+        queryset = model_admin.get_queryset(self._request_for(user))
+
+        self.assertEqual(list(queryset.values_list("pk", flat=True)), [self.own.pk])
+
+    def test_superuser_sees_all_organizations_even_outside_tfoms(self):
+        user = Employee.objects.create_superuser(
+            username="exchange-root-foreign-org",
+            password="GoodPass!1",
+            org=81007,
+        )
+        model_admin = admin.site._registry[ImportLog]
+
+        queryset = model_admin.get_queryset(self._request_for(user))
+
+        self.assertEqual(set(queryset.values_list("pk", flat=True)), {self.own.pk, self.foreign.pk})
+
+    def test_tfoms_staff_sees_all_organizations(self):
+        user = Employee.objects.create_user(
+            username="exchange-tfoms-staff",
+            password="GoodPass!1",
+            org=81000,
+            is_staff=True,
+        )
+        model_admin = admin.site._registry[ImportLog]
+
+        queryset = model_admin.get_queryset(self._request_for(user))
+
+        self.assertEqual(set(queryset.values_list("pk", flat=True)), {self.own.pk, self.foreign.pk})
+
 
 class EmployeeImportTests(ExchangeTestMixin, TestCase):
     def test_import_creates_users(self):

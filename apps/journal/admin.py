@@ -5,10 +5,14 @@ from django_admin_listfilter_dropdown.filters import RelatedDropdownFilter
 from import_export.admin import ExportMixin
 from rangefilter.filters import DateRangeFilterBuilder
 
-from apps.core.admin_utils import AuditedAdminMixin, ReadOnlyAdminMixin
+from apps.core.admin_utils import (
+    AuditedAdminMixin,
+    OrganizationScopedAdminMixin,
+    ReadOnlyAdminMixin,
+)
 from apps.core.exports import excel_safe_value
 from apps.core.models import EventLog, log_event
-from apps.employee.models import ORGS, TFOMS
+from apps.employee.models import ORGS
 from apps.journal.models import (
     Irp,
     IrpAnswer,
@@ -20,7 +24,9 @@ from apps.journal.models import (
 
 
 @admin.register(Irp)
-class IrpAdmin(ReadOnlyAdminMixin, ExportMixin, admin.ModelAdmin):
+class IrpAdmin(
+    OrganizationScopedAdminMixin, ReadOnlyAdminMixin, ExportMixin, admin.ModelAdmin
+):
     """Обращения: списком с фильтрами, карточка с полным набором реквизитов."""
 
     model = Irp
@@ -127,12 +133,7 @@ class IrpAdmin(ReadOnlyAdminMixin, ExportMixin, admin.ModelAdmin):
     )
     search_fields = ("^z_f", "in_f")
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        org = request.user.org
-        if org != TFOMS:
-            qs = qs.filter(employee_one__org=org)
-        return qs
+    organization_lookup = "employee_one__org"
 
     def org_name(self, obj):
         for code, name in ORGS:
@@ -155,24 +156,36 @@ class IrpThemeAdmin(AuditedAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(XmlFiles)
-class XmlFilesAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+class XmlFilesAdmin(
+    OrganizationScopedAdminMixin, ReadOnlyAdminMixin, admin.ModelAdmin
+):
+    organization_lookup = "smo"
     list_display = ("filename", "smo", "data", "version", "year", "month", "day")
     list_filter = ("smo", "year")
 
 
 @admin.register(IrpHistory)
-class IrpHistoryAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+class IrpHistoryAdmin(
+    OrganizationScopedAdminMixin, ReadOnlyAdminMixin, admin.ModelAdmin
+):
+    organization_lookup = "irp__employee_one__org"
     list_display = ("irp", "user", "changed_at")
     list_filter = ("changed_at",)
 
 
 @admin.register(IrpAnswer)
-class IrpAnswerAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+class IrpAnswerAdmin(
+    OrganizationScopedAdminMixin, ReadOnlyAdminMixin, admin.ModelAdmin
+):
+    organization_lookup = "irp__employee_one__org"
     list_display = ("irp", "user", "is_preliminary", "created_at")
     list_filter = ("is_preliminary",)
     search_fields = ("irp__n_irp", "text")
 
 
 @admin.register(IrpFile)
-class IrpFileAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+class IrpFileAdmin(
+    OrganizationScopedAdminMixin, ReadOnlyAdminMixin, admin.ModelAdmin
+):
+    organization_lookup = "irp__employee_one__org"
     list_display = ("id", "irp", "answer", "uploader", "created_at")

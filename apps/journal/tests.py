@@ -26,7 +26,14 @@ from openpyxl import load_workbook
 from apps.core.models import EventLog
 from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
-from apps.journal.models import Irp, IrpFile, IrpHistory, IrpTheme, XmlFiles
+from apps.journal.models import (
+    Irp,
+    IrpAnswer,
+    IrpFile,
+    IrpHistory,
+    IrpTheme,
+    XmlFiles,
+)
 
 ROUTING_MEDIA_ROOT = tempfile.mkdtemp(prefix="ejournal_test_media_")
 
@@ -442,6 +449,78 @@ class JournalScreenTests(TestCase):
         import uuid
 
         return str(uuid.uuid4())
+
+    def test_admin_related_records_are_scoped_to_staff_organization(self):
+        own = self._make_irp(owner=self.smo_user)
+        foreign = self._make_irp(owner=self.tfoms_user)
+        own_history = IrpHistory.objects.create(
+            irp=own, user=self.smo_user, field_name="own"
+        )
+        IrpHistory.objects.create(
+            irp=foreign, user=self.tfoms_user, field_name="foreign"
+        )
+        own_answer = IrpAnswer.objects.create(
+            irp=own, user=self.smo_user, text="own"
+        )
+        IrpAnswer.objects.create(
+            irp=foreign, user=self.tfoms_user, text="foreign"
+        )
+        own_file = IrpFile.objects.create(
+            irp=own, uploader=self.smo_user, file="journal/own.txt"
+        )
+        IrpFile.objects.create(
+            irp=foreign, uploader=self.tfoms_user, file="journal/foreign.txt"
+        )
+        own_xml = XmlFiles.objects.create(
+            year="2026",
+            month="09",
+            day="12",
+            smo=self.smo_user.org,
+            filename="own.xml",
+            real_filename="own.xml",
+        )
+        XmlFiles.objects.create(
+            year="2026",
+            month="09",
+            day="12",
+            smo=self.tfoms_user.org,
+            filename="foreign.xml",
+            real_filename="foreign.xml",
+        )
+        self.smo_user.is_staff = True
+        self.smo_user.save(update_fields=["is_staff"])
+        request = RequestFactory().get("/admin/")
+        request.user = self.smo_user
+
+        expected = {
+            Irp: {own.pk},
+            IrpHistory: {own_history.pk},
+            IrpAnswer: {own_answer.pk},
+            IrpFile: {own_file.pk},
+            XmlFiles: {own_xml.pk},
+        }
+        for model, expected_ids in expected.items():
+            with self.subTest(model=model._meta.label):
+                model_admin = admin.site._registry[model]
+                self.assertEqual(
+                    set(model_admin.get_queryset(request).values_list("pk", flat=True)),
+                    expected_ids,
+                )
+
+    def test_admin_scope_does_not_restrict_superuser_by_org(self):
+        own = self._make_irp(owner=self.smo_user)
+        foreign = self._make_irp(owner=self.tfoms_user)
+        root = Employee.objects.create_superuser(
+            username="journal-root-foreign-org",
+            password="GoodPass!1",
+            org=81007,
+        )
+        request = RequestFactory().get("/admin/journal/irp/")
+        request.user = root
+
+        queryset = admin.site._registry[Irp].get_queryset(request)
+
+        self.assertEqual(set(queryset.values_list("pk", flat=True)), {own.pk, foreign.pk})
 
     def test_list_requires_login(self):
         resp = self.client.get(reverse("journal:list"))

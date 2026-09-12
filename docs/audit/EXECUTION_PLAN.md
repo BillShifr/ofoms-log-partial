@@ -1174,3 +1174,12 @@
 - [x] Отклонять сборку без SHA и обновить CI/операционные команды.
 - [x] Повторить live Compose startup: миграции завершены, web healthy, scheduler running;
   SHA label `volume-init`, `migrate`, `web` и `scheduler` совпадает с проверяемым commit.
+
+## 2026-09-12 — deploy и rollback по immutable artifact
+
+- [x] Сопоставить публикуемый CI SHA-tag с фактическими image references Compose.
+- [x] Назначить один `frozendevs/tfoms-ejournal:${VCS_REF}` всем application-сервисам.
+- [x] Отделить production `pull + up --no-build` от локального source build.
+- [x] Описать исполнимый rollback выбором предыдущего SHA.
+- [x] Проверить resolved Compose config: четыре application-сервиса разрешаются в один
+  `frozendevs/tfoms-ejournal:<полный SHA>`; PostgreSQL остаётся отдельным digest-pinned image.

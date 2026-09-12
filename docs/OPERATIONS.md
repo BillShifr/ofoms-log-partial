@@ -61,10 +61,10 @@ POST-операции карточки автоматизированного з
 ## Запуск и обновление
 
 ```bash
-export VCS_REF=$(git rev-parse HEAD)
+export VCS_REF=<полный SHA проверенного main-образа>
 docker compose config --quiet
-docker compose build
-docker compose up -d
+docker compose pull web
+docker compose up -d --no-build
 docker compose ps
 docker compose logs --tail=200 web scheduler
 ```
@@ -81,18 +81,25 @@ CI загружает собранный image в локальный Docker daem
 Compose также требует `VCS_REF` и передаёт его всем четырём сборкам приложения. Dockerfile
 принимает только полный 40-символьный lowercase Git SHA, поэтому локальная или production-сборка
 без доказуемой ревизии завершается до создания runtime-образа.
+Все application-сервисы (`volume-init`, `migrate`, `web`, `scheduler`) ссылаются на один
+immutable `frozendevs/tfoms-ejournal:${VCS_REF}`. Команда `docker compose pull web` загружает
+этот общий образ, а `up --no-build` гарантирует, что production не подменит проверенный artifact
+локальной сборкой. `build` используется только для разработки и release-проверки исходников.
 
 Для обновления сначала создайте резервную копию, затем:
 
 ```bash
 git pull --ff-only
-export VCS_REF=$(git rev-parse HEAD)
-docker compose build
-docker compose up -d
+export VCS_REF=<полный SHA нового проверенного main-образа>
+docker compose pull web
+docker compose up -d --no-build
 docker compose ps
 ```
 
-Откат приложения выполняется развёртыванием предыдущего проверенного image/tag. Откат миграций допускается только после проверки обратимости конкретной миграции и наличия свежей резервной копии.
+Для отката установите `VCS_REF` в SHA предыдущего проверенного образа, повторите `pull web` и
+`up -d --no-build`. Перед этим проверьте совместимость старого приложения с текущей схемой.
+Откат миграций допускается только после проверки обратимости конкретной миграции и наличия
+свежей резервной копии.
 
 ## Резервное копирование
 

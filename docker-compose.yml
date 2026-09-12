@@ -37,6 +37,7 @@ services:
     logging: *default-logging
 
   volume-init:
+    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
     build: *app-build
     user: "0:0"
     read_only: true
@@ -55,6 +56,7 @@ services:
 
   web:
     <<: *app-security
+    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
     build: *app-build
     init: true
     command: [".venv/bin/gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60"]
@@ -117,6 +119,7 @@ services:
 
   migrate:
     <<: *app-security
+    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
     build: *app-build
     command: [".venv/bin/python", "manage.py", "migrate", "--noinput"]
     environment: *web_env
@@ -128,6 +131,7 @@ services:
 
   scheduler:
     <<: *app-security
+    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
     build: *app-build
     init: true
     command: [".venv/bin/python", "manage.py", "run_scheduler", "--interval", "60"]

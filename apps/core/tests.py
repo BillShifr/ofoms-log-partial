@@ -795,6 +795,12 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("org.opencontainers.image.revision=\"${VCS_REF}\"", dockerfile)
         self.assertIn("VCS_REF: ${VCS_REF:?VCS_REF must be the full Git commit SHA}", compose)
         self.assertEqual(compose.count("build: *app-build"), 4)
+        self.assertEqual(
+            compose.count(
+                "image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}"
+            ),
+            4,
+        )
 
     def test_ci_uses_least_privilege_and_bounded_jobs(self):
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()

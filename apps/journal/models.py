@@ -138,6 +138,24 @@ class XmlFiles(models.Model):
         verbose_name = "Файл с обращениями"
         verbose_name_plural = "Файлы с обращениями"
         ordering = ["-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(smo__in=tuple(code for code, _ in ORGS)),
+                name="xmlfiles_smo_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(year__regex=r"^[0-9]{4}$")
+                    & models.Q(month__regex=r"^(0[1-9]|1[0-2])$")
+                    & models.Q(day__regex=r"^(0[1-9]|[12][0-9]|3[01])$")
+                ),
+                name="xmlfiles_date_parts_valid",
+            ),
+            models.CheckConstraint(
+                condition=(~models.Q(filename="") & ~models.Q(real_filename="")),
+                name="xmlfiles_names_present",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.filename}"

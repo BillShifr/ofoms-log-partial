@@ -14,14 +14,15 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connection, transaction
-from django.test import TestCase, override_settings
+from django.db.migrations.executor import MigrationExecutor
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from apps.core.models import EventLog
 from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
-from apps.journal.models import Irp, IrpFile, IrpHistory, IrpTheme
+from apps.journal.models import Irp, IrpFile, IrpHistory, IrpTheme, XmlFiles
 
 ROUTING_MEDIA_ROOT = tempfile.mkdtemp(prefix="ejournal_test_media_")
 
@@ -38,6 +39,77 @@ class IrpThemeTests(TestCase):
     def test_unique_together(self):
         IrpTheme.objects.create(code_name="XX.XX", title="v2", version=2)
         self.assertEqual(IrpTheme.objects.count(), 2)
+
+
+class XmlFilesConstraintTests(TestCase):
+    def _assert_rejected(self, **overrides):
+        values = {
+            "year": "2026",
+            "month": "09",
+            "day": "12",
+            "smo": 81000,
+            "filename": "G1R_valid.xml",
+            "real_filename": "/exchange/G1R_valid.xml",
+            **overrides,
+        }
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            XmlFiles.objects.create(**values)
+
+    def test_database_rejects_unknown_source_organization(self):
+        self._assert_rejected(smo=99999)
+
+    def test_database_rejects_invalid_header_date_parts(self):
+        for overrides in (
+            {"year": "26"},
+            {"month": "00"},
+            {"month": "13"},
+            {"day": "00"},
+            {"day": "32"},
+        ):
+            with self.subTest(overrides=overrides):
+                self._assert_rejected(**overrides)
+
+    def test_database_rejects_empty_provenance_names(self):
+        self._assert_rejected(filename="")
+        self._assert_rejected(real_filename="")
+
+
+class XmlFilesConstraintMigrationTests(TransactionTestCase):
+    migrate_from = [("journal", "0008_irp_temporal_and_status_constraints")]
+    migrate_to = [("journal", "0009_enforce_xml_provenance_constraints")]
+
+    def test_migration_fails_closed_on_invalid_legacy_provenance(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        OldXmlFiles = old_apps.get_model("journal", "XmlFiles")
+        invalid = OldXmlFiles.objects.create(
+            year="26",
+            month="13",
+            day="00",
+            smo=99999,
+            filename="",
+            real_filename="",
+        )
+        valid = OldXmlFiles.objects.create(
+            year="2026",
+            month="09",
+            day="12",
+            smo=81000,
+            filename="G1R_valid.xml",
+            real_filename="/exchange/G1R_valid.xml",
+        )
+
+        executor = MigrationExecutor(connection)
+        with self.assertRaisesRegex(RuntimeError, str(invalid.pk)):
+            executor.migrate(self.migrate_to)
+
+        OldXmlFiles.objects.filter(pk=invalid.pk).delete()
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        new_apps = executor.loader.project_state(self.migrate_to).apps
+        NewXmlFiles = new_apps.get_model("journal", "XmlFiles")
+        self.assertTrue(NewXmlFiles.objects.filter(pk=valid.pk).exists())
 
 
 class IrpModelTests(TestCase):

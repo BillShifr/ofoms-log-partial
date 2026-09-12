@@ -601,7 +601,9 @@ class JournalScreenTests(TestCase):
         self.assertIn("right: 0", css)
         self.assertIn(".data--journal .group-row th", css)
         self.assertIn(".data--journal .group-row th.group-row__empty", css)
-        self.assertIn("background: color-mix(in srgb, var(--green) 5%, var(--card))", css)
+        self.assertIn("background: color-mix(in srgb, var(--green) 7%, var(--card))", css)
+        self.assertIn("display: inline-flex", css)
+        self.assertIn("background: var(--card) !important", css)
         self.assertIn(".data--journal tbody td:first-child", css)
         self.assertIn("left: 0", css)
         self.assertIn(

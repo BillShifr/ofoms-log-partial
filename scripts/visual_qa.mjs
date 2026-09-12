@@ -34,14 +34,25 @@ const routes = [
   ["journal", "/journal/"],
   ["journal-detail", "/journal/1/"],
   ["journal-new", "/journal/new/"],
+  ["journal-edit", "/journal/1/edit/"],
+  ["journal-redirect", "/journal/1/redirect/"],
+  ["journal-cover", "/journal/1/cover/"],
   ["tasks", "/system/tasks/"],
+  ["task-new", "/system/tasks/new/"],
   ["messages", "/system/messages/"],
+  ["message-new", "/system/messages/new/"],
   ["reports", "/reports/"],
+  ["report-detail", "/reports/r4_complaints/?date_from=2000-01-01"],
   ["news", "/system/news/"],
+  ["news-new", "/system/news/new/"],
   ["docs", "/system/docs/"],
   ["users", "/system/users/"],
+  ["user-form", "/system/users/new/"],
   ["events", "/system/events/"],
   ["exchange", "/exchange/logs/"],
+  ["exchange-upload", "/exchange/upload/"],
+  ["prefs", "/system/prefs/"],
+  ["table-prefs", "/system/prefs/journal/"],
 ];
 const responsiveRouteNames = new Set([
   "events", "users", "exchange", "exchange-protocol",
@@ -302,6 +313,7 @@ try {
       const metrics = await evaluate(`(() => ({
         path: location.pathname,
         title: document.title,
+        httpStatus: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
         forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
         documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
         navOverflow: Boolean(document.querySelector('.nav__scroll')) && document.querySelector('.nav__scroll').scrollWidth > document.querySelector('.nav__scroll').clientWidth + 1,
@@ -343,6 +355,7 @@ try {
       const metrics = await evaluate(`(() => ({
           path: location.pathname,
           title: document.title,
+          httpStatus: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
           forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
           documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
           navOverflow: Boolean(document.querySelector('.nav__scroll')) && document.querySelector('.nav__scroll').scrollWidth > document.querySelector('.nav__scroll').clientWidth + 1,
@@ -399,7 +412,10 @@ try {
     cases: results.length,
     expectedForbidden: [...expectedForbidden],
     failures: checkedResults.filter((item) =>
-      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") || item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch || item.journalLayoutMismatch || item.taskLayoutMismatch || item.responsiveTableMismatch || item.activeAnimations
+      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") ||
+      (item.httpStatus >= 400 && !(item.expectedForbidden && item.httpStatus === 403)) ||
+      item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch ||
+      item.journalLayoutMismatch || item.taskLayoutMismatch || item.responsiveTableMismatch || item.activeAnimations
     ),
     results: checkedResults,
   };

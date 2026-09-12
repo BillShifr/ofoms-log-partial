@@ -1,7 +1,7 @@
 """Администрирование журнала обращений (перенос из v1 + экспорт/импорт)."""
 
 from django.contrib import admin
-from django_admin_listfilter_dropdown.filters import RelatedDropdownFilter
+from django.contrib.admin import SimpleListFilter
 from import_export.admin import ExportMixin
 from rangefilter.filters import DateRangeFilterBuilder
 
@@ -21,6 +21,39 @@ from apps.journal.models import (
     IrpTheme,
     XmlFiles,
 )
+
+
+class ScopedEmployeeFilter(SimpleListFilter):
+    """Фильтр исполнителя без раскрытия сотрудников вне admin tenant scope."""
+
+    title = "Принял"
+    parameter_name = "employee_one"
+
+    def lookups(self, request, model_admin):
+        rows = (
+            model_admin.get_queryset(request)
+            .order_by("employee_one_id")
+            .values_list(
+                "employee_one_id",
+                "employee_one__last_name",
+                "employee_one__first_name",
+                "employee_one__username",
+            )
+            .distinct()
+        )
+        return [
+            (
+                str(employee_id),
+                " ".join(part for part in (last_name, first_name) if part)
+                or username,
+            )
+            for employee_id, last_name, first_name, username in rows
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(employee_one_id=self.value())
+        return queryset
 
 
 @admin.register(Irp)
@@ -129,7 +162,7 @@ class IrpAdmin(
         "irp_type",
         "how",
         ("date_create", DateRangeFilterBuilder()),
-        ("employee_one", RelatedDropdownFilter),
+        ScopedEmployeeFilter,
     )
     search_fields = ("^z_f", "in_f")
 

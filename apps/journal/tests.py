@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connection, transaction
@@ -521,6 +521,26 @@ class JournalScreenTests(TestCase):
         queryset = admin.site._registry[Irp].get_queryset(request)
 
         self.assertEqual(set(queryset.values_list("pk", flat=True)), {own.pk, foreign.pk})
+
+    def test_admin_employee_filter_does_not_disclose_foreign_staff(self):
+        self.smo_user.last_name = "ВидимыйСотрудник"
+        self.smo_user.save(update_fields=["last_name"])
+        self.tfoms_user.last_name = "СкрытыйСотрудник"
+        self.tfoms_user.save(update_fields=["last_name"])
+        self._make_irp(owner=self.smo_user)
+        self._make_irp(owner=self.tfoms_user)
+        self.smo_user.is_staff = True
+        self.smo_user.user_permissions.add(
+            Permission.objects.get(codename="view_irp")
+        )
+        self.smo_user.save(update_fields=["is_staff"])
+        self.client.force_login(self.smo_user)
+
+        response = self.client.get(reverse("admin:journal_irp_changelist"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ВидимыйСотрудник")
+        self.assertNotContains(response, "СкрытыйСотрудник")
 
     def test_list_requires_login(self):
         resp = self.client.get(reverse("journal:list"))

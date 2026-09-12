@@ -1185,7 +1185,41 @@ class ImportCommandTests(ExchangeTestMixin, TestCase):
         self.assertEqual(target.read_bytes(), SAMPLE_USERS)
         self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o640)
         self.assertFalse(source.exists())
-        self.assertTrue(archived.is_symlink())
+        self.assertTrue(archived.is_file())
+        self.assertFalse(archived.is_symlink())
+        self.assertEqual(archived.stat().st_size, 0)
+        self.assertFalse(Employee.objects.filter(first_name="Пётр").exists())
+
+    def test_auto_import_rejects_hard_link_without_reading_shared_inode(self):
+        from django.core.management import call_command
+
+        in_dir = Path(self.in_dir)
+        out_dir = Path(self.out_dir)
+        arch_dir = Path(self.arch_dir)
+        target = in_dir / "private-hardlink-target.xml"
+        target.write_bytes(SAMPLE_USERS)
+        target.chmod(0o640)
+        source = in_dir / "81000" / "users-hardlinked.xml"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        os.link(target, source)
+
+        with override_settings(
+            EXCHANGE_IN=in_dir,
+            EXCHANGE_OUT=out_dir,
+            EXCHANGE_ARCHIVE=arch_dir,
+        ):
+            call_command("import_exchange", orgs=[81000], verbosity=0)
+
+        log = ImportLog.objects.get(filename=source.name)
+        archived = arch_dir / "81000" / source.name
+        self.assertEqual(log.status, ImportLog.Status.ERROR)
+        self.assertIn("ссылки запрещены", log.flcp)
+        self.assertEqual(target.read_bytes(), SAMPLE_USERS)
+        self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o640)
+        self.assertEqual(target.stat().st_nlink, 1)
+        self.assertFalse(source.exists())
+        self.assertTrue(archived.is_file())
+        self.assertEqual(archived.stat().st_size, 0)
         self.assertFalse(Employee.objects.filter(first_name="Пётр").exists())
 
     def test_auto_import_restores_input_when_audit_fails(self):

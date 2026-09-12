@@ -134,12 +134,12 @@ def validate_xlsx_container(path: Path) -> None:
 
 
 def validate_regular_exchange_input(path: Path) -> None:
-    """Разрешает importer только обычный файл, не следуя filesystem links."""
+    """Разрешает importer только отдельный обычный filesystem object."""
     try:
-        mode = path.lstat().st_mode
+        file_stat = path.lstat()
     except OSError as error:
         raise ValueError("Входной файл недоступен") from error
-    if not stat.S_ISREG(mode):
+    if not stat.S_ISREG(file_stat.st_mode) or file_stat.st_nlink != 1:
         raise ValueError("Входной объект должен быть обычным файлом; ссылки запрещены")
 
 
@@ -183,11 +183,17 @@ def reserve_unique_artifact_path(path: Path) -> Path:
 
 def archive_artifact(source: Path, archive_dir: Path, org: int) -> Path:
     """Move a processed input exactly once, including across filesystems."""
-    source_mode = source.lstat().st_mode
-    if stat.S_ISREG(source_mode):
+    source_stat = source.lstat()
+    is_exclusive_regular = (
+        stat.S_ISREG(source_stat.st_mode) and source_stat.st_nlink == 1
+    )
+    if is_exclusive_regular:
         source.chmod(0o600)
     org_dir = archive_dir / str(org)
     destination = reserve_unique_artifact_path(org_dir / source.name)
+    if not is_exclusive_regular:
+        source.unlink()
+        return destination
     try:
         os.replace(source, destination)
     except OSError as exc:

@@ -218,6 +218,65 @@ class EmployeeAdminPolicyTests(TestCase):
         self.assertNotIn("is_superuser", readonly)
         self.assertNotIn("user_permissions", readonly)
 
+    def test_admin_password_change_records_subject_audit(self):
+        actor = Employee.objects.create_superuser(
+            username="password_admin_actor",
+            password="GoodPass!1",
+            org=81000,
+        )
+        target = Employee.objects.create_user(
+            username="password_admin_target",
+            password="OldGoodPass!1",
+            org=81000,
+        )
+        self.client.force_login(actor)
+
+        response = self.client.post(
+            reverse("admin:auth_user_password_change", args=[target.pk]),
+            {
+                "password1": "Zebra!4827Orbit",
+                "password2": "Zebra!4827Orbit",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        target.refresh_from_db()
+        self.assertTrue(target.check_password("Zebra!4827Orbit"))
+        event = EventLog.objects.get(
+            target=f"admin:employee:{target.pk}:password"
+        )
+        self.assertEqual(event.event_type, EventLog.EventType.UPDATE)
+        self.assertEqual(event.user, actor)
+
+    def test_admin_password_change_rolls_back_when_audit_fails(self):
+        actor = Employee.objects.create_superuser(
+            username="password_admin_rollback_actor",
+            password="GoodPass!1",
+            org=81000,
+        )
+        target = Employee.objects.create_user(
+            username="password_admin_rollback_target",
+            password="OriginalGoodPass!1",
+            org=81000,
+        )
+        self.client.force_login(actor)
+
+        with (
+            patch("apps.employee.admin.log_event", side_effect=RuntimeError("audit")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse("admin:auth_user_password_change", args=[target.pk]),
+                {
+                    "password1": "Quartz!5938River",
+                    "password2": "Quartz!5938River",
+                },
+            )
+
+        target.refresh_from_db()
+        self.assertTrue(target.check_password("OriginalGoodPass!1"))
+        self.assertFalse(target.check_password("Quartz!5938River"))
+
     def test_admin_change_records_subject_audit_after_roles(self):
         actor = Employee.objects.create_superuser(
             username="employee_admin_actor",

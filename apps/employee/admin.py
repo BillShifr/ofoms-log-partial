@@ -94,6 +94,29 @@ class EmployeeAdmin(UserAdmin):
     )
     readonly_fields = ("guid", "failed_attempts", "lock_until")
 
+    def user_change_password(self, request, id, form_url=""):
+        """Связывает credential change с предметным audit в одной транзакции."""
+        if request.method != "POST":
+            return super().user_change_password(request, id, form_url)
+
+        with transaction.atomic():
+            user = self.get_object(request, id)
+            previous_password = user.password if user is not None else None
+            response = super().user_change_password(request, id, form_url)
+            if user is not None:
+                current_password = type(user).objects.values_list(
+                    "password", flat=True
+                ).get(pk=user.pk)
+                if current_password != previous_password:
+                    log_event(
+                        module="employee",
+                        event_type=EventLog.EventType.UPDATE,
+                        user=request.user,
+                        target=f"admin:employee:{user.pk}:password",
+                        ip=request.META.get("REMOTE_ADDR"),
+                    )
+            return response
+
     def save_model(self, request, obj, form, change):
         obj._admin_audit_event_type = (
             EventLog.EventType.UPDATE if change else EventLog.EventType.CREATE

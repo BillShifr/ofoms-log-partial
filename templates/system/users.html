@@ -9,9 +9,10 @@
 <div class="card mb-2">
   <form method="get">
     <div class="filters">
-      <div class="field"><label for="id_q">Поиск</label>{{ form.q }}</div>
-      <div class="field"><label for="id_org">Организация</label>{{ form.org }}</div>
-      <div class="field"><label class="checkbox" for="id_locked">{{ form.locked }} Только заблокированные</label></div>
+      <div class="field"><label for="id_q">Поиск</label>{{ form.q }}{{ form.q.errors }}</div>
+      <div class="field"><label for="id_org">Организация</label>{{ form.org }}{{ form.org.errors }}</div>
+      <div class="field"><label class="checkbox" for="id_locked">{{ form.locked }} Только заблокированные</label>{{ form.locked.errors }}</div>
+      {% for error in form.non_field_errors %}<div class="field field--wide"><div class="alert alert--error" role="alert">{{ error }}</div></div>{% endfor %}
     </div>
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Применить</button>

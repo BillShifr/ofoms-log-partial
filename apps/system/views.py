@@ -116,7 +116,7 @@ def user_list(request):
         .prefetch_related("groups")
         .order_by("last_name", "first_name")
     )
-    if form.is_valid():
+    if form.is_bound and form.is_valid():
         cd = form.cleaned_data
         if cd["q"]:
             qs = models_q_lookup(qs, cd["q"])
@@ -124,6 +124,8 @@ def user_list(request):
             qs = qs.filter(org=cd["org"])
         if cd["locked"]:
             qs = qs.filter(lock_until__gt=timezone.now())
+    elif form.is_bound:
+        qs = qs.none()
 
     page = _paginate(request, qs)
     return render(

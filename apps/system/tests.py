@@ -477,6 +477,17 @@ class UserManagementTests(BaseSystemTestCase):
         self.assertContains(resp, self.smo.username)
         self.assertNotContains(resp, self.operator.username)
 
+    def test_invalid_user_filter_does_not_expand_identity_directory(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("system:users"), {"org": "unknown"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Выберите корректный вариант")
+        self.assertContains(response, "Пользователи не найдены")
+        self.assertNotContains(response, self.operator.username)
+        self.assertNotContains(response, self.smo.username)
+
 
 class EventLogScreenTests(BaseSystemTestCase):
     def test_events_rendered_with_filters(self):

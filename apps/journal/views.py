@@ -72,7 +72,7 @@ def irp_suggest(request):
 @login_required
 @require_safe
 def irp_list(request):
-    """Реестр обращений: таблица + панель фильтров + пагинация."""
+    """Реестр: фильтры, пагинация и progressive infinite scroll."""
     _require_capability(request, JOURNAL_READ)
     qs = Irp.objects.select_related("theme", "employee_one", "employee_it")
 

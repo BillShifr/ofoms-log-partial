@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Журнал обращений{% endblock %}
 {% block content %}
 <div class="page-heading">
@@ -68,7 +69,7 @@
           {% endfor %}
         </tr>
       </thead>
-      <tbody>
+      <tbody data-infinite-body>
         {% for irp in page.object_list %}
         <tr class="clickable {% if not irp.is_closed and irp.is_overdue %}row--overdue{% elif not irp.is_closed and not irp.result %}row--open{% endif %}"
             data-href="{% url 'journal:detail' irp.pk %}">
@@ -100,7 +101,20 @@
   </div>
 
   {% if page.paginator.num_pages > 1 %}
-  <div class="pagination">
+  <div class="infinite-scroll"
+       data-infinite-scroll
+       data-next-url="{% if page.has_next %}{% querystring page=page.next_page_number %}{% endif %}"
+       data-loaded="{{ page.end_index }}"
+       data-total="{{ page.paginator.count }}">
+    <p class="infinite-scroll__status" data-infinite-status aria-live="polite">
+      Показано {{ page.end_index }} из {{ page.paginator.count }}
+    </p>
+    <button class="btn btn--ghost btn--sm" type="button" data-infinite-retry hidden>
+      Повторить загрузку
+    </button>
+    <div class="infinite-scroll__sentinel" data-infinite-sentinel aria-hidden="true"></div>
+  </div>
+  <div class="pagination" data-page-pagination>
     {% if page.has_previous %}
       <a href="{% querystring page=page.previous_page_number %}">‹ Назад</a>
     {% endif %}
@@ -111,4 +125,7 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'js/infinite-scroll.js' %}?v=20260912" defer></script>
 {% endblock %}

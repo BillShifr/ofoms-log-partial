@@ -759,6 +759,40 @@ class JournalScreenTests(TestCase):
         self.assertNotContains(response, "page=2")
         self.assertContains(response, "page=1")
 
+    def test_list_exposes_progressive_infinite_scroll_with_pagination_fallback(self):
+        first = self._make_irp()
+        second = self._make_irp()
+        self.client.force_login(self.tfoms_user)
+
+        with patch("apps.journal.views.PAGE_SIZE", 1):
+            first_page = self.client.get(
+                reverse("journal:list"), {"z_f": "Петров", "sort": "id"}
+            )
+            second_page = self.client.get(
+                reverse("journal:list"),
+                {"z_f": "Петров", "sort": "id", "page": 2},
+            )
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertContains(first_page, "data-infinite-body")
+        self.assertContains(first_page, "data-infinite-scroll")
+        self.assertContains(first_page, "data-page-pagination")
+        self.assertContains(first_page, "z_f=%D0%9F%D0%B5%D1%82%D1%80%D0%BE%D0%B2")
+        self.assertContains(first_page, "sort=id")
+        self.assertContains(first_page, "page=2")
+        self.assertContains(first_page, first.n_irp)
+        self.assertNotContains(first_page, second.n_irp)
+        self.assertContains(second_page, second.n_irp)
+        self.assertNotContains(second_page, first.n_irp)
+        self.assertContains(second_page, 'data-next-url=""')
+
+        script = (settings.BASE_DIR / "static/js/infinite-scroll.js").read_text()
+        self.assertIn("IntersectionObserver", script)
+        self.assertIn("credentials: 'same-origin'", script)
+        self.assertIn("response.ok", script)
+        self.assertIn("data-infinite-body", script)
+        self.assertIn("data-infinite-retry", script)
+
     def test_filter_finds_cyrillic_case_insensitive(self):
         # Локаль PG = C: __icontains не сворачивает кириллицу — ищем через fold
         self._make_irp()

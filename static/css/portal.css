@@ -578,6 +578,15 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
   background: var(--card);
 }
 .pagination .current { background: var(--primary); color: #fff; border-color: var(--primary); }
+.infinite-scroll {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 14px 22px 0;
+}
+.infinite-scroll__status { margin: 0; color: var(--muted); font-size: .88rem; }
+.infinite-scroll__sentinel { width: 100%; height: 1px; }
 
 /* ---------- Раскрытие деталей строки таблицы ---------- */
 tr.row-detail > td {

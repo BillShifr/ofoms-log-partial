@@ -548,6 +548,44 @@ class JournalScreenTests(TestCase):
         self.assertEqual(irp.employee_one, self.smo_user)
         self.assertEqual(irp.z_f, "Владелец сохранён")
 
+    def test_edit_cannot_change_unique_import_identity_through_post(self):
+        irp = self._make_irp()
+        original_number = irp.n_irp
+        self.client.force_login(self.tfoms_user)
+
+        response = self.client.post(
+            reverse("journal:edit", args=[irp.pk]),
+            {
+                "n_irp": "00000000-0000-0000-0000-00000000fake",
+                "irp_type": 1,
+                "date_create": irp.date_create.isoformat(),
+                "way": 1,
+                "how": 1,
+                "theme": self.theme.pk,
+                "otv_t": 1,
+                "otv_kon": 81000,
+                "employee_one": self.tfoms_user.pk,
+                "line_one": 1,
+                "data_plan": irp.data_plan.isoformat(),
+                "z_f": "Номер сохранён",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        irp.refresh_from_db()
+        self.assertEqual(irp.n_irp, original_number)
+        self.assertEqual(irp.z_f, "Номер сохранён")
+        self.assertFalse(
+            IrpHistory.objects.filter(irp=irp, field_name="n_irp").exists()
+        )
+
+        edit_page = self.client.get(reverse("journal:edit", args=[irp.pk]))
+        self.assertContains(edit_page, 'name="n_irp"', count=1)
+        self.assertContains(edit_page, "disabled", count=2)
+        self.assertContains(
+            edit_page, "Уникальный номер фиксируется при регистрации."
+        )
+
     def test_smo_cannot_assign_foreign_organization_or_employee(self):
         irp = self._make_irp(owner=self.smo_user)
         foreign = Employee.objects.create_user(

@@ -16,7 +16,7 @@
 
     <div class="form-section-heading"><span>01</span><div><h2>Обращение</h2><p>Регистрация, источник и содержание</p></div></div>
     <div class="form-grid">
-      <div class="field"><label>Номер обращения</label>{{ form.n_irp }}{{ form.n_irp.errors }}</div>
+      <div class="field"><label>Номер обращения</label>{{ form.n_irp }}{{ form.n_irp.errors }}{% if form.n_irp.help_text %}<span class="helptext" id="{{ form.n_irp.id_for_label }}_helptext">{{ form.n_irp.help_text }}</span>{% endif %}</div>
       <div class="field"><label>Вид обращения</label>{{ form.irp_type }}{{ form.irp_type.errors }}</div>
       <div class="field"><label>Дата поступления</label>{{ form.date_create }}{{ form.date_create.errors }}</div>
       <div class="field"><label>Время поступления</label>{{ form.time_create }}{{ form.time_create.errors }}</div>
@@ -71,7 +71,7 @@
     <div class="form-grid">
       <div class="field"><label>Ответственная организация (тип)</label>{{ form.otv_t }}{{ form.otv_t.errors }}</div>
       <div class="field"><label>Ответственная организация</label>{{ form.otv_kon }}{{ form.otv_kon.errors }}</div>
-      <div class="field"><label>Принял</label>{{ form.employee_one }}{{ form.employee_one.errors }}</div>
+      <div class="field"><label>Принял</label>{{ form.employee_one }}{{ form.employee_one.errors }}{% if form.employee_one.help_text %}<span class="helptext" id="{{ form.employee_one.id_for_label }}_helptext">{{ form.employee_one.help_text }}</span>{% endif %}</div>
       <div class="field"><label>Линия принятия</label>{{ form.line_one }}{{ form.line_one.errors }}</div>
       <div class="field"><label>Ответственный</label>{{ form.employee_it }}{{ form.employee_it.errors }}</div>
       <div class="field"><label>Линия рассмотрения</label>{{ form.line_it }}{{ form.line_it.errors }}</div>

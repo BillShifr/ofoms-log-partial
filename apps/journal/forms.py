@@ -43,6 +43,11 @@ class IrpForm(forms.ModelForm):
             self.fields["employee_one"].help_text = (
                 "Первичный исполнитель фиксируется при регистрации."
             )
+            if self.instance.pk is not None:
+                self.fields["n_irp"].disabled = True
+                self.fields["n_irp"].help_text = (
+                    "Уникальный номер фиксируется при регистрации."
+                )
             self.fields["employee_it"].queryset = _assignable_employees(
                 user, self.instance.employee_it_id
             )

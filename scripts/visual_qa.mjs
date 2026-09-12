@@ -182,6 +182,25 @@ async function measureJournalLayout() {
   })()`);
 }
 
+async function measureTaskLayout() {
+  return evaluate(`(() => {
+    const wrap = document.querySelector('.table-wrap--tasks');
+    const table = wrap?.querySelector('table.data--tasks');
+    const row = table?.querySelector('tbody tr.task-row');
+    const actions = row?.querySelector('.table-actions');
+    if (!wrap || !table || !row || !actions) return null;
+    const compact = innerWidth <= 1100;
+    const wrapRect = wrap.getBoundingClientRect();
+    const actionsRect = actions.getBoundingClientRect();
+    return {
+      compact,
+      headerHidden: getComputedStyle(table.tHead).display === 'none',
+      cardGrid: getComputedStyle(row).display === 'grid',
+      actionsVisible: actionsRect.left >= wrapRect.left - 1 && actionsRect.right <= wrapRect.right + 1
+    };
+  })()`);
+}
+
 try {
   const port = await devtoolsPort();
   const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
@@ -263,6 +282,7 @@ try {
         scrollWidth: document.documentElement.scrollWidth
       }))()`);
       metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
+      metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
       metrics.browserErrors = browserErrors.slice(errorStart);
       const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
       const filename = `${name}-${width}x${height}-light.png`;
@@ -301,6 +321,7 @@ try {
           scrollWidth: document.documentElement.scrollWidth
         }))()`);
         metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
+        metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
         metrics.browserErrors = browserErrors.slice(errorStart);
         const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
         const filename = `${name}-${width}x${height}-${theme}-${font}-${contrast}.png`;
@@ -322,6 +343,9 @@ try {
         ? (!item.journalLayout.cardGrid || !item.journalLayout.headerHidden)
         : (!item.journalLayout.firstPinned || !item.journalLayout.statusPinned ||
           (item.width >= 1366 && item.journalLayout.internalOverflow)))),
+    taskLayoutMismatch: item.name === "tasks" && item.width <= 1100 &&
+      (!item.taskLayout || !item.taskLayout.compact || !item.taskLayout.headerHidden ||
+        !item.taskLayout.cardGrid || !item.taskLayout.actionsVisible),
   }));
   const report = {
     generatedAt: new Date().toISOString(),
@@ -329,7 +353,7 @@ try {
     cases: results.length,
     expectedForbidden: [...expectedForbidden],
     failures: checkedResults.filter((item) =>
-      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") || item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch || item.journalLayoutMismatch || item.activeAnimations
+      item.documentOverflow || (item.width >= 1024 && item.navOverflow) || item.path.includes("login") || item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch || item.journalLayoutMismatch || item.taskLayoutMismatch || item.activeAnimations
     ),
     results: checkedResults,
   };

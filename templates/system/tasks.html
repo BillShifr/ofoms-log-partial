@@ -8,8 +8,8 @@
 </header>
 
 <div class="card table-card">
-  <div class="table-wrap" tabindex="0" aria-label="Таблица заданий; прокручивается по горизонтали">
-    <table class="data" data-client-sort>
+  <div class="table-wrap table-wrap--tasks" tabindex="0" aria-label="Таблица заданий; на узком экране показана карточками">
+    <table class="data data--tasks" data-client-sort>
       <thead>
         <tr>
           <th>Наименование</th>
@@ -24,25 +24,25 @@
       </thead>
       <tbody>
         {% for t in tasks %}
-        <tr data-href="{% url 'system:task_update' t.pk %}" data-sort-group="task-{{ t.pk }}">
-          <td>{{ t.name }}</td>
-          <td class="mono" data-tip="{{ command_tips|get_item:t.command|default:t.command }}">{{ t.command }}</td>
-          <td>
+        <tr class="task-row" data-href="{% url 'system:task_update' t.pk %}" data-sort-group="task-{{ t.pk }}">
+          <td class="task-cell--name" data-label="Наименование">{{ t.name }}</td>
+          <td class="mono" data-label="Команда" data-tip="{{ command_tips|get_item:t.command|default:t.command }}">{{ t.command }}</td>
+          <td data-label="Статус">
             {% if t.status == 'completed' %}<span class="badge badge--closed">{{ t.get_status_display }}</span>
             {% elif t.status == 'failed' %}<span class="badge badge--overdue">{{ t.get_status_display }}</span>
             {% elif t.status == 'running' %}<span class="badge badge--running">{{ t.get_status_display }}</span>
             {% elif t.status == 'cancelled' %}<span class="badge badge--cancelled">{{ t.get_status_display }}</span>
             {% else %}<span class="badge badge--open">{{ t.get_status_display }}</span>{% endif %}
           </td>
-          <td>{% if t.assigned_to %}{{ t.assigned_to.full_name }}{% else %}—{% endif %}</td>
-          <td>
+          <td data-label="Исполнитель">{% if t.assigned_to %}{{ t.assigned_to.full_name }}{% else %}—{% endif %}</td>
+          <td data-label="Приоритет">
             {% if t.priority == 2 %}<span class="badge badge--overdue">Высокий</span>
             {% elif t.priority == 1 %}<span class="badge badge--open">Средний</span>
             {% else %}<span class="badge badge--cancelled">Низкий</span>{% endif %}
           </td>
-          <td>{{ t.get_run_mode_display }}</td>
-          <td data-value="{{ t.last_finished_at|date:'Y-m-d\TH:i:s' }}">{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
-          <td class="text-nowrap"><div class="table-actions">
+          <td data-label="Режим">{{ t.get_run_mode_display }}</td>
+          <td data-label="Последний запуск" data-value="{{ t.last_finished_at|date:'Y-m-d\TH:i:s' }}">{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
+          <td class="text-nowrap task-cell--actions" data-label="Действия"><div class="table-actions">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:task_update' t.pk %}">Карточка</a>
             <form method="post" action="{% url 'system:task_run' t.pk %}" class="inline-form">{% csrf_token %}
               <button class="btn btn--sm btn--primary" type="submit"{% if not t.enabled %} disabled title="Сначала включите задание"{% endif %}>Запустить</button>

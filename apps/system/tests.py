@@ -10,6 +10,7 @@ from pathlib import Path
 from threading import Barrier
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
@@ -2015,6 +2016,15 @@ class TaskTests(BaseSystemTestCase):
         response = self.client.get(reverse("system:tasks"))
         self.assertContains(response, f'data-sort-group="task-{task.pk}"', count=2)
         self.assertContains(response, "data-no-sort")
+        self.assertContains(response, 'class="data data--tasks"')
+        self.assertContains(response, 'class="task-row"')
+        self.assertContains(response, 'data-label="Действия"')
+
+        css = (settings.BASE_DIR / "static/css/portal.css").read_text()
+        self.assertIn("@media (max-width: 1100px)", css)
+        self.assertIn(".data--tasks tbody tr.task-row", css)
+        visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text()
+        self.assertIn("taskLayoutMismatch", visual_qa)
 
     def test_running_task_cannot_be_started_twice(self):
         task = self._make_task(

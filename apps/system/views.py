@@ -24,8 +24,7 @@ from django.views.decorators.http import require_http_methods, require_safe
 
 from apps.core.fold import contains_folded, filter_contains_any
 from apps.core.models import EventLog, log_event
-from apps.core.policy import role_codes_for_user
-from apps.core.roles import Roles
+from apps.core.policy import user_is_system_admin
 from apps.core.storage import (
     UploadedFileRollback,
     close_file_on_error,
@@ -71,11 +70,7 @@ PAGE_SIZE = 25
 
 
 def _is_admin(user) -> bool:
-    return bool(
-        user
-        and user.is_authenticated
-        and (user.is_superuser or Roles.ADMIN in role_codes_for_user(user))
-    )
+    return user_is_system_admin(user)
 
 
 def admin_required(view):

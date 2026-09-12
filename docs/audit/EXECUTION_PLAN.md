@@ -923,3 +923,10 @@
 - [x] Согласовать общий object loader для detail/edit/redirect/print/download.
 - [x] Расширить organization choices и assignable employees обеих форм.
 - [x] Проверить foreign-org superuser и сохранить SМО foreign denial.
+
+## 2026-09-12 — organization-bound administrative portal role
+
+- [x] Связать effective Admin capability с обязательной организацией ТФОМС.
+- [x] Закрыть одной boundary все служебные administrative portal routes.
+- [x] Проверить forged Admin group для СМО, включая попытку блокировки чужого пользователя.
+- [x] Сохранить recovery scope superuser с profile organization СМО.

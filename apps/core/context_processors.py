@@ -6,19 +6,15 @@ from django.conf import settings
 def system_meta(request):
     """Передаёт SYSTEM_META, текущую роль, признак администратора и число
     непрочитанных сообщений (для пунктов меню base.html)."""
-    from apps.core.policy import role_codes_for_user
-    from apps.core.roles import ROLE_CHOICES, ROLE_GROUP_MAP, Roles
+    from apps.core.policy import role_codes_for_user, user_is_system_admin
+    from apps.core.roles import ROLE_CHOICES, ROLE_GROUP_MAP
 
     user = getattr(request, "user", None)
     role_codes = role_codes_for_user(user)
     role_code = next(
         (code for code, _label in ROLE_CHOICES if code in role_codes), None
     )
-    is_admin = bool(
-        user
-        and user.is_authenticated
-        and (user.is_superuser or Roles.ADMIN in role_codes)
-    )
+    is_admin = user_is_system_admin(user)
     unread = 0
     if user is not None and user.is_authenticated:
         from apps.system.models import MessageReply

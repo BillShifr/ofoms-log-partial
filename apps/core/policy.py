@@ -67,6 +67,24 @@ def user_has_capability(user, capability: str) -> bool:
     return allowed is not None and bool(role_codes_for_user(user) & allowed)
 
 
+def user_is_system_admin(user) -> bool:
+    """Administrative portal role with its mandatory organization boundary."""
+    from apps.employee.models import TFOMS
+
+    return bool(
+        user
+        and user.is_authenticated
+        and user.is_active
+        and (
+            user.is_superuser
+            or (
+                user.org == TFOMS
+                and Roles.ADMIN in role_codes_for_user(user)
+            )
+        )
+    )
+
+
 def capability_matrix():
     """Строки фактической RBAC-матрицы для административного UI."""
     from apps.core.roles import ROLE_CHOICES

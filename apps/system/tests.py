@@ -109,6 +109,58 @@ class AccessTests(BaseSystemTestCase):
             resp = self.client.get(reverse(f"system:{name}"))
             self.assertEqual(resp.status_code, 200, name)
 
+    def test_smo_account_with_forged_admin_group_is_denied_admin_surfaces(self):
+        forged_admin = Employee.objects.create_user(
+            username="forged_smo_admin",
+            password=PASSWORD,
+            org=81001,
+            is_staff=True,
+        )
+        forged_admin.groups.add(Group.objects.get(name="Администратор"))
+        target = Employee.objects.create_user(
+            username="protected_tfoms_user",
+            password=PASSWORD,
+            org=81000,
+        )
+        self.client.force_login(forged_admin)
+
+        read_routes = (
+            "users",
+            "user_create",
+            "events",
+            "event_initiator_suggest",
+            "events_export",
+            "tasks",
+            "task_create",
+        )
+        for name in read_routes:
+            response = self.client.get(reverse(f"system:{name}"))
+            self.assertEqual(response.status_code, 403, name)
+
+        ordinary_screen = self.client.get(reverse("system:docs"))
+        self.assertEqual(ordinary_screen.status_code, 200)
+        self.assertNotContains(ordinary_screen, reverse("system:users"))
+        self.assertNotContains(ordinary_screen, reverse("system:events"))
+
+        response = self.client.post(
+            reverse("system:user_block", args=[target.pk])
+        )
+        self.assertEqual(response.status_code, 403)
+        target.refresh_from_db()
+        self.assertTrue(target.is_active)
+
+    def test_superuser_outside_tfoms_retains_admin_recovery_scope(self):
+        root = Employee.objects.create_superuser(
+            username="system_foreign_org_root",
+            password=PASSWORD,
+            org=81001,
+        )
+        self.client.force_login(root)
+
+        for name in ("users", "user_create", "events", "tasks", "task_create"):
+            response = self.client.get(reverse(f"system:{name}"))
+            self.assertEqual(response.status_code, 200, name)
+
     def test_admin_navigation_groups_management_destinations(self):
         self.client.force_login(self.admin)
         response = self.client.get(reverse("system:users"))

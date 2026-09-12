@@ -397,3 +397,9 @@
 - Superuser и пользователь ТФОМС используют общий global-scope predicate в form querysets/choices; чтение дополнительно проверяет `is_superuser` перед tenant restriction.
 - Реестр, autocomplete и общий object loader согласованы, поэтому detail/edit/redirect/print/download не расходятся по recovery visibility.
 - При создании обращения immutable primary owner остаётся текущим principal и его profile organization; глобальный scope не переписывает provenance новой записи.
+
+## 2026-09-12 Организационная граница роли администратора portal
+
+- Каноническая роль «Администратор» действует на служебных portal-экранах только для principal ТФОМС; одного имени M2M-группы недостаточно.
+- Проверка сосредоточена в `_is_admin`, поэтому одинаково защищает пользователей, события, задачи, административные действия сообщений, документов и новостей.
+- Superuser сохраняет независимый от profile organization recovery bypass; прямые Django permissions и Django Admin продолжают применять собственные object-level scopes.

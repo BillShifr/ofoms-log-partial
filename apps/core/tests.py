@@ -92,6 +92,18 @@ class SystemMetaContextTests(TestCase):
         self.assertEqual(context["SYSTEM_ROLE_LABEL"], "Суперпользователь")
         self.assertTrue(context["can_manage_system"])
 
+    def test_smo_account_with_admin_group_has_no_management_navigation(self):
+        user = User.objects.create_user(
+            username="forged-smo-admin-context",
+            password="GoodPass!1",
+            org=81001,
+        )
+        user.groups.add(Group.objects.get(name="Администратор"))
+
+        context = system_meta(mock.Mock(user=user))
+
+        self.assertFalse(context["can_manage_system"])
+
 
 class EventLogAdminScopeTests(TestCase):
     def setUp(self):

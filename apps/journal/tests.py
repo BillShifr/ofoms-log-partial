@@ -593,6 +593,8 @@ class JournalScreenTests(TestCase):
         self.assertContains(resp, "table-row-link")
         self.assertContains(resp, reverse("journal:list_print"))
         self.assertContains(resp, 'class="data data--wide data--journal')
+        self.assertContains(resp, '<col class="col-id">', html=True)
+        self.assertContains(resp, '<col class="col-status">', html=True)
         self.assertContains(resp, 'class="group-row__label"')
         self.assertContains(resp, 'class="col-status"')
         self.assertContains(resp, 'data-label="Статус"')
@@ -620,7 +622,12 @@ class JournalScreenTests(TestCase):
         self.assertIn(
             "background: color-mix(in srgb, var(--bg) 38%, var(--card))", css
         )
-        self.assertIn("min-width: 1080px !important", css)
+        self.assertIn("min-width: 1130px !important", css)
+        self.assertIn("table-layout: fixed", css)
+        visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text()
+        self.assertIn(
+            "(item.width >= 1366 && item.journalLayout.internalOverflow)", visual_qa
+        )
         self.assertIn("table.data .group-row th", css)
         self.assertIn(".data--journal thead { display: none; }", css)
         self.assertIn("content: attr(data-label)", css)

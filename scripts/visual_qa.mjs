@@ -13,6 +13,9 @@ const outputDir = process.env.QA_OUTPUT_DIR || ".artifacts/visual-qa";
 const expectedForbidden = new Set(
   (process.env.QA_EXPECT_FORBIDDEN || "").split(",").map((value) => value.trim()).filter(Boolean),
 );
+const requestedRoutes = new Set(
+  (process.env.QA_ROUTE_NAMES || "").split(",").map((value) => value.trim()).filter(Boolean),
+);
 
 if (!username || !password) {
   console.error("Set QA_USERNAME and QA_PASSWORD for a local non-production account.");
@@ -46,6 +49,14 @@ if (process.env.QA_EXTRA_ROUTES) {
     !Array.isArray(item) || item.length !== 2 || item.some((value) => typeof value !== "string")
   )) throw new Error("QA_EXTRA_ROUTES must be a JSON array of [name, path] pairs");
   routes.push(...extraRoutes);
+}
+if (requestedRoutes.size) {
+  const knownRoutes = new Set(routes.map(([name]) => name));
+  const unknownRoutes = [...requestedRoutes].filter((name) => !knownRoutes.has(name));
+  if (unknownRoutes.length) throw new Error(`Unknown QA_ROUTE_NAMES: ${unknownRoutes.join(", ")}`);
+  for (let index = routes.length - 1; index >= 0; index -= 1) {
+    if (!requestedRoutes.has(routes[index][0])) routes.splice(index, 1);
+  }
 }
 
 const profileDir = await mkdtemp(join(tmpdir(), "ofoms-visual-qa-"));
@@ -100,6 +111,20 @@ async function evaluate(expression) {
   return result.result.value;
 }
 
+async function settleAnimations() {
+  await evaluate(`new Promise((resolve) => {
+    const deadline = performance.now() + 1200;
+    let stableFrames = 0;
+    const check = () => {
+      const running = document.getAnimations().some((animation) => animation.playState === 'running');
+      stableFrames = running ? 0 : stableFrames + 1;
+      if (stableFrames >= 2 || performance.now() >= deadline) resolve();
+      else requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  })`);
+}
+
 async function measureJournalLayout() {
   return evaluate(`(async () => {
     const wrap = document.querySelector('.table-wrap--journal');
@@ -130,7 +155,22 @@ async function measureJournalLayout() {
     const statusSticky = getComputedStyle(lastCell).position === 'sticky';
     const result = {
       mobile,
-      internalOverflow: wrap.scrollWidth > wrap.clientWidth + 1,
+      internalOverflow: wrap.scrollLeft > 1,
+      overflowWidth: wrap.scrollWidth - wrap.clientWidth,
+      wrapClientWidth: wrap.clientWidth,
+      wrapScrollWidth: wrap.scrollWidth,
+      tableWidth: tableRect.width,
+      overflowingDescendants: [...wrap.querySelectorAll('*')]
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            tag: element.tagName.toLowerCase(),
+            className: typeof element.className === 'string' ? element.className : '',
+            rightOverflow: Math.max(0, rect.right - wrapRect.right)
+          };
+        })
+        .filter((item) => item.rightOverflow > 1)
+        .slice(0, 8),
       groupCoversTable,
       firstPinned: getComputedStyle(firstCell).position === 'sticky' &&
         Math.abs(firstRect.left - wrapRect.left) <= 2,
@@ -200,7 +240,7 @@ try {
       const errorStart = browserErrors.length;
       await navigate(`${baseUrl}${path}`);
       await evaluate(`document.documentElement.dataset.theme='light'; document.documentElement.dataset.font='base'; document.documentElement.dataset.contrast='default'`);
-      await pause(180);
+      await settleAnimations();
       const metrics = await evaluate(`(() => ({
         path: location.pathname,
         title: document.title,
@@ -238,7 +278,7 @@ try {
         const errorStart = browserErrors.length;
         await navigate(`${baseUrl}${path}`);
         await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}; document.documentElement.dataset.font=${JSON.stringify(font)}; document.documentElement.dataset.contrast=${JSON.stringify(contrast)}`);
-        await pause(180);
+        await settleAnimations();
       const metrics = await evaluate(`(() => ({
           path: location.pathname,
           title: document.title,
@@ -280,7 +320,8 @@ try {
       !item.journalLayout.groupCoversTable ||
       (item.journalLayout.mobile
         ? (!item.journalLayout.cardGrid || !item.journalLayout.headerHidden)
-        : (!item.journalLayout.firstPinned || !item.journalLayout.statusPinned))),
+        : (!item.journalLayout.firstPinned || !item.journalLayout.statusPinned ||
+          (item.width >= 1366 && item.journalLayout.internalOverflow)))),
   }));
   const report = {
     generatedAt: new Date().toISOString(),

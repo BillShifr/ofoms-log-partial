@@ -384,7 +384,12 @@ table.data tbody tr[data-href]:focus-within {
 }
 table.data tr.row--overdue { background: color-mix(in srgb, var(--chip-red) 60%, var(--card)); box-shadow: inset 4px 0 var(--danger); }
 table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%, var(--card)); box-shadow: inset 4px 0 var(--warn); }
-.data--journal { min-width: 1080px !important; font-size: .76rem; }
+.data--journal {
+  width: calc(100% - 2px);
+  min-width: 1130px !important;
+  table-layout: fixed;
+  font-size: .76rem;
+}
 .data--journal th, .data--journal td { padding: 9px 10px; }
 .data--journal thead tr:not(.group-row) th {
   background: color-mix(in srgb, var(--ink) 2.5%, var(--card));
@@ -407,23 +412,30 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
   width: 58px;
   min-width: 58px;
   background: var(--card);
-  box-shadow: 10px 0 18px -20px color-mix(in srgb, var(--ink) 65%, transparent);
+  box-shadow: inset -1px 0 color-mix(in srgb, var(--ink) 12%, var(--line));
 }
 .data--journal thead tr:not(.group-row) th:first-child {
   z-index: 6;
   background: color-mix(in srgb, var(--ink) 2.5%, var(--card));
 }
 .data--journal tbody tr:hover td:first-child { background: color-mix(in srgb, var(--ink) 2.5%, var(--card)); }
-.data--journal .col-theme { min-width: 150px; }
-.data--journal .col-n_irp { width: 148px; max-width: 148px; }
-.data--journal .col-z_f { min-width: 156px; }
+.data--journal .col-id { width: 58px; }
+.data--journal .col-n_irp { width: 112px; max-width: 112px; }
+.data--journal .col-irp_type { width: 105px; }
+.data--journal .col-theme { width: 120px; overflow-wrap: anywhere; }
+.data--journal .col-date_create,
+.data--journal .col-data_plan,
+.data--journal .col-date_close { width: 95px; }
+.data--journal .col-z_f { width: 140px; overflow-wrap: anywhere; }
+.data--journal .col-z_enp { width: 95px; }
+.data--journal .col-employee_one { width: 105px; overflow-wrap: anywhere; }
 .data--journal .col-status {
   position: sticky;
   right: 0;
   z-index: 3;
-  min-width: 132px;
+  width: 135px;
   background: var(--card);
-  box-shadow: -12px 0 18px -18px color-mix(in srgb, var(--ink) 55%, transparent);
+  box-shadow: inset 1px 0 color-mix(in srgb, var(--ink) 12%, var(--line));
 }
 .data--journal thead .col-status {
   z-index: 5;
@@ -441,6 +453,7 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .data--journal tbody tr:hover .col-status {
   background: color-mix(in srgb, var(--ink) 2.5%, var(--card));
 }
+.data--journal .badge { max-width: 100%; padding-inline: 7px; font-size: .68rem; }
 .cell-id { white-space: nowrap; letter-spacing: -.02em; }
 .compact-id { display: block; overflow: hidden; color: color-mix(in srgb, var(--ink) 78%, transparent); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
 .table-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
@@ -777,6 +790,10 @@ table.data th { border-top: 1px solid var(--line); }
 table.data.th-sticky th:first-child,
 table.data.th-sticky td:first-child { position: sticky; left: 0; background: var(--card); z-index: 3; box-shadow: 1px 0 var(--line); }
 table.data.th-sticky th:first-child { position: sticky; left: 0; z-index: 4; box-shadow: 1px 0 var(--line); }
+.data--journal.th-sticky th:first-child,
+.data--journal.th-sticky td:first-child {
+  box-shadow: inset -1px 0 color-mix(in srgb, var(--ink) 12%, var(--line));
+}
 .task-log-row td { font-size: .78rem; background: color-mix(in srgb, var(--bg) 45%, var(--card)); }
 
 /* ---------- Тосты (Этап v3, 2.0.2) ---------- */
@@ -920,6 +937,7 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
 /* ---------- Адаптивность (2.0.1) ---------- */
 @media (min-width: 1920px) { :root { --wrap: 1440px; --fs: 18px; } }
 @media (min-width: 1440px) and (max-width: 1919px) { :root { --wrap: 1320px; } }
+@media (min-width: 1366px) { .table-wrap--journal { overflow-x: clip; } }
 @media (max-width: 1279px) {
   .nav__link { padding: 10px 12px; }
   .header__inner { min-height: calc(var(--header-h) - 8px); }

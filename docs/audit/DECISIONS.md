@@ -415,3 +415,9 @@
 - Все portal-пути list/update/block/unblock получают пользователя из одного actor-scoped queryset; non-superuser никогда не получает строку с `is_superuser=True`.
 - Прямой URL возвращает 404 вместо раскрытия существования корневой учётной записи, а row lock берётся только после применения scope.
 - Другой superuser сохраняет recovery-возможность управлять root principal; создание root и смена credential через portal не добавляются.
+
+## 2026-09-12 Least privilege для volume init
+
+- `volume-init` сохраняет UID 0 только для смены владельца подключённых data volumes, но получает единственную capability `CHOWN` после `cap_drop: ALL`.
+- Image root filesystem init-контейнера read-only, а `no-new-privileges` запрещает расширение прав через исполняемые файлы.
+- Ошибка `chown` остаётся блокирующей зависимостью web; fallback к world-writable каталогам намеренно отсутствует.

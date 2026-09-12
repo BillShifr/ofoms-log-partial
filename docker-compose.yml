@@ -34,6 +34,13 @@ services:
   volume-init:
     build: .
     user: "0:0"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
     command: ["sh", "-c", "chown -R 10001:10001 /app/media /app/exchange"]
     volumes:
       - media:/app/media

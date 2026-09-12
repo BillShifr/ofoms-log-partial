@@ -944,3 +944,10 @@
 - [x] Применить один scoped queryset к GET, update, block и unblock.
 - [x] Возвращать 404 на прямые URL без изменения root-профиля или статуса.
 - [x] Сохранить межорганизационное recovery-управление для другого superuser.
+
+## 2026-09-12 — least-privilege volume initialization
+
+- [x] Сделать root filesystem init-контейнера read-only.
+- [x] Сбросить все capabilities и вернуть только `CHOWN`.
+- [x] Запретить privilege escalation.
+- [x] Проверить реальный chown mounted path и невозможность записи в image filesystem.

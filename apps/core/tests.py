@@ -750,6 +750,14 @@ class ProductionSettingsTests(TestCase):
         self.assertIn('user: "0:0"', compose)
         self.assertIn("chown -R 10001:10001 /app/media /app/exchange", compose)
 
+        volume_init = compose[
+            compose.index("  volume-init:") : compose.index("  web:")
+        ]
+        self.assertIn("read_only: true", volume_init)
+        self.assertIn("no-new-privileges:true", volume_init)
+        self.assertIn("cap_drop:\n      - ALL", volume_init)
+        self.assertIn("cap_add:\n      - CHOWN", volume_init)
+
     def test_compose_services_restart_and_receive_termination_signals(self):
         compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
 

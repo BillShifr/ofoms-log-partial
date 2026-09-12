@@ -879,3 +879,10 @@
 - [x] Ограничить XML-файлы и протоколы импорта организацией СМО.
 - [x] Сохранить полный обзор для staff ТФОМС и superuser.
 - [x] Проверить все шесть моделей на реальных queryset с own/foreign строками.
+
+## 2026-09-12 — participant ACL сообщений в Django Admin
+
+- [x] Вынести общий participant-aware admin queryset mixin.
+- [x] Ограничить диалоги, темы, ответы и вложения через их relation chain.
+- [x] Не предоставлять superuser неявный обход продуктового participant ACL.
+- [x] Проверить четыре модели на own/foreign объектах и отдельный uninvited-superuser сценарий.

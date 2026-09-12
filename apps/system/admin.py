@@ -2,7 +2,11 @@
 
 from django.contrib import admin
 
-from apps.core.admin_utils import AuditedAdminMixin, ReadOnlyAdminMixin
+from apps.core.admin_utils import (
+    AuditedAdminMixin,
+    ParticipantScopedAdminMixin,
+    ReadOnlyAdminMixin,
+)
 from apps.system.models import (
     Conversation,
     MessageAttachment,
@@ -38,24 +42,35 @@ class SystemDocumentAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(Conversation)
-class ConversationAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+class ConversationAdmin(
+    ParticipantScopedAdminMixin, ReadOnlyAdminMixin, admin.ModelAdmin
+):
     list_display = ("id", "title", "created_at", "updated_at")
 
 
 @admin.register(MessageThread)
-class MessageThreadAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+class MessageThreadAdmin(
+    ParticipantScopedAdminMixin, ReadOnlyAdminMixin, admin.ModelAdmin
+):
+    participant_lookup = "conversation__participants"
     list_display = ("id", "conversation", "title", "created_by", "is_closed", "created_at")
     list_filter = ("is_closed",)
 
 
 @admin.register(MessageReply)
-class MessageReplyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+class MessageReplyAdmin(
+    ParticipantScopedAdminMixin, ReadOnlyAdminMixin, admin.ModelAdmin
+):
+    participant_lookup = "thread__conversation__participants"
     list_display = ("id", "thread", "author", "created_at", "edited_at")
     search_fields = ("body",)
 
 
 @admin.register(MessageAttachment)
-class MessageAttachmentAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+class MessageAttachmentAdmin(
+    ParticipantScopedAdminMixin, ReadOnlyAdminMixin, admin.ModelAdmin
+):
+    participant_lookup = "reply__thread__conversation__participants"
     list_display = ("id", "reply", "uploaded_by", "created_at")
     search_fields = ("file",)
 

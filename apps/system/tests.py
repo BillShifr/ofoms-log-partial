@@ -10,7 +10,7 @@ from pathlib import Path
 from threading import Barrier
 from unittest.mock import patch
 
-from django.contrib import messages
+from django.contrib import admin, messages
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -18,7 +18,13 @@ from django.core.management import CommandError, call_command
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.db.models import QuerySet
-from django.test import Client, TestCase, TransactionTestCase, override_settings
+from django.test import (
+    Client,
+    RequestFactory,
+    TestCase,
+    TransactionTestCase,
+    override_settings,
+)
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -411,6 +417,75 @@ class MessageTests(BaseSystemTestCase):
         conv = Conversation.objects.create(title="Обмен данными")
         conv.participants.set([self.operator, self.admin])
         return conv
+
+    def test_message_admin_querysets_follow_participant_acl(self):
+        own_conversation = self._conv()
+        own_thread = MessageThread.objects.create(
+            conversation=own_conversation,
+            created_by=self.operator,
+            title="Доступная тема",
+        )
+        own_reply = MessageReply.objects.create(
+            thread=own_thread,
+            author=self.operator,
+            body="Доступное сообщение",
+        )
+        own_attachment = MessageAttachment.objects.create(
+            reply=own_reply,
+            uploaded_by=self.operator,
+            file="messages/own.txt",
+        )
+        foreign_conversation = Conversation.objects.create(title="Чужой диалог")
+        foreign_conversation.participants.set([self.operator, self.smo])
+        foreign_thread = MessageThread.objects.create(
+            conversation=foreign_conversation,
+            created_by=self.operator,
+            title="Чужая тема",
+        )
+        foreign_reply = MessageReply.objects.create(
+            thread=foreign_thread,
+            author=self.operator,
+            body="Чужое сообщение",
+        )
+        MessageAttachment.objects.create(
+            reply=foreign_reply,
+            uploaded_by=self.operator,
+            file="messages/foreign.txt",
+        )
+        request = RequestFactory().get("/admin/system/")
+        request.user = self.admin
+
+        expected = {
+            Conversation: {own_conversation.pk},
+            MessageThread: {own_thread.pk},
+            MessageReply: {own_reply.pk},
+            MessageAttachment: {own_attachment.pk},
+        }
+        for model, expected_ids in expected.items():
+            with self.subTest(model=model._meta.label):
+                queryset = admin.site._registry[model].get_queryset(request)
+                self.assertEqual(
+                    set(queryset.values_list("pk", flat=True)), expected_ids
+                )
+
+    def test_message_admin_does_not_bypass_participant_acl_for_superuser(self):
+        conversation = self._conv()
+        MessageThread.objects.create(
+            conversation=conversation,
+            created_by=self.operator,
+            title="Закрытая для root тема",
+        )
+        root = Employee.objects.create_superuser(
+            username="message-uninvited-root",
+            password=PASSWORD,
+            org=81000,
+        )
+        request = RequestFactory().get("/admin/system/conversation/")
+        request.user = root
+
+        queryset = admin.site._registry[Conversation].get_queryset(request)
+
+        self.assertFalse(queryset.exists())
 
     def test_create_conversation(self):
         self.client.force_login(self.operator)

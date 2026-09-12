@@ -20,6 +20,20 @@ class OrganizationScopedAdminMixin:
         return queryset.filter(**{self.organization_lookup: user.org})
 
 
+class ParticipantScopedAdminMixin:
+    """Ограничивает admin queryset диалогами текущего участника."""
+
+    participant_lookup = "participants"
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .filter(**{self.participant_lookup: request.user})
+            .distinct()
+        )
+
+
 class AuditedAdminMixin:
     """Связывает CRUD справочника с предметным событием в admin-транзакции."""
 

@@ -8,6 +8,7 @@ import errno
 import os
 import stat
 import threading
+import unittest
 import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -278,6 +279,9 @@ class FlcTests(TestCase):
 
 
 class ArtifactWriteTests(TestCase):
+    @unittest.skipIf(
+        os.name == "nt", "POSIX file-mode and link semantics are unavailable on Windows."
+    )
     def test_parallel_writers_never_share_or_overwrite_a_path(self):
         import tempfile
 
@@ -321,6 +325,9 @@ class ArtifactWriteTests(TestCase):
 
             self.assertFalse(target.exists())
 
+    @unittest.skipIf(
+        os.name == "nt", "POSIX umask semantics are unavailable on Windows."
+    )
     def test_writer_enforces_private_mode_independently_of_umask(self):
         import tempfile
 
@@ -1188,6 +1195,9 @@ class ImportCommandTests(ExchangeTestMixin, TestCase):
             ).exists()
         )
 
+    @unittest.skipIf(
+        os.name == "nt", "Symbolic links require POSIX or elevated privileges."
+    )
     def test_auto_import_rejects_symbolic_link_without_reading_target(self):
         from django.core.management import call_command
 
@@ -1220,6 +1230,9 @@ class ImportCommandTests(ExchangeTestMixin, TestCase):
         self.assertEqual(archived.stat().st_size, 0)
         self.assertFalse(Employee.objects.filter(first_name="Пётр").exists())
 
+    @unittest.skipIf(
+        os.name == "nt", "Hard links and POSIX file modes are unavailable on Windows."
+    )
     def test_auto_import_rejects_hard_link_without_reading_shared_inode(self):
         from django.core.management import call_command
 
@@ -1375,6 +1388,9 @@ class ImportCommandTests(ExchangeTestMixin, TestCase):
         copy_file.assert_not_called()
         self.assertTrue(source.exists())
 
+    @unittest.skipIf(
+        os.name == "nt", "POSIX file-mode assertions are unavailable on Windows."
+    )
     def test_parallel_archives_never_overwrite_the_same_destination(self):
         source_dirs = [Path(self.in_dir) / "first", Path(self.in_dir) / "second"]
         sources = []

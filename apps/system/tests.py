@@ -514,7 +514,7 @@ class EventLogScreenTests(BaseSystemTestCase):
         )
         self.assertContains(resp, 'class="js-event-row responsive-row"')
         self.assertContains(resp, 'data-label="Длительность, мс"')
-        visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text()
+        visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text(encoding="utf-8")
         self.assertIn("responsiveTableMismatch", visual_qa)
         resp = self.client.get(
             reverse("system:events"), {"module": "auth", "result": "failed"}
@@ -2057,10 +2057,10 @@ class TaskTests(BaseSystemTestCase):
         self.assertContains(response, 'class="task-row"')
         self.assertContains(response, 'data-label="Действия"')
 
-        css = (settings.BASE_DIR / "static/css/portal.css").read_text()
+        css = (settings.BASE_DIR / "static/css/portal.css").read_text(encoding="utf-8")
         self.assertIn("@media (max-width: 1100px)", css)
         self.assertIn(".data--tasks tbody tr.task-row", css)
-        visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text()
+        visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text(encoding="utf-8")
         self.assertIn("taskLayoutMismatch", visual_qa)
 
     def test_running_task_cannot_be_started_twice(self):

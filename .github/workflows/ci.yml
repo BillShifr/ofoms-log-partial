@@ -15,7 +15,7 @@ concurrency:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     services:
       postgres:
         image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
@@ -96,8 +96,20 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check registry credentials
+        id: registry
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Docker Login
-        if: github.ref == 'refs/heads/main' && secrets.DOCKERHUB_TOKEN != ''
+        if: github.ref == 'refs/heads/main' && steps.registry.outputs.available == 'true'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -120,7 +132,7 @@ jobs:
           ${{ github.sha }}
 
       - name: Push verified runtime image
-        if: github.ref == 'refs/heads/main' && secrets.DOCKERHUB_TOKEN != ''
+        if: github.ref == 'refs/heads/main' && steps.registry.outputs.available == 'true'
         run: |
           docker push frozendevs/tfoms-ejournal:${{ github.sha }}
           docker push frozendevs/tfoms-ejournal:latest

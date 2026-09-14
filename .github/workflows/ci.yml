@@ -97,7 +97,7 @@ jobs:
           persist-credentials: false
 
       - name: Docker Login
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && secrets.DOCKERHUB_TOKEN != ''
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -120,7 +120,7 @@ jobs:
           ${{ github.sha }}
 
       - name: Push verified runtime image
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && secrets.DOCKERHUB_TOKEN != ''
         run: |
           docker push frozendevs/tfoms-ejournal:${{ github.sha }}
           docker push frozendevs/tfoms-ejournal:latest

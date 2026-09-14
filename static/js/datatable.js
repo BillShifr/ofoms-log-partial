@@ -87,8 +87,36 @@
   }
 
   function initCellTruncate() {
+    function hasOverflow(element) {
+      return element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight;
+    }
+
+    function syncOverflowTip(td) {
+      if (!td.dataset.overflowTip) {
+        td.dataset.overflowTip = (td.getAttribute('title') || td.textContent || '').trim();
+      }
+      var tip = td.dataset.overflowTip;
+      var overflowing = tip && hasOverflow(td);
+      if (overflowing) {
+        td.setAttribute('title', tip);
+        if (!isInteractive(td) && !td.hasAttribute('tabindex')) {
+          td.tabIndex = 0;
+          td.dataset.overflowManagedFocus = 'true';
+        }
+      } else {
+        td.removeAttribute('title');
+        if (td.dataset.overflowManagedFocus === 'true') td.removeAttribute('tabindex');
+      }
+    }
+
     document.querySelectorAll('table.data td.cell-long').forEach(function (td) {
-      if (!td.hasAttribute('title')) td.title = td.textContent.trim();
+      syncOverflowTip(td);
+      if (window.ResizeObserver) {
+        var observer = new ResizeObserver(function () { syncOverflowTip(td); });
+        observer.observe(td);
+      } else {
+        window.addEventListener('resize', function () { syncOverflowTip(td); });
+      }
     });
   }
 

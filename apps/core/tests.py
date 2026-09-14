@@ -688,8 +688,8 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("no-store", response.headers["Cache-Control"])
 
     def test_compose_binds_web_to_loopback_by_default(self):
-        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
-        example = (settings.BASE_DIR / ".env.example").read_text()
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
+        example = (settings.BASE_DIR / ".env.example").read_text(encoding="utf-8")
 
         self.assertIn("${WEB_BIND_ADDRESS:-127.0.0.1}:8000:8000", compose)
         self.assertIn("TRUST_PROXY_SSL_HEADER: ${TRUST_PROXY_SSL_HEADER:-True}", compose)
@@ -716,9 +716,9 @@ class ProductionSettingsTests(TestCase):
         )
 
     def test_build_executables_are_pinned_to_immutable_revisions(self):
-        dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()
-        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
-        workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()
+        dockerfile = (settings.BASE_DIR / "Dockerfile").read_text(encoding="utf-8")
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
+        workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
         self.assertIn("FROM python:3.13-slim@sha256:", dockerfile)
         self.assertIn("FROM ghcr.io/astral-sh/uv@sha256:", dockerfile)
@@ -739,7 +739,7 @@ class ProductionSettingsTests(TestCase):
         )
 
     def test_docker_context_excludes_local_tools_secrets_and_runtime_data(self):
-        dockerignore = (settings.BASE_DIR / ".dockerignore").read_text().splitlines()
+        dockerignore = (settings.BASE_DIR / ".dockerignore").read_text(encoding="utf-8").splitlines()
 
         for path in (".pytest_cache", ".ruff_cache", ".mypy_cache", ".tox", ".nox"):
             self.assertIn(path, dockerignore)
@@ -758,14 +758,14 @@ class ProductionSettingsTests(TestCase):
             self.assertIn(path, dockerignore)
 
     def test_ci_verifies_runtime_image_before_push(self):
-        workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()
-        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+        workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
         runtime_gate = (
             settings.BASE_DIR / "scripts" / "container_runtime_gate.sh"
-        ).read_text()
+        ).read_text(encoding="utf-8")
         release_gate = (
             settings.BASE_DIR / "scripts" / "verify_release_image.sh"
-        ).read_text()
+        ).read_text(encoding="utf-8")
 
         build_index = workflow.index("- name: Build runtime image")
         verify_index = workflow.index("- name: Verify runtime image")
@@ -793,7 +793,7 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("find /app/exchange -type f", runtime_gate)
         self.assertIn("org.opencontainers.image.revision", runtime_gate)
 
-        dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()
+        dockerfile = (settings.BASE_DIR / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn("ARG VCS_REF\n", dockerfile)
         self.assertIn('test "${#VCS_REF}" -eq 40', dockerfile)
         self.assertIn("org.opencontainers.image.revision=\"${VCS_REF}\"", dockerfile)
@@ -811,7 +811,7 @@ class ProductionSettingsTests(TestCase):
         self.assertIn('image_name="frozendevs/tfoms-ejournal:$expected_revision"', release_gate)
 
     def test_ci_uses_least_privilege_and_bounded_jobs(self):
-        workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text()
+        workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
         self.assertIn("permissions:\n  contents: read", workflow)
         self.assertEqual(workflow.count("timeout-minutes: 30"), 2)
@@ -819,8 +819,8 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("cancel-in-progress: true", workflow)
 
     def test_release_backup_and_restore_are_consistent_and_fail_closed(self):
-        backup = (settings.BASE_DIR / "scripts" / "backup_release.sh").read_text()
-        restore = (settings.BASE_DIR / "scripts" / "restore_release.sh").read_text()
+        backup = (settings.BASE_DIR / "scripts" / "backup_release.sh").read_text(encoding="utf-8")
+        restore = (settings.BASE_DIR / "scripts" / "restore_release.sh").read_text(encoding="utf-8")
 
         self.assertIn("docker compose stop web scheduler", backup)
         self.assertIn("web_container=$(docker compose ps -q -a web)", backup)
@@ -879,8 +879,8 @@ class ProductionSettingsTests(TestCase):
         self.assertNotIn("trap", restore)
 
     def test_application_image_uses_unprivileged_runtime_user(self):
-        dockerfile = (settings.BASE_DIR / "Dockerfile").read_text()
-        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+        dockerfile = (settings.BASE_DIR / "Dockerfile").read_text(encoding="utf-8")
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
 
         self.assertIn("useradd --uid 10001", dockerfile)
         self.assertIn("chown -R app:app /app/media /app/exchange", dockerfile)
@@ -898,7 +898,7 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("cap_add:\n      - CHOWN", volume_init)
 
     def test_compose_services_restart_and_receive_termination_signals(self):
-        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
 
         self.assertEqual(compose.count("restart: unless-stopped"), 3)
         self.assertEqual(compose.count("stop_grace_period: 75s"), 2)
@@ -913,7 +913,7 @@ class ProductionSettingsTests(TestCase):
         self.assertNotIn("while true", compose)
 
     def test_compose_runs_schema_migrations_once_before_web(self):
-        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
 
         self.assertIn("  migrate:\n    <<: *app-security", compose)
         self.assertIn(
@@ -930,7 +930,7 @@ class ProductionSettingsTests(TestCase):
         self.assertNotIn("manage.py migrate", web_block)
 
     def test_compose_rotates_all_service_logs(self):
-        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
 
         self.assertIn("x-logging: &default-logging", compose)
         self.assertIn('max-size: "10m"', compose)
@@ -941,7 +941,7 @@ class ProductionSettingsTests(TestCase):
     def test_compose_hardens_long_running_application_services(self):
         from apps.system.validators import VIDEO_MAX_SIZE_MB
 
-        compose = (settings.BASE_DIR / "docker-compose.yml").read_text()
+        compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
 
         self.assertIn("x-app-security: &app-security", compose)
         self.assertEqual(compose.count("<<: *app-security"), 3)
@@ -954,8 +954,8 @@ class ProductionSettingsTests(TestCase):
         self.assertGreater(int(tmpfs_size.group(1)), VIDEO_MAX_SIZE_MB)
 
     def test_uv_sync_treats_application_as_virtual_project(self):
-        project = (settings.BASE_DIR / "pyproject.toml").read_text()
-        lockfile = (settings.BASE_DIR / "uv.lock").read_text()
+        project = (settings.BASE_DIR / "pyproject.toml").read_text(encoding="utf-8")
+        lockfile = (settings.BASE_DIR / "uv.lock").read_text(encoding="utf-8")
 
         self.assertIn("[tool.uv]", project)
         self.assertIn("package = false", project)

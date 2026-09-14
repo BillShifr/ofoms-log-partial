@@ -613,7 +613,7 @@ class JournalScreenTests(TestCase):
             ).exists()
         )
 
-        css = (settings.BASE_DIR / "static/css/portal.css").read_text()
+        css = (settings.BASE_DIR / "static/css/portal.css").read_text(encoding="utf-8")
         self.assertIn(".data--journal .col-status", css)
         self.assertIn("position: sticky", css)
         self.assertIn("right: 0", css)
@@ -629,7 +629,7 @@ class JournalScreenTests(TestCase):
         )
         self.assertIn("min-width: 1130px !important", css)
         self.assertIn("table-layout: fixed", css)
-        visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text()
+        visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text(encoding="utf-8")
         self.assertIn(
             "(item.width >= 1366 && item.journalLayout.internalOverflow)", visual_qa
         )
@@ -820,7 +820,7 @@ class JournalScreenTests(TestCase):
         self.assertNotContains(second_page, first.n_irp)
         self.assertContains(second_page, 'data-next-url=""')
 
-        script = (settings.BASE_DIR / "static/js/infinite-scroll.js").read_text()
+        script = (settings.BASE_DIR / "static/js/infinite-scroll.js").read_text(encoding="utf-8")
         self.assertIn("IntersectionObserver", script)
         self.assertIn("credentials: 'same-origin'", script)
         self.assertIn("response.ok", script)
@@ -1164,7 +1164,7 @@ class JournalScreenTests(TestCase):
         self.assertContains(response, "js/conditional-fields.js")
 
     def test_conditional_fields_css_can_override_field_layout(self):
-        css = (settings.BASE_DIR / "static/css/portal.css").read_text()
+        css = (settings.BASE_DIR / "static/css/portal.css").read_text(encoding="utf-8")
         self.assertIn(".field[hidden] { display: none; }", css)
 
     def test_empty_insured_person_section_is_collapsed(self):

@@ -26,8 +26,11 @@
         <div class="field"><label for="id_irp_type">Вид обращения</label>{{ form.irp_type }}{{ form.irp_type.errors }}</div>
         <div class="field"><label for="id_how">Способ</label>{{ form.how }}{{ form.how.errors }}</div>
         <div class="field"><label for="id_status">Статус</label>{{ form.status }}{{ form.status.errors }}</div>
-        <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}{{ form.date_from.errors }}</div>
-        <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}{{ form.date_to.errors }}</div>
+        <fieldset class="field-group field-group--period">
+          <legend>Период</legend>
+          <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}{{ form.date_from.errors }}</div>
+          <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}{{ form.date_to.errors }}</div>
+        </fieldset>
         {% for error in form.non_field_errors %}<div class="field field--wide"><div class="alert alert--error" role="alert">{{ error }}</div></div>{% endfor %}
       </div>
     </details>
@@ -37,7 +40,6 @@
         <a class="btn btn--ghost" href="{% url 'journal:list' %}">Сбросить</a>
       </div>
       <div class="journal-actions__secondary">
-        <a class="btn btn--ghost btn--sm" href="{% url 'system:prefs' %}">Колонки</a>
         <a class="btn btn--ghost btn--sm" href="{{ print_url }}" target="_blank">Печать</a>
         <a class="btn btn--accent" href="{% url 'journal:create' %}"><span aria-hidden="true">＋</span> Новое обращение</a>
       </div>
@@ -46,6 +48,15 @@
 </div>
 
 <div class="card table-card">
+  <div class="table-toolbar" aria-label="Действия с таблицей обращений">
+    <div>
+      <p class="table-toolbar__title">Реестр обращений</p>
+      <p class="table-toolbar__meta">Настройки применяются только к этой таблице.</p>
+    </div>
+    <a class="btn btn--ghost btn--icon" href="{% url 'system:prefs' %}" aria-label="Настроить колонки таблицы обращений" title="Настроить колонки">
+      <span aria-hidden="true">⚙</span>
+    </a>
+  </div>
   {% data_table variant="wide journal" wrap_variant="journal" fixed_first=fixed_first label="Таблица обращений; на узком экране показана карточками" %}
       <colgroup>
         {% for col in cols %}<col class="col-{{ col.key }}">{% endfor %}

@@ -256,6 +256,13 @@ a:hover { text-decoration: underline; }
 .btn--accent:hover { background: var(--accent-hover); color: var(--ink); }
 .btn--danger { background: var(--danger); color: #fff; }
 .btn--sm { padding: 7px 14px; font-size: .88rem; border-radius: 10px; }
+.btn--icon {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 1rem;
+}
 
 /* ---------- Бейджи ---------- */
 .badge {
@@ -321,6 +328,26 @@ a:hover { text-decoration: underline; }
 
 /* ---------- Таблицы ---------- */
 .table-card { padding: 0 0 16px; overflow: hidden; }
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 54%, var(--card));
+}
+.table-toolbar__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: .92rem;
+  font-weight: 750;
+}
+.table-toolbar__meta {
+  margin: 2px 0 0;
+  color: color-mix(in srgb, var(--ink) 58%, transparent);
+  font-size: .78rem;
+}
 .table-wrap {
   overflow-x: auto;
   overscroll-behavior-inline: contain;
@@ -549,6 +576,30 @@ table.data tr.row--open { background: color-mix(in srgb, var(--chip-yellow) 58%,
 .filters .field { flex: 1 1 180px; }
 .filters .field--narrow { flex: 0 1 auto; }
 .filters .field--date { flex: 0 1 168px; }
+.field-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: min(100%, 350px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.field-group legend {
+  width: 100%;
+  margin: 0 0 6px;
+  color: color-mix(in srgb, var(--ink) 68%, transparent);
+  font-size: .82rem;
+  font-weight: 650;
+}
+.field-group--period {
+  flex: 1 1 350px;
+  flex-wrap: wrap;
+}
+.field-group--period .field--date {
+  flex: 1 1 150px;
+  min-width: 0;
+}
 .collapsible .filters, .collapsible .form-grid { padding-top: 12px; }
 .form-section { font-size: 1rem; font-weight: 600; margin: 18px 0 8px; padding-top: 14px; border-top: 1px solid var(--line); }
 .form-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }

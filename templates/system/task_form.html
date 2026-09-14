@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% load system_filters %}
+{% load system_filters ui_components %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<div class="flex-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-  <a class="btn btn--ghost mb-2" href="{% url 'system:tasks' %}">← Все задачи</a>
-  <h1 style="flex:1">{{ title }}</h1>
+<header class="module-heading module-heading--actions">
+  <a class="module-heading__back" href="{% url 'system:tasks' %}">← Все задания</a>
+  <div><p class="page-heading__eyebrow">Автоматизированное задание</p><h1>{{ title }}</h1></div>
   {% if task %}
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <form method="post" action="{% url 'system:task_run' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--primary" type="submit">Запустить</button></form>
-    <form method="post" action="{% url 'system:task_toggle' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--ghost btn--sm" type="submit">{% if task.enabled %}Stop{% else %}Включить{% endif %}</button></form>
+  <div class="page-heading__actions">
+    <form method="post" action="{% url 'system:task_run' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--primary" type="submit"{% if not task.enabled %} disabled title="Сначала включите задание"{% endif %}>Запустить</button></form>
+    <form method="post" action="{% url 'system:task_toggle' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--ghost" type="submit">{% if task.enabled %}Отключить{% else %}Включить{% endif %}</button></form>
   </div>
   {% endif %}
-</div>
+</header>
 
 <div class="card">
   <form method="post" data-validate>
@@ -27,17 +27,20 @@
       </div>
     </details>
 
-    <details class="collapsible" data-key="task-form-sched">
+    <details class="collapsible" data-key="task-form-sched"{% if form.errors %} open{% endif %}>
       <summary class="collapsible__toggle">Исполнение и приоритет</summary>
       <div class="form-grid">
-        <div class="field"><label for="{{ form.status.id_for_label }}">Статус</label>{{ form.status }}</div>
+        <div class="field"><label for="{{ form.status.id_for_label }}">Статус</label>{{ form.status }}
+          <span class="text-muted">{{ form.status.help_text }}</span></div>
         <div class="field" id="assignee-wrap">
           <label for="assignee_search">Исполнитель</label>
           <input id="assignee_search" type="text" data-assignee-search
+                 data-suggest-url="{% url 'system:task_assignee_suggest' %}"
                  value="{% if form.instance.assigned_to %}{{ form.instance.assigned_to.full_name }}{% endif %}"
                  placeholder="Введите ФИО (от 3 символов)" autocomplete="off">
           <div id="assignee-select">{{ form.assigned_to }}</div>
           <span class="text-muted">Начните вводить фамилию — система предложит сотрудников</span>
+          {% for error in form.assigned_to.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
         </div>
         <div class="field"><label for="{{ form.priority.id_for_label }}">Приоритет</label>{{ form.priority }}
           {% if form.priority.help_text %}<span class="text-muted">{{ form.priority.help_text }}</span>{% endif %}</div>
@@ -50,7 +53,7 @@
       </div>
     </details>
 
-    <div class="form-actions">
+    <div class="form-actions form-actions--sticky">
       <button class="btn btn--primary" type="submit">Сохранить</button>
       <a class="btn btn--ghost" href="{% url 'system:tasks' %}">Отмена</a>
     </div>
@@ -68,24 +71,22 @@
 
   <div class="tab-panel is-active" data-panel="runs">
     {% if runs %}
-    <div class="table-wrap">
-      <table class="data">
+    {% data_table responsive=True label="История запусков; на узком экране показана карточками" %}
         <thead>
           <tr><th>Начало</th><th>Завершение</th><th>Инициатор</th><th>Результат</th><th>Лог</th></tr>
         </thead>
         <tbody>
           {% for r in runs %}
-          <tr>
-            <td>{{ r.started_at|date:"d.m.Y H:i:s" }}</td>
-            <td>{{ r.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
-            <td>{% if r.triggered_by == "auto" %}Автоматически{% else %}Пользователь{% endif %}</td>
-            <td>{% if r.result == 'ok' %}<span class="badge badge--closed">успешно</span>{% elif r.result == 'failed' %}<span class="badge badge--overdue">ошибка</span>{% else %}<span class="badge badge--open">{{ r.result }}</span>{% endif %}</td>
-            <td class="mono cell-long" title="{{ r.log }}">{{ r.log|truncatechars:160 }}</td>
+          <tr class="responsive-row">
+            <td data-label="Начало">{{ r.started_at|date:"d.m.Y H:i:s" }}</td>
+            <td data-label="Завершение">{{ r.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
+            <td data-label="Инициатор">{% if r.triggered_by == "auto" %}Автоматически{% elif r.triggered_by == "legacy" %}Исторический запуск{% else %}Пользователь{% endif %}</td>
+            <td data-label="Результат">{% if r.result == 'ok' %}<span class="badge badge--closed">успешно</span>{% elif r.result == 'failed' %}<span class="badge badge--overdue">ошибка</span>{% else %}<span class="badge badge--open">{{ r.result }}</span>{% endif %}</td>
+            <td class="mono cell-long responsive-cell--wide" data-label="Лог" title="{{ r.log }}">{{ r.log|truncatechars:160 }}</td>
           </tr>
           {% endfor %}
         </tbody>
-      </table>
-    </div>
+    {% end_data_table %}
     {% else %}
     <p class="text-muted">Запусков ещё не было.</p>
     {% endif %}
@@ -94,7 +95,7 @@
   <div class="tab-panel" data-panel="notes">
     {% for n in notes %}
     <div class="message">
-      <div class="flex" style="justify-content:space-between;gap:8px">
+      <div class="flex flex--between gap-8">
         <span>
           <strong>{{ n.author.full_name }}</strong>
           <span class="text-muted"> · {{ n.created_at|date:"d.m.Y H:i" }}</span>
@@ -102,7 +103,7 @@
         <form method="post" class="inline-form">{% csrf_token %}
           <input type="hidden" name="action" value="note_delete">
           <input type="hidden" name="note_id" value="{{ n.pk }}">
-          <button class="btn btn--sm btn--ghost" type="submit">Удалить</button>
+          <button class="btn btn--sm btn--ghost" type="submit" data-confirm="Удалить эту заметку?">Удалить</button>
         </form>
       </div>
       <p>{{ n.text }}</p>
@@ -113,7 +114,7 @@
           <input type="hidden" name="action" value="note_edit">
           <input type="hidden" name="note_id" value="{{ n.pk }}">
           <div class="field"><textarea name="text" rows="2" data-validate>{{ n.text }}</textarea></div>
-          <div class="form-actions" style="justify-content:flex-start">
+          <div class="form-actions form-actions--start">
             <button class="btn btn--sm btn--primary" type="submit">Сохранить</button>
           </div>
         </form>
@@ -122,10 +123,10 @@
     {% empty %}
     <p class="text-muted">Заметок нет.</p>
     {% endfor %}
-    <form method="post" class="answer-form" data-validate style="border-top:none;margin-top:12px">
+    <form method="post" class="answer-form answer-form--embedded" data-validate>
       {% csrf_token %}
       <input type="hidden" name="action" value="note">
-      <div class="field" style="flex:1">{{ note_form.text }}</div>
+      <div class="field field--grow">{{ note_form.text }}</div>
       <button class="btn btn--primary" type="submit">Добавить</button>
     </form>
   </div>
@@ -133,16 +134,16 @@
   <div class="tab-panel" data-panel="files">
     {% for f in files %}
     <div class="message">
-      <span class="text-nowrap">Файл: <a href="{{ f.file.url }}" target="_blank">{{ f.file.name|cut:"tasks/" }}</a></span>
+      <span class="text-nowrap">Файл: <a href="{% url 'system:task_file_download' f.pk %}">{{ f.file.name|cut:"tasks/" }}</a></span>
       <span class="text-muted"> · {{ f.uploaded_by.full_name|default:f.uploaded_by.username }} · {{ f.created_at|date:"d.m.Y H:i" }}</span>
     </div>
     {% empty %}
     <p class="text-muted">Файлов нет.</p>
     {% endfor %}
-    <form method="post" enctype="multipart/form-data" class="answer-form" style="border-top:none;margin-top:12px">
+    <form method="post" enctype="multipart/form-data" class="answer-form answer-form--embedded">
       {% csrf_token %}
       <input type="hidden" name="action" value="file">
-      <div class="field" style="flex:1">{{ file_form.file }}</div>
+      <div class="field field--grow">{{ file_form.file }}</div>
       <button class="btn btn--primary" type="submit">Прикрепить</button>
     </form>
   </div>
@@ -156,84 +157,13 @@
     {% empty %}
     <p class="text-muted">Отчётов нет.</p>
     {% endfor %}
-    <form method="post" class="answer-form" data-validate style="border-top:none;margin-top:12px">
+    <form method="post" class="answer-form answer-form--embedded" data-validate>
       {% csrf_token %}
       <input type="hidden" name="action" value="report">
-      <div class="field" style="flex:1"><label for="{{ report_form.title.id_for_label }}">Заголовок</label>{{ report_form.title }}{{ report_form.content }}</div>
+      <div class="field field--grow"><label for="{{ report_form.title.id_for_label }}">Заголовок</label>{{ report_form.title }}{{ report_form.content }}</div>
       <button class="btn btn--primary" type="submit">Сохранить отчёт</button>
     </form>
   </div>
 </div>
 {% endif %}
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  document.querySelectorAll('.tab').forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      var target = tab.getAttribute('data-tab');
-      document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('is-active', t === tab); });
-      document.querySelectorAll('.tab-panel').forEach(function (p) {
-        p.classList.toggle('is-active', p.getAttribute('data-panel') === target);
-      });
-    });
-  });
-
-  var search = document.querySelector('[data-assignee-search]');
-  var selectBox = document.querySelector('#assignee-select');
-  if (search && selectBox) {
-    var select = selectBox.querySelector('select');
-    var panel = null;
-    selectBox.style.display = 'none';
-
-    function removePanel() {
-      if (panel) { panel.remove(); panel = null; }
-    }
-
-    function pick(item) {
-      select.value = item.getAttribute('data-id');
-      search.value = item.textContent;
-      removePanel();
-    }
-
-    search.addEventListener('input', function () {
-      var q = search.value.trim();
-      if (q.length < 3) { removePanel(); return; }
-      var url = "/system/tasks/assignees/suggest/?q=" + encodeURIComponent(q);
-      fetch(url)
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          removePanel();
-          var items = (data.suggestions || []).filter(function (s) { return s && s.id; });
-          if (!items.length) return;
-          panel = document.createElement('div');
-          panel.className = 'autocomplete';
-          var rect = search.getBoundingClientRect();
-          panel.style.left = rect.left + 'px';
-          panel.style.top = (rect.bottom + 4) + 'px';
-          panel.style.width = rect.width + 'px';
-          items.forEach(function (s) {
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'autocomplete__item';
-            b.setAttribute('data-id', s.id);
-            b.textContent = s.label;
-            b.addEventListener('click', function () { pick(b); });
-            panel.appendChild(b);
-          });
-          document.body.appendChild(panel);
-        })
-        .catch(function () { removePanel(); });
-    });
-
-    document.addEventListener('click', function (e) {
-      if (panel && !panel.contains(e.target) && !(e.target.closest('#assignee-wrap'))) removePanel();
-    });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') removePanel();
-    });
-  }
-})();
-</script>
 {% endblock %}

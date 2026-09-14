@@ -10,6 +10,7 @@ import uuid
 
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models
+from django.db.models import Case, ExpressionWrapper, F, Value, When
 from django.utils import timezone
 
 # Организации участников ОМС (коды ЕМИАС/реестров — совместимость с v1)
@@ -30,7 +31,7 @@ class Employee(AbstractUser):
         max_length=120, blank=True, null=True, verbose_name="Должность"
     )
     org = models.IntegerField(
-        choices=ORGS, verbose_name="Организация",
+        choices=ORGS, db_index=True, verbose_name="Организация",
     )
     guid = models.UUIDField(
         unique=True, editable=False, verbose_name="Идентификатор (GUID)",
@@ -47,6 +48,12 @@ class Employee(AbstractUser):
         verbose_name = "Сотрудник"
         verbose_name_plural = "Сотрудники"
         ordering = ["last_name", "first_name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(org__in=tuple(code for code, _ in ORGS)),
+                name="employee_org_valid",
+            )
+        ]
 
     def full_name(self) -> str:
         return " ".join(part for part in (self.last_name, self.first_name) if part).strip()
@@ -60,12 +67,26 @@ class Employee(AbstractUser):
         """Увеличивает счётчик неудачных попыток; блокирует при превышении лимита."""
         from django.conf import settings
 
-        self.failed_attempts = (self.failed_attempts or 0) + 1
         limit = settings.SECURITY_MAX_FAILED_LOGIN_ATTEMPTS
-        if self.failed_attempts >= limit:
-            # Пользователь не разблокируется автоматически — только администратором
-            self.lock_until = timezone.now().replace(year=9999)
-        self.save(update_fields=["failed_attempts", "lock_until"])
+        permanent_lock = timezone.now().replace(year=9999)
+        type(self).objects.filter(pk=self.pk).update(
+            failed_attempts=Case(
+                When(
+                    failed_attempts__lt=limit,
+                    then=ExpressionWrapper(
+                        F("failed_attempts") + 1,
+                        output_field=models.PositiveSmallIntegerField(),
+                    ),
+                ),
+                default=F("failed_attempts"),
+                output_field=models.PositiveSmallIntegerField(),
+            ),
+            lock_until=Case(
+                When(failed_attempts__gte=limit - 1, then=Value(permanent_lock)),
+                default=F("lock_until"),
+            ),
+        )
+        self.refresh_from_db(fields=["failed_attempts", "lock_until"])
 
     def reset_failed_logins(self) -> None:
         self.failed_attempts = 0

@@ -1,26 +1,32 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Обращение № {{ irp.n_irp }}{% endblock %}
 {% block content %}
-<div class="flex mb-2">
-  <h1>Обращение № {{ irp.n_irp }}</h1>
-  <div class="flex">
-    {% if irp.is_closed %}<span class="badge badge--closed">Закрыто</span>
+<header class="record-heading">
+  <div class="record-heading__copy">
+    <p class="page-heading__eyebrow">Карточка обращения</p>
+    <h1>№ {{ irp.n_irp }}</h1>
+    <div class="record-heading__status" aria-label="Статус обращения">
+    {% if irp.is_closed %}<span class="badge badge--closed">{{ irp.get_status_display }}</span>
     {% elif irp.is_overdue %}<span class="badge badge--overdue">Просрочено</span>
-    {% else %}<span class="badge badge--open">Открыто</span>{% endif %}
+    {% else %}<span class="badge badge--open">{{ irp.get_status_display }}</span>{% endif %}
     {% if irp.result %}<span class="badge badge--result">{{ irp.get_result_display }}</span>{% endif %}
+    </div>
   </div>
-</div>
+  <div class="record-actions">
+    <a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a>
+    <a class="btn btn--ghost" href="{% url 'journal:print' irp.pk %}" target="_blank" rel="noopener">Печать</a>
+    {% if not irp.is_closed %}
+      <a class="btn btn--ghost" href="{% url 'journal:redirect' irp.pk %}">Переадресовать</a>
+      <a class="btn btn--primary" href="{% url 'journal:edit' irp.pk %}">Редактировать</a>
+    {% endif %}
+  </div>
+</header>
 
-<div class="flex mb-2">
-  <a class="btn btn--accent" href="{% url 'journal:edit' irp.pk %}">Редактировать</a>
-  <a class="btn btn--accent" href="{% url 'journal:redirect' irp.pk %}">Переадресация</a>
-  <a class="btn btn--ghost" href="{% url 'journal:print' irp.pk %}" target="_blank">Печать</a>
-  <a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a>
-</div>
-
-<div class="card">
-  <h2 class="text-muted mt-1">Основные сведения</h2>
-  <dl class="dl">
+<div class="record-layout">
+<section class="card record-section record-section--main">
+  <div class="section-heading"><div><p class="section-heading__index">01</p><h2>Основные сведения</h2></div><span>Регистрация и содержание</span></div>
+  <dl class="detail-list">
     <dt>Вид обращения</dt><dd>{{ irp.get_irp_type_display }}</dd>
     <dt>Дата / время поступления</dt><dd>{{ irp.date_create|date:"d.m.Y" }}
       {% if irp.time_create %}{{ irp.time_create|time:"H:i" }}{% endif %}</dd>
@@ -34,11 +40,11 @@
     <dt>Фактическое закрытие</dt><dd>{{ irp.date_close|date:"d.m.Y"|default:"—" }}</dd>
     <dt>Исход</dt><dd>{{ irp.get_result_display|default:"—" }}</dd>
   </dl>
-</div>
+</section>
 
-<div class="card">
-  <h2 class="text-muted mt-1">Обратившийся</h2>
-  <dl class="dl">
+<section class="card record-section">
+  <div class="section-heading"><div><p class="section-heading__index">02</p><h2>Обратившийся</h2></div><span>Контактные и страховые данные</span></div>
+  <dl class="detail-list">
     <dt>ФИО</dt><dd>{{ irp.z_f }} {{ irp.z_i|default:"" }} {{ irp.z_o|default:"" }}</dd>
     <dt>Дата рождения</dt><dd>{{ irp.z_dr|date:"d.m.Y"|default:"—" }}</dd>
     <dt>ЕНП</dt><dd>{{ irp.z_enp|default:"—" }}</dd>
@@ -49,11 +55,11 @@
     <dt>Телефон</dt><dd>{{ irp.phone|default:"—" }}</dd>
     <dt>E-mail</dt><dd>{{ irp.e_mail|default:"—" }}</dd>
   </dl>
-</div>
+</section>
 
-<div class="card">
-  <h2 class="text-muted mt-1">Застрахованный</h2>
-  <dl class="dl">
+<section class="card record-section">
+  <div class="section-heading"><div><p class="section-heading__index">03</p><h2>Застрахованный</h2></div><span>Данные участника обращения</span></div>
+  <dl class="detail-list">
     <dt>ФИО</dt><dd>{{ irp.in_f|default:"—" }} {{ irp.in_i|default:"" }} {{ irp.in_o|default:"" }}</dd>
     <dt>Дата рождения</dt><dd>{{ irp.in_dr|date:"d.m.Y"|default:"—" }}</dd>
     <dt>ЕНП</dt><dd>{{ irp.in_enp|default:"—" }}</dd>
@@ -61,11 +67,11 @@
     <dt>Документ</dt><dd>{{ irp.get_in_doctype_display|default:"—" }}
       {{ irp.in_docser|default:"" }} {{ irp.in_docnum|default:"" }}</dd>
   </dl>
-</div>
+</section>
 
-<div class="card">
-  <h2 class="text-muted mt-1">Исполнение</h2>
-  <dl class="dl">
+<section class="card record-section">
+  <div class="section-heading"><div><p class="section-heading__index">04</p><h2>Исполнение</h2></div><span>Ответственные и маршрут</span></div>
+  <dl class="detail-list">
     <dt>Ответственная организация</dt><dd>{{ irp.get_otv_t_display }} / {{ irp.get_otv_kon_display }}</dd>
     <dt>Принял (линия)</dt><dd>{{ irp.employee_one.full_name }}
       {% if irp.line_one %}({{ irp.get_line_one_display }}){% endif %}</dd>
@@ -74,10 +80,11 @@
     <dt>Переадресация</dt><dd>{{ irp.get_pr_out_display|default:"—" }}
       {% if irp.date_cross %}<br>{{ irp.date_cross|date:"d.m.Y" }} {{ irp.time_cross|time:"H:i"|default:"" }}{% endif %}</dd>
   </dl>
+</section>
 </div>
 
-<div class="card">
-  <h2 class="text-muted mt-1">Ответы</h2>
+<section class="card record-section record-section--full">
+  <div class="section-heading"><div><p class="section-heading__index">05</p><h2>Ответы</h2></div><span>{{ answers|length }} в карточке</span></div>
   {% for answer in answers %}
   <div class="answer">
     <div class="flex">
@@ -90,15 +97,16 @@
     {% if answer.files.all %}
     <ul class="file-list">
       {% for f in answer.files.all %}
-      <li><a href="{{ f.file.url }}">{{ f.file.name }}</a></li>
+      <li><a href="{% url 'journal:file_download' f.pk %}">{{ f.file.name }}</a></li>
       {% endfor %}
     </ul>
     {% endif %}
   </div>
   {% empty %}
-  <p class="text-muted">Ответов пока нет.</p>
+  <div class="empty-state">Ответов пока нет</div>
   {% endfor %}
 
+  {% if not irp.is_closed %}
   <form method="post" action="{% url 'journal:answer' irp.pk %}" class="answer-form" data-validate>
     {% csrf_token %}
     <div class="field"><label for="{{ answer_form.text.id_for_label }}">Новый ответ</label>{{ answer_form.text }}</div>
@@ -111,7 +119,7 @@
   <form method="post" action="{% url 'journal:file' irp.pk %}" enctype="multipart/form-data" class="answer-form">
     {% csrf_token %}
     <div class="field"><label for="id_file">Прикрепить файл</label>
-      <input type="file" name="file" id="id_file">
+      <input type="file" name="file" id="id_file" accept=".doc,.docx,.odt,.ods,.pdf,.rtf,.txt,.xls,.xlsx,.zip">
       <select name="answer" id="id_answer">
         <option value="">к обращению</option>
         {% for answer in answers %}<option value="{{ answer.pk }}">к ответу от {{ answer.created_at|date:"d.m.Y H:i" }}</option>{% endfor %}
@@ -119,10 +127,11 @@
     </div>
     <button class="btn btn--ghost" type="submit">Загрузить файл</button>
   </form>
-</div>
+  {% endif %}
+</section>
 
-<div class="card">
-  <h2 class="text-muted mt-1">Файлы обращения</h2>
+<section class="card record-section record-section--full">
+  <div class="section-heading"><div><p class="section-heading__index">06</p><h2>Файлы обращения</h2></div><span>{{ files|length }} прикреплено</span></div>
   {% if files %}
   <ul class="file-list">
     {% for f in files %}
@@ -130,29 +139,27 @@
     {% endfor %}
   </ul>
   {% else %}
-  <p class="text-muted">Файлов нет.</p>
+  <div class="empty-state">Файлов пока нет</div>
   {% endif %}
-</div>
+</section>
 
 {% if history %}
-<div class="card">
-  <h2 class="text-muted mt-1">История изменений</h2>
-  <div class="table-wrap">
-    <table class="data">
+<section class="card record-section record-section--full">
+  <div class="section-heading"><div><p class="section-heading__index">07</p><h2>История изменений</h2></div><span>Аудит карточки</span></div>
+  {% data_table responsive=True sortable=True label="История изменений; на узком экране показана карточками" %}
       <thead><tr><th>Когда</th><th>Кем</th><th>Поле</th><th>Было</th><th>Стало</th></tr></thead>
       <tbody>
         {% for h in history %}
-        <tr>
-          <td>{{ h.changed_at|date:"d.m.Y H:i" }}</td>
-          <td>{{ h.user.full_name|default:"—" }}</td>
-          <td>{{ h.field_name }}</td>
-          <td>{{ h.old_value|default:"—" }}</td>
-          <td>{{ h.new_value|default:"—" }}</td>
+        <tr class="responsive-row">
+          <td data-label="Когда">{{ h.changed_at|date:"d.m.Y H:i" }}</td>
+          <td data-label="Кем">{{ h.user.full_name|default:"—" }}</td>
+          <td data-label="Поле">{{ h.field_name }}</td>
+          <td class="responsive-cell--wide" data-label="Было">{{ h.old_value|default:"—" }}</td>
+          <td class="responsive-cell--wide" data-label="Стало">{{ h.new_value|default:"—" }}</td>
         </tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
-</div>
+  {% end_data_table %}
+</section>
 {% endif %}
 {% endblock %}

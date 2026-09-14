@@ -1,14 +1,17 @@
 {% extends "base.html" %}
-{% load report_filters %}
+{% load report_filters ui_components %}
 {% block title %}{{ report.title }}{% endblock %}
 {% block content %}
-<a class="btn btn--ghost mb-2" href="{% url 'reports:index' %}">← Все отчёты</a>
-<h1>{{ report.title }}</h1>
-<p class="text-muted">{{ report.description }}</p>
+<header class="module-heading">
+  <a class="module-heading__back" href="{% url 'reports:index' %}">← Все отчёты</a>
+  <p class="page-heading__eyebrow">Приложение №{{ report.number }}</p>
+  <h1>{{ report.title }}</h1>
+  <p>{{ report.description }}</p>
+</header>
 
 <div class="card">
   <form method="get" class="filter-form" id="report-filter-form">
-    <details class="collapsible" id="report-filters" data-key="report-filters">
+    <details class="collapsible" id="report-filters" data-key="report-filters"{% if form.errors %} open{% endif %}>
       <summary class="collapsible__toggle">Параметры отчёта</summary>
       <div class="filters">
         {% for field in form %}
@@ -25,21 +28,21 @@
         {% endif %}
         {% endfor %}
       </div>
+      {% for error in form.non_field_errors %}<div class="alert alert--error">{{ error }}</div>{% endfor %}
     </details>
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Сформировать</button>
       {% if rows %}
-      <a class="btn btn--accent" href="{% url 'reports:export' report.slug 'xlsx' %}?{{ request.GET.urlencode }}">Скачать Excel</a>
-      <a class="btn btn--accent" href="{% url 'reports:export' report.slug 'pdf' %}?{{ request.GET.urlencode }}">Скачать PDF</a>
+      <a class="btn btn--ghost" href="{% url 'reports:export' report.slug 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a>
+      <a class="btn btn--ghost" href="{% url 'reports:export' report.slug 'pdf' %}?{{ request.GET.urlencode }}">PDF</a>
       {% endif %}
     </div>
   </form>
 </div>
 
 {% if rows is not None %}
-<div class="card">
-  <div class="table-wrap">
-    <table class="data reports-table" data-client-sort>
+<div class="card table-card">
+  {% data_table variant="reports" responsive=True sortable=True label="Таблица отчёта; на узком экране показана карточками" %}
       <thead>
         <tr>
           {% for label in report.labels %}<th>{{ label }}</th>{% endfor %}
@@ -47,37 +50,18 @@
       </thead>
       <tbody>
         {% for row in rows %}
-        <tr {% if row.period == "ИТОГО" or row.type == "ИТОГО" or row.month == "ИТОГО" or row.theme == "ИТОГО" %}class="row-total"{% endif %}>
-          {% for key in report.keys %}<td>{{ row|get_item:key }}</td>{% endfor %}
+        <tr class="responsive-row{% if row.period == "ИТОГО" or row.type == "ИТОГО" or row.month == "ИТОГО" or row.theme == "ИТОГО" %} row-total{% endif %}">
+          {% for key, label in report.columns %}<td data-label="{{ label }}">{{ row|get_item:key }}</td>{% endfor %}
         </tr>
         {% empty %}
-        <tr><td colspan="{{ report.columns|length }}" class="text-muted">По заданным параметрам обращений не найдено.</td></tr>
+        <tr class="responsive-empty"><td colspan="{{ report.columns|length }}" class="text-muted">По заданным параметрам обращений не найдено.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 </div>
 {% else %}
 <div class="card">
-  <p class="text-muted">Задайте параметры формы выше и нажмите «Сформировать».</p>
+  <div class="empty-state">Задайте параметры выше и нажмите «Сформировать»</div>
 </div>
 {% endif %}
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  var form = document.getElementById('report-filter-form');
-  if (!form) return;
-  form.addEventListener('submit', function (e) {
-    var from = form.querySelector('[name="date_from"]');
-    var to = form.querySelector('[name="date_to"]');
-    if (from && to && !from.value && !to.value) {
-      e.preventDefault();
-      [from, to].forEach(function (el) { el.classList.add('is-invalid'); });
-      if (window.toast) toast.error('Укажите хотя бы дату начала или окончания периода');
-    }
-  });
-})();
-</script>
 {% endblock %}

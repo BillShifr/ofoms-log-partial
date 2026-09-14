@@ -5,12 +5,20 @@ on:
     branches: [main, master]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
         env:
           POSTGRES_DB: ejournal
           POSTGRES_USER: ejournal
@@ -23,18 +31,29 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version-file: "pyproject.toml"
 
       - name: Sync deps
         run: uv sync --frozen
+
+      - name: Install pip for pip-audit
+        run: uv pip install --python .venv pip
+
+      - name: Audit Python dependencies
+        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          virtual-environment: .venv
+          vulnerability-service: osv
 
       - name: Lint (ruff)
         run: uv run ruff check .
@@ -47,21 +66,61 @@ jobs:
           DB_PASSWORD: ejournal
           DB_HOST: 127.0.0.1
 
+      - name: Migration drift
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Production configuration
+        run: uv run python manage.py check --deploy
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          SECRET_KEY: ci-only-secret-key-with-more-than-fifty-characters-123456789
+          JWT_SECRET: ci-only-jwt-secret-with-more-than-fifty-characters-987654321
+          DB_PASSWORD: ci-only-database-password-4827
+          DB_HOST: 127.0.0.1
+          ALLOWED_HOSTS: localhost,127.0.0.1
+
+      - name: Compose configuration
+        run: docker compose config --quiet
+        env:
+          VCS_REF: ${{ github.sha }}
+          SECRET_KEY: ci-only-secret-key-with-more-than-fifty-characters-123456789
+          JWT_SECRET: ci-only-jwt-secret-with-more-than-fifty-characters-987654321
+          DB_PASSWORD: ci-only-database-password-4827
+
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: lint-and-test
-    if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Docker Login
-        uses: docker/login-action@v3
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build & push
-        uses: docker/build-push-action@v6
+      - name: Build runtime image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          push: true
-          tags: frozendevs/tfoms-ejournal:latest
+          load: true
+          push: false
+          build-args: VCS_REF=${{ github.sha }}
+          tags: |
+            frozendevs/tfoms-ejournal:${{ github.sha }}
+            frozendevs/tfoms-ejournal:latest
+
+      - name: Verify runtime image
+        run: >-
+          sh scripts/container_runtime_gate.sh
+          frozendevs/tfoms-ejournal:${{ github.sha }}
+          ${{ github.sha }}
+
+      - name: Push verified runtime image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker push frozendevs/tfoms-ejournal:${{ github.sha }}
+          docker push frozendevs/tfoms-ejournal:latest

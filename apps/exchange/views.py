@@ -8,13 +8,21 @@ import os
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_safe
 
 from apps.core.models import EventLog, log_event
+from apps.core.policy import EXCHANGE_READ, EXCHANGE_UPLOAD, user_has_capability
 from apps.employee.models import ORGS, TFOMS
 from apps.exchange.forms import UploadFileForm
-from apps.exchange.importers import EmployeeXMLFile, ExcelIrpFile, IrpXMLFile
+from apps.exchange.importers import (
+    ArtifactRollback,
+    EmployeeXMLFile,
+    ExcelIrpFile,
+    IrpXMLFile,
+    write_unique_artifact,
+)
 from apps.exchange.models import ImportLog
 
 
@@ -28,6 +36,8 @@ def _allowed_orgs(user):
 @login_required
 @require_http_methods(["GET", "POST"])
 def exchange_upload(request):
+    if not user_has_capability(request.user, EXCHANGE_UPLOAD):
+        raise PermissionDenied
     form = UploadFileForm(
         user=request.user, org_choices=_allowed_orgs(request.user)
     )
@@ -39,14 +49,15 @@ def exchange_upload(request):
         if form.is_valid():
             org = int(form.cleaned_data["org"])
             uploaded = request.FILES["file"]
-            log = _process_upload(request.user, org, uploaded)
-            log_event(
-                module="exchange",
-                event_type=EventLog.EventType.CREATE,
-                user=request.user,
-                target=f"import:{log.pk}:{log.filename}",
-                ip=request.META.get("REMOTE_ADDR"),
-            )
+            with ArtifactRollback() as artifacts, transaction.atomic():
+                log = _process_upload(request.user, org, uploaded, artifacts)
+                log_event(
+                    module="exchange",
+                    event_type=EventLog.EventType.CREATE,
+                    user=request.user,
+                    target=f"import:{log.pk}:{log.filename}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                )
             return redirect("exchange:protocol", pk=log.pk)
     return render(
         request,
@@ -55,17 +66,14 @@ def exchange_upload(request):
     )
 
 
-def _process_upload(user, org, uploaded) -> ImportLog:
+def _process_upload(user, org, uploaded, artifacts: ArtifactRollback) -> ImportLog:
     from django.conf import settings
 
     # Безопасное имя файла (без путей) — только имя
     safe_name = os.path.basename(uploaded.name or "file")
     in_org = settings.EXCHANGE_IN / str(org)
-    in_org.mkdir(parents=True, exist_ok=True)
-    dest = in_org / safe_name
-    with open(dest, "wb") as f:
-        for chunk in uploaded.chunks():
-            f.write(chunk)
+    dest = write_unique_artifact(in_org / safe_name, uploaded.chunks())
+    artifacts.track(dest)
 
     name_lower = safe_name.lower()
     if name_lower.startswith("users") and name_lower.endswith(".xml"):
@@ -80,7 +88,9 @@ def _process_upload(user, org, uploaded) -> ImportLog:
         )
 
     result = importer.process()
-    importer.write_flcp(result)
+    artifacts.track(importer.archived_path)
+    protocol_path = importer.write_flcp(result)
+    artifacts.track(protocol_path)
     log = ImportLog.objects.create(
         org=org,
         kind=result.kind,
@@ -93,7 +103,10 @@ def _process_upload(user, org, uploaded) -> ImportLog:
 
 
 @login_required
+@require_safe
 def exchange_logs(request):
+    if not user_has_capability(request.user, EXCHANGE_READ):
+        raise PermissionDenied
     qs = ImportLog.objects.all()
     if request.user.org != TFOMS and not request.user.is_superuser:
         qs = qs.filter(org=request.user.org)
@@ -106,7 +119,10 @@ def exchange_logs(request):
 
 
 @login_required
+@require_safe
 def exchange_protocol(request, pk):
+    if not user_has_capability(request.user, EXCHANGE_READ):
+        raise PermissionDenied
     log = get_object_or_404(ImportLog, pk=pk)
     if (
         request.user.org != TFOMS
@@ -118,16 +134,35 @@ def exchange_protocol(request, pk):
     return render(
         request,
         "exchange/protocol.html",
-        {"log": log, "prs": rows, "active_nav": "exchange"},
+        {
+            "log": log,
+            "prs": rows or [],
+            "protocol_unavailable": rows is None,
+            "active_nav": "exchange",
+        },
     )
 
 
-def _parse_flcp(text: str) -> list[dict]:
+def _parse_flcp(text: str) -> list[dict] | None:
     """FLCP (XML) -> список записей протокола для отображения."""
+    if not text or not text.strip():
+        return None
     try:
         from lxml import etree
 
-        root = etree.fromstring(text.encode("windows-1251"))
-    except Exception:
-        return []
-    return [dict(el.attrib) for el in root.iter("PR")]
+        parser = etree.XMLParser(
+            resolve_entities=False,
+            no_network=True,
+            huge_tree=False,
+            recover=False,
+        )
+        root = etree.fromstring(text.encode("windows-1251"), parser=parser)
+        if etree.QName(root).localname != "FLCP":
+            return None
+        return [
+            dict(el.attrib)
+            for el in root.iterchildren()
+            if etree.QName(el).localname == "PR"
+        ]
+    except (UnicodeError, ValueError, etree.XMLSyntaxError):
+        return None

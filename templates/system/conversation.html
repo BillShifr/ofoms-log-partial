@@ -3,20 +3,18 @@
 {% block content %}
 <div class="messenger">
   <aside class="messenger__side">
-    <div class="card" style="padding:14px">
+    <div class="card messenger__side-card">
       {% include "system/_conversation_side.html" %}
     </div>
   </aside>
 
   <section class="messenger__main">
-    <div class="flex-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <a class="btn btn--ghost" href="{% url 'system:messages' %}">← Все диалоги</a>
-      <h1 style="flex:1;margin:0">{{ conv.display_title }}</h1>
-      {% if unread_total %}<span class="nav__badge">непрочитанных: {{ unread_total }}</span>{% endif %}
-    </div>
-    <p class="text-muted">
-      Участники: {% for p in conv.participants.all %}{{ p.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
-    </p>
+    <header class="conversation-heading">
+      <a class="conversation-heading__back" href="{% url 'system:messages' %}">← Все диалоги</a>
+      <div class="conversation-heading__title"><p class="page-heading__eyebrow">Диалог</p><h1>{{ conv.display_title }}</h1></div>
+      {% if unread_total %}<span class="badge badge--result">непрочитанных: {{ unread_total }}</span>{% endif %}
+      <p>Участники: {% for p in conv.participants.all %}{{ p.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+    </header>
 
     <div class="card">
       <details class="collapsible" data-key="new-thread-{{ conv.pk }}">
@@ -29,7 +27,7 @@
               {% for error in thread_form.title.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
             </div>
           </div>
-          <div class="form-actions" style="justify-content:flex-start">
+          <div class="form-actions form-actions--start">
             <button class="btn btn--primary" type="submit">Открыть тему</button>
           </div>
         </form>
@@ -37,18 +35,19 @@
     </div>
 
     <div class="card">
-      <h2 style="font-size:1.1rem;margin:0 0 10px">Темы</h2>
+      <h2 class="section-title-sm">Темы</h2>
       <div class="threads">
         {% for t in threads %}
         <a class="thread-card {% if t.is_closed %}thread-card--closed{% endif %}" href="{% url 'system:thread' t.pk %}">
-          <span class="flex" style="justify-content:space-between;gap:8px;align-items:baseline">
+          <span class="flex flex--between flex--baseline gap-8">
             <strong>{{ t.title }}</strong>
             <span class="text-muted">{{ t.replies.count }} сообщ. · {{ t.created_by.full_name }} · {{ t.created_at|date:"d.m.Y H:i" }}</span>
           </span>
+          {% if t.unread_count %}<span class="nav__badge">{{ t.unread_count }} непрочит.</span>{% endif %}
           {% if t.is_closed %}<span class="badge badge--open">Закрыта</span>{% endif %}
         </a>
         {% empty %}
-        <p class="text-muted">Тем в диалоге нет.</p>
+        <div class="empty-state">Тем в диалоге пока нет</div>
         {% endfor %}
       </div>
     </div>

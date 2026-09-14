@@ -1,15 +1,15 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Протокол обработки {{ log.filename }}{% endblock %}
 {% block content %}
-<h1>Протокол обработки</h1>
-
-<div class="flex mb-2">
-  <a class="btn btn--ghost" href="{% url 'exchange:logs' %}">← В журнал загрузок</a>
-  <a class="btn btn--ghost" href="{% url 'exchange:upload' %}">Загрузить ещё</a>
-</div>
+<header class="module-heading module-heading--actions">
+  <a class="module-heading__back" href="{% url 'exchange:logs' %}">← Журнал загрузок</a>
+  <div><p class="page-heading__eyebrow">Результат проверки</p><h1>Протокол обработки</h1></div>
+  <div class="page-heading__actions"><a class="btn btn--primary" href="{% url 'exchange:upload' %}">Загрузить ещё</a></div>
+</header>
 
 <div class="card">
-  <dl class="dl">
+  <dl class="detail-list">
     <dt>Файл</dt><dd class="mono">{{ log.filename }}</dd>
     <dt>Организация</dt><dd>{{ log.get_org_display }}</dd>
     <dt>Тип</dt><dd>{{ log.get_kind_display }}</dd>
@@ -21,24 +21,28 @@
 </div>
 
 <div class="card">
-  <h2 class="text-muted mt-1">Протокол FLCP</h2>
-  <div class="table-wrap">
-    <table class="data" data-client-sort>
+  <div class="section-heading"><div><p class="section-heading__index">ФЛК</p><h2>Результаты контроля</h2></div><span>{{ prs|length }} записей</span></div>
+  {% if protocol_unavailable %}
+  <div class="alert alert--error" role="alert">
+    Протокол контроля отсутствует или повреждён. Нельзя подтвердить отсутствие нарушений; повторите обработку файла или обратитесь к администратору.
+  </div>
+  {% else %}
+  {% data_table variant="protocol" responsive=True sortable=True label="Протокол ФЛК; на узком экране показан карточками" %}
       <thead><tr><th>Код</th><th>Поле</th><th data-type="num">Обращение</th><th>Комментарий</th></tr></thead>
       <tbody>
         {% for pr in prs %}
-        <tr>
-          <td>{% if pr.OSHIB == '0' %}<span class="badge badge--closed" data-tip="Ошибок не обнаружено">0</span>{% else %}
+        <tr class="responsive-row">
+          <td data-label="Код">{% if pr.OSHIB == '0' %}<span class="badge badge--closed" data-tip="Ошибок не обнаружено">0</span>{% else %}
               <span class="badge badge--overdue" data-tip="Код 41: ошибка формата данных (нарушена структура XML-элемента)">41</span>{% endif %}</td>
-          <td>{{ pr.IM_POL|default:"—" }}</td>
-          <td class="mono" data-type="num">{{ pr.N_ZAP|default:"—" }}</td>
-          <td>{{ pr.COMMENT }}</td>
+          <td data-label="Поле">{{ pr.IM_POL|default:"—" }}</td>
+          <td class="mono" data-label="Обращение" data-type="num">{{ pr.N_ZAP|default:"—" }}</td>
+          <td class="responsive-cell--wide" data-label="Комментарий">{{ pr.COMMENT }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="4" class="text-muted">Протокол пуст.</td></tr>
+        <tr class="responsive-empty"><td colspan="4" class="table-empty">Нарушений не зафиксировано.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
+  {% endif %}
 </div>
 {% endblock %}

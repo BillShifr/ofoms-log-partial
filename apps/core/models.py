@@ -5,12 +5,25 @@
 """
 
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
 logger = logging.getLogger("apps.core")
+
+
+class ConsumedToken(models.Model):
+    """Одноразовый идентификатор уже обмененного временного JWT."""
+
+    jti = models.UUIDField(primary_key=True, editable=False)
+    expires_at = models.DateTimeField(db_index=True)
+    consumed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Использованный временный токен"
+        verbose_name_plural = "Использованные временные токены"
 
 
 class EventLog(models.Model):
@@ -26,6 +39,7 @@ class EventLog(models.Model):
         IMPORT = "import", "Импорт данных"
         EXPORT = "export", "Экспорт данных"
         PRINT = "print", "Печать"
+        VIEW = "view", "Просмотр данных"
         SEND = "send", "Отправка/переадресация"
         BLOCK = "block", "Блокировка учётной записи"
         UNBLOCK = "unblock", "Разблокировка учётной записи"
@@ -48,7 +62,7 @@ class EventLog(models.Model):
         settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         related_name="events",
         verbose_name="Инициатор",
     )
@@ -72,6 +86,39 @@ class EventLog(models.Model):
         indexes = [
             models.Index(fields=["module", "event_type"]),
             models.Index(fields=["user", "-id"]),
+            models.Index(fields=["started_at"], name="core_event_started_idx"),
+            models.Index(fields=["result", "-id"], name="core_event_result_id_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(module=""), name="core_event_module_not_blank"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    event_type__in=(
+                        "login", "login_failed", "logout", "create", "update",
+                        "delete", "import", "export", "print", "view", "send", "block",
+                        "unblock", "task", "other",
+                    )
+                ),
+                name="core_event_type_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(result__in=("ok", "failed", "denied")),
+                name="core_event_result_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(finished_at__isnull=True, duration_ms__isnull=True)
+                    | models.Q(finished_at__isnull=False, duration_ms__isnull=False)
+                ),
+                name="core_event_completion_pair",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(finished_at__isnull=True)
+                | models.Q(finished_at__gte=models.F("started_at")),
+                name="core_event_timeline_valid",
+            ),
         ]
 
     def __str__(self):
@@ -89,10 +136,11 @@ def log_event(
     detail: str = "",
     obj: "EventLog | None" = None,
     duration_ms: int | None = None,
+    pending: bool = False,
 ) -> "EventLog":
     """Утилита записи события в журнал. Если передан obj — завершает запись."""
     if obj is None:
-        return EventLog.objects.create(
+        entry = EventLog.objects.create(
             module=module,
             event_type=event_type,
             result=result,
@@ -101,14 +149,18 @@ def log_event(
             ip=ip,
             detail=detail,
         )
-    if duration_ms is not None:
-        obj.duration_ms = duration_ms
-    if duration_ms is not None:
-        obj.finished_at = timezone.now()
+        if not pending:
+            entry.duration_ms = duration_ms if duration_ms is not None else 0
+            entry.finished_at = entry.started_at + timedelta(milliseconds=entry.duration_ms)
+            entry.save(update_fields=["duration_ms", "finished_at"])
+        return entry
+    obj.finished_at = timezone.now()
+    obj.duration_ms = (
+        duration_ms
+        if duration_ms is not None
+        else max(0, int((obj.finished_at - obj.started_at).total_seconds() * 1000))
+    )
     obj.result = result
     obj.detail = detail or obj.detail
-    update = ["result", "detail"]
-    if duration_ms is not None:
-        update += ["duration_ms", "finished_at"]
-    obj.save(update_fields=update)
+    obj.save(update_fields=["result", "detail", "duration_ms", "finished_at"])
     return obj

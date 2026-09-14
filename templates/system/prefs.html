@@ -1,25 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Настройки{% endblock %}
 {% block content %}
-<h1>Настройки пользовательского интерфейса</h1>
-<p class="text-muted mb-2">Персональные настройки таблиц, темы и масштаба сохраняются для последующих сеансов работы (ТЗ разд. 3.2, 2.12).</p>
+<header class="page-heading">
+  <div><p class="page-heading__eyebrow">Персонализация</p><h1>Настройки интерфейса</h1><p class="page-heading__lead">Оформление и состав рабочих таблиц сохраняются для следующих сеансов</p></div>
+</header>
 
 <div class="card mb-2">
   <h3 class="mt-1 mb-1">Оформление</h3>
   <div class="form-grid">
     <div class="field">
-      <label>Тема</label>
-      <div class="flex-row" style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn--ghost btn--sm" type="button" data-ui-theme="light">Светлая</button>
-        <button class="btn btn--ghost btn--sm" type="button" data-ui-theme="dark">Тёмная</button>
+      <span class="field-label" id="theme-label">Тема</span>
+      <div class="option-group" role="group" aria-labelledby="theme-label">
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-theme="light" aria-pressed="false">Светлая</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-theme="dark" aria-pressed="false">Тёмная</button>
       </div>
     </div>
     <div class="field">
-      <label>Масштаб шрифта</label>
-      <div class="flex-row" style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="md">A-</button>
-        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="base">A</button>
-        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="lg">A+</button>
+      <span class="field-label" id="font-scale-label">Размер шрифта</span>
+      <div class="option-group" role="group" aria-labelledby="font-scale-label">
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="base" aria-pressed="false">Обычный</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="a" aria-pressed="false">A</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="a-plus" aria-pressed="false">A+</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-font="a-plus-plus" aria-pressed="false">A++</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label" id="contrast-label">Контраст</span>
+      <div class="option-group" role="group" aria-labelledby="contrast-label">
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-contrast="default" aria-pressed="false">Как в теме</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-contrast="white" aria-pressed="false">Белая</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-ui-contrast="black" aria-pressed="false">Чёрная</button>
       </div>
     </div>
   </div>

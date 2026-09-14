@@ -3,9 +3,11 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import Group
+from django.db.models import Q
 
 from apps.core.models import EventLog
-from apps.employee.models import ORGS, Employee
+from apps.core.roles import GROUP_ROLE_MAP, ROLE_GROUP_MAP, SMO_ROLES, TFOMS_ROLES, Roles
+from apps.employee.models import ORGS, TFOMS, Employee
 from apps.system.models import (
     Conversation,
     MessageReply,
@@ -18,7 +20,11 @@ from apps.system.models import (
     TaskReport,
 )
 from apps.system.tasks import TASK_COMMAND_CHOICES
-from apps.system.validators import DOC_EXTENSIONS, validate_document_file
+from apps.system.validators import (
+    ALLOWED_ATTACHMENT_EXTENSIONS,
+    ALLOWED_DOCUMENT_EXTENSIONS,
+    validate_document_file,
+)
 
 # Модули, фиксируемые в журнале событий (для фильтра)
 EVENT_MODULE_CHOICES = (
@@ -43,7 +49,29 @@ class EmployeeFilterForm(forms.Form):
         self.fields["org"].choices = [("", "Все")] + [(o, lbl) for o, lbl in ORGS]
 
 
-class EmployeeCreateForm(UserCreationForm):
+class RoleAssignmentMixin:
+    """Ограничивает назначение зарегистрированными ролями подходящей организации."""
+
+    def _configure_roles(self):
+        self.fields["roles"].queryset = Group.objects.filter(
+            name__in=ROLE_GROUP_MAP.values()
+        ).order_by("name")
+
+    def clean_roles(self):
+        roles = self.cleaned_data.get("roles")
+        org = self.cleaned_data.get("org")
+        if not roles or org is None:
+            return roles
+        allowed_codes = TFOMS_ROLES if org == TFOMS else SMO_ROLES
+        invalid = [group.name for group in roles if GROUP_ROLE_MAP.get(group.name) not in allowed_codes]
+        if invalid:
+            raise forms.ValidationError(
+                "Роли не соответствуют выбранной организации: " + ", ".join(invalid)
+            )
+        return roles
+
+
+class EmployeeCreateForm(RoleAssignmentMixin, UserCreationForm):
     """Регистрация учётной записи пользователя (ТЗ разд. 3.5)."""
 
     roles = forms.ModelMultipleChoiceField(
@@ -57,13 +85,17 @@ class EmployeeCreateForm(UserCreationForm):
         model = Employee
         fields = ("username", "last_name", "first_name", "job_title", "org")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._configure_roles()
+
     def save(self, commit=True):
         user = super().save(commit=commit)
         user.groups.set(self.cleaned_data.get("roles", ()))
         return user
 
 
-class EmployeeUpdateForm(forms.ModelForm):
+class EmployeeUpdateForm(RoleAssignmentMixin, forms.ModelForm):
     """Редактирование учётной записи: профиль, активность, роли."""
 
     roles = forms.ModelMultipleChoiceField(
@@ -77,10 +109,36 @@ class EmployeeUpdateForm(forms.ModelForm):
         model = Employee
         fields = ("last_name", "first_name", "job_title", "org", "is_active", "is_staff")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, actor=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.actor = actor
+        self._configure_roles()
         if self.instance.pk:
             self.fields["roles"].initial = self.instance.groups.all()
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self.actor or self.instance.pk != self.actor.pk:
+            return cleaned
+
+        if not cleaned.get("is_active"):
+            self.add_error(
+                "is_active",
+                "Нельзя отключить собственную учётную запись.",
+            )
+
+        roles = cleaned.get("roles")
+        admin_group = ROLE_GROUP_MAP[Roles.ADMIN]
+        if (
+            not self.actor.is_superuser
+            and roles is not None
+            and not roles.filter(name=admin_group).exists()
+        ):
+            self.add_error(
+                "roles",
+                "Нельзя снять собственную роль администратора.",
+            )
+        return cleaned
 
     def save(self, commit=True):
         user = super().save(commit=commit)
@@ -155,7 +213,9 @@ class NewConversationForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["participants"].widget = forms.CheckboxSelectMultiple()
-        self.fields["participants"].queryset = Employee.objects.order_by("last_name", "first_name")
+        self.fields["participants"].queryset = Employee.objects.filter(
+            is_active=True
+        ).order_by("last_name", "first_name")
         self.fields["participants"].label_from_instance = (
             lambda u: f"{u.full_name()} ({u.get_org_display()})"
         )
@@ -172,7 +232,7 @@ class ThreadForm(forms.ModelForm):
 
     class Meta:
         model = MessageThread
-        fields = ("title", "is_closed")
+        fields = ("title",)
         widgets = {
             "title": forms.TextInput(attrs={"placeholder": "Тема обсуждения"}),
         }
@@ -216,7 +276,9 @@ class DocForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         file_field = self.fields["file"]
         file_field.validators.append(validate_document_file)
-        file_field.widget.attrs["accept"] = ",".join(sorted(DOC_EXTENSIONS))
+        file_field.widget.attrs["accept"] = ",".join(
+            sorted(ALLOWED_DOCUMENT_EXTENSIONS)
+        )
         self.fields["category"].required = False
         self.fields["category"].empty_label = "— Без категории —"
         self.fields["version"].required = False
@@ -225,6 +287,11 @@ class DocForm(forms.ModelForm):
 
 class TaskForm(forms.ModelForm):
     """Задание (ТЗ разд. 3.6, PRD v3 §2.11)."""
+
+    command = forms.ChoiceField(
+        choices=TASK_COMMAND_CHOICES,
+        label="Команда",
+    )
 
     class Meta:
         model = TaskJob
@@ -240,13 +307,21 @@ class TaskForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["command"].choices = TASK_COMMAND_CHOICES
         self.fields["interval_minutes"].help_text = "Интервал автозапуска в минутах"
         self.fields["interval_minutes"].required = False
         self.fields["priority"].help_text = "0 — низкий, 1 — средний, 2 — высокий"
         self.fields["priority"].required = False
         self.fields["status"].required = False
-        self.fields["assigned_to"].queryset = Employee.objects.order_by(
+        self.fields["status"].disabled = True
+        self.fields["status"].help_text = (
+            "Статус изменяется системой при запуске и завершении задания."
+        )
+        available_assignees = Q(is_active=True)
+        if self.instance.assigned_to_id:
+            available_assignees |= Q(pk=self.instance.assigned_to_id)
+        self.fields["assigned_to"].queryset = Employee.objects.filter(
+            available_assignees
+        ).order_by(
             "last_name", "first_name"
         )
         self.fields["assigned_to"].label_from_instance = (
@@ -256,12 +331,20 @@ class TaskForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         if (
+            self.instance.pk
+            and self.instance.status == TaskJob.Status.CANCELLED
+            and cleaned.get("enabled")
+        ):
+            cleaned["status"] = TaskJob.Status.CREATED
+        if (
             cleaned.get("run_mode") == TaskJob.RunMode.SCHEDULED
             and not cleaned.get("interval_minutes")
         ):
             raise forms.ValidationError(
                 {"interval_minutes": "Для задания «По расписанию» укажите интервал"}
             )
+        if cleaned.get("run_mode") == TaskJob.RunMode.MANUAL:
+            cleaned["interval_minutes"] = None
         return cleaned
 
 
@@ -285,7 +368,9 @@ class TaskFileForm(forms.ModelForm):
         model = TaskFile
         fields = ("file",)
         widgets = {
-            "file": forms.ClearableFileInput(attrs={"accept": ".pdf,.docx,.doc,.xlsx,.xls,.zip,txt,.csv"}),
+            "file": forms.ClearableFileInput(
+                attrs={"accept": ",".join(sorted(ALLOWED_ATTACHMENT_EXTENSIONS))}
+            ),
         }
 
 

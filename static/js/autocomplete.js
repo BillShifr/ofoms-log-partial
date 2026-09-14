@@ -16,15 +16,13 @@
     removePanel();
     if (!items.length) return;
     panel = document.createElement('div');
-    panel.className = 'autocomplete';
-    var rect = input.getBoundingClientRect();
-    panel.style.left = rect.left + 'px';
-    panel.style.top = (rect.bottom + 4) + 'px';
-    panel.style.width = rect.width + 'px';
+    panel.className = 'autocomplete autocomplete--anchored';
+    panel.setAttribute('role', 'listbox');
     items.forEach(function (v) {
       var item = document.createElement('button');
       item.type = 'button';
       item.className = 'autocomplete__item';
+      item.setAttribute('role', 'option');
       item.textContent = v;
       item.addEventListener('click', function () {
         input.value = v;
@@ -32,7 +30,10 @@
       });
       panel.appendChild(item);
     });
-    document.body.appendChild(panel);
+    var host = input.parentElement;
+    if (!host) return;
+    host.classList.add('autocomplete-host');
+    host.appendChild(panel);
   }
 
   document.addEventListener('DOMContentLoaded', function () {

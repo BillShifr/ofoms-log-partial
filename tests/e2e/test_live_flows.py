@@ -1,22 +1,49 @@
-"""Сквозные (E2E) сценарии через реальный HTTP-стек (Этап 7).
+"""Сквозные (E2E) сценарии через реальный HTTP-стек (этап 4 плана готовности).
 
-Покрывают полный пользовательский путь с настоящими cookie/CSRF:
-вход -> типовые экраны -> выход. Без JS (серверный рендеринг), stdlib urllib.
+Покрывают пользовательские пути с настоящими cookie/CSRF и multipart-загрузками:
+вход -> создание -> изменение/результат -> выход. Без JS, stdlib urllib.
 Запуск: pytest (LiveServerTestCase самостоятельно поднимает dev-сервер).
 """
 
+import datetime
 import re
+import tempfile
+import uuid
 from http.cookiejar import CookieJar
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 
 from apps.core.models import EventLog
+from apps.core.roles import ensure_role_groups
 from apps.employee.models import Employee
-from django.test import LiveServerTestCase
+from apps.exchange.models import ImportLog
+from apps.journal.models import Irp, IrpTheme
+from apps.system.models import (
+    Conversation,
+    MessageReply,
+    MessageThread,
+    NewsItem,
+    SystemDocument,
+    TaskJob,
+    TaskNote,
+    TaskReport,
+)
+from django.contrib.auth.models import Group
+from django.test import LiveServerTestCase, override_settings
 
 TOKEN_RE = re.compile(r'name="csrfmiddlewaretoken" value="([^"]+)"')
 PASSWORD = "GoodPass!1"
+SAMPLE_USERS_XML = """<?xml version="1.0" encoding="windows-1251"?>
+<USER_COLLECTION>
+  <USERS>
+    <USER_FULLNAME>Файлов Файл Файлович</USER_FULLNAME>
+    <USER_UUID>00000000-0000-0000-0000-00000000e2e1</USER_UUID>
+    <USER_EMAIL>file-e2e@example.ru</USER_EMAIL>
+  </USERS>
+</USER_COLLECTION>
+""".encode("windows-1251")
 
 
 class _LiveHttp:
@@ -29,12 +56,18 @@ class _LiveHttp:
         with self._opener.open(self.base + path, timeout=20) as resp:
             return resp.status, resp.read().decode("utf-8", errors="replace")
 
+    def get_bytes(self, path):
+        with self._opener.open(self.base + path, timeout=20) as resp:
+            return resp.status, resp.headers, resp.read()
+
     def post_form(self, path, data, token_page):
         status, html = self.get(token_page)
         match = TOKEN_RE.search(html)
         if match is None:
             raise AssertionError(f"CSRF-токен не найден на {token_page}")
-        body = urlencode({**data, "csrfmiddlewaretoken": match.group(1)}).encode()
+        body = urlencode(
+            {**data, "csrfmiddlewaretoken": match.group(1)}, doseq=True
+        ).encode()
         req = Request(
             self.base + path,
             data=body,
@@ -49,11 +82,76 @@ class _LiveHttp:
             html = exc.read().decode("utf-8", errors="replace")
         return code, html
 
+    def post_multipart(self, path, data, files, token_page):
+        _, html = self.get(token_page)
+        match = TOKEN_RE.search(html)
+        if match is None:
+            raise AssertionError(f"CSRF-токен не найден на {token_page}")
+        boundary = f"----ofoms-e2e-{uuid.uuid4().hex}"
+        chunks = []
+        for name, value in {**data, "csrfmiddlewaretoken": match.group(1)}.items():
+            chunks.extend(
+                [
+                    f"--{boundary}\r\n".encode(),
+                    f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode(),
+                    str(value).encode(),
+                    b"\r\n",
+                ]
+            )
+        for name, (filename, payload, content_type) in files.items():
+            chunks.extend(
+                [
+                    f"--{boundary}\r\n".encode(),
+                    (
+                        f'Content-Disposition: form-data; name="{name}"; '
+                        f'filename="{filename}"\r\n'
+                    ).encode(),
+                    f"Content-Type: {content_type}\r\n\r\n".encode(),
+                    payload,
+                    b"\r\n",
+                ]
+            )
+        chunks.append(f"--{boundary}--\r\n".encode())
+        request = Request(
+            self.base + path,
+            data=b"".join(chunks),
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        )
+        try:
+            with self._opener.open(request, timeout=20) as response:
+                return response.status, response.read().decode("utf-8", errors="replace")
+        except HTTPError as exc:
+            return exc.code, exc.read().decode("utf-8", errors="replace")
+
 
 class LiveFlowsTests(LiveServerTestCase):
     def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory(prefix="ofoms-e2e-")
+        root = Path(self.temp_dir.name)
+        self.settings_override = override_settings(
+            MEDIA_ROOT=root / "media",
+            EXCHANGE_IN=root / "exchange" / "in",
+            EXCHANGE_OUT=root / "exchange" / "out",
+            EXCHANGE_ARCHIVE=root / "exchange" / "archive",
+        )
+        self.settings_override.enable()
+        self.addCleanup(self.settings_override.disable)
+        self.addCleanup(self.temp_dir.cleanup)
+        ensure_role_groups()
         self.operator = Employee.objects.create_user(
             username="e2e_op", password=PASSWORD, org=81000
+        )
+        self.operator.groups.add(Group.objects.get(name="ОП1"))
+        self.recipient = Employee.objects.create_user(
+            username="e2e_recipient", password=PASSWORD, org=81001
+        )
+        self.recipient.groups.add(Group.objects.get(name="СП1"))
+        self.admin = Employee.objects.create_user(
+            username="e2e_admin", password=PASSWORD, org=81000, is_staff=True
+        )
+        self.admin.groups.add(Group.objects.get(name="Администратор"))
+        self.theme = IrpTheme.objects.create(
+            code_name="E2E.01", title="Сквозная проверка", version=3
         )
 
     def _client(self):
@@ -92,3 +190,243 @@ class LiveFlowsTests(LiveServerTestCase):
         status, html = http.get("/journal/")
         self.assertEqual(status, 200)
         self.assertIn("Вход в систему", html)
+
+    def test_journal_create_edit_close_flow_via_http(self):
+        http = self._client()
+        status, _ = http.post_form(
+            "/accounts/login/?next=/journal/new/",
+            {"username": self.operator.username, "password": PASSWORD},
+            token_page="/accounts/login/",
+        )
+        self.assertEqual(status, 200)
+
+        today = datetime.date.today()
+        planned = today + datetime.timedelta(days=30)
+        create_data = {
+            "irp_type": 2,
+            "date_create": today.isoformat(),
+            "way": 1,
+            "how": 2,
+            "theme": self.theme.pk,
+            "otv_t": 1,
+            "otv_kon": self.operator.org,
+            "employee_one": self.operator.pk,
+            "line_one": 1,
+            "data_plan": planned.isoformat(),
+            "z_f": "Сквозной",
+            "z_i": "Тест",
+            "text": "Создано через реальный HTTP-стек",
+        }
+        status, html = http.post_form(
+            "/journal/new/", create_data, token_page="/journal/new/"
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Сквозной", html)
+
+        irp = Irp.objects.get(z_f="Сквозной")
+        self.assertEqual(irp.status, Irp.Status.REGISTERED)
+
+        edit_data = {
+            **create_data,
+            "n_irp": str(irp.n_irp),
+            "z_f": "Сквозной-изменён",
+            "date_close": today.isoformat(),
+            "result": 2,
+        }
+        status, html = http.post_form(
+            f"/journal/{irp.pk}/edit/",
+            edit_data,
+            token_page=f"/journal/{irp.pk}/edit/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Закрыто", html)
+        self.assertIn("Сквозной-изменён", html)
+
+        irp.refresh_from_db()
+        self.assertEqual(irp.status, Irp.Status.CLOSED)
+        self.assertEqual(irp.result, 2)
+
+        status, html = http.get(
+            f"/reports/r1_volume/?date_from={today.isoformat()}"
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Количество поступивших обращений", html)
+        self.assertIn("ИТОГО", html)
+        self.assertNotIn(">None<", html)
+
+        status, headers, payload = http.get_bytes(
+            f"/reports/r1_volume/export/xlsx/?date_from={today.isoformat()}"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            headers.get_content_type(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertTrue(payload.startswith(b"PK"))
+
+    def test_conversation_thread_reply_flow_via_http(self):
+        http = self._client()
+        status, _ = http.post_form(
+            "/accounts/login/?next=/system/messages/",
+            {"username": self.operator.username, "password": PASSWORD},
+            token_page="/accounts/login/",
+        )
+        self.assertEqual(status, 200)
+
+        status, html = http.post_form(
+            "/system/messages/new/",
+            {"title": "Сквозной диалог", "participants": [self.recipient.pk]},
+            token_page="/system/messages/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Сквозной диалог", html)
+        conversation = Conversation.objects.get(title="Сквозной диалог")
+        self.assertSetEqual(
+            set(conversation.participants.values_list("pk", flat=True)),
+            {self.operator.pk, self.recipient.pk},
+        )
+
+        status, html = http.post_form(
+            f"/system/messages/conversation/{conversation.pk}/threads/new/",
+            {"title": "Проверка обработки"},
+            token_page=f"/system/messages/conversation/{conversation.pk}/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Проверка обработки", html)
+        thread = MessageThread.objects.get(conversation=conversation)
+
+        status, html = http.post_form(
+            f"/system/messages/thread/{thread.pk}/reply/",
+            {"body": "Результат сквозной проверки получен"},
+            token_page=f"/system/messages/thread/{thread.pk}/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Результат сквозной проверки получен", html)
+        self.assertTrue(
+            MessageReply.objects.filter(thread=thread, author=self.operator).exists()
+        )
+
+    def test_admin_news_task_and_user_flow_via_http(self):
+        http = self._client()
+        status, _ = http.post_form(
+            "/accounts/login/?next=/system/news/",
+            {"username": self.admin.username, "password": PASSWORD},
+            token_page="/accounts/login/",
+        )
+        self.assertEqual(status, 200)
+
+        status, html = http.post_form(
+            "/system/news/new/",
+            {
+                "title": "Новость сквозной проверки",
+                "summary": "Краткий результат",
+                "text": "Публикация создана через HTTP",
+                "is_active": "on",
+            },
+            token_page="/system/news/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Новость сквозной проверки", html)
+        news = NewsItem.objects.get(title="Новость сквозной проверки")
+        self.assertTrue(news.is_active)
+
+        status, html = http.post_form(
+            "/system/tasks/new/",
+            {
+                "name": "Сквозная задача",
+                "command": "noop",
+                "description": "Проверка жизненного цикла",
+                "status": TaskJob.Status.CREATED,
+                "assigned_to": self.operator.pk,
+                "priority": TaskJob.Priority.MEDIUM,
+                "run_mode": TaskJob.RunMode.MANUAL,
+                "enabled": "on",
+            },
+            token_page="/system/tasks/new/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Сквозная задача", html)
+        task = TaskJob.objects.get(name="Сквозная задача")
+
+        status, html = http.post_form(
+            f"/system/tasks/{task.pk}/",
+            {"action": "note", "text": "Ход выполнения проверен"},
+            token_page=f"/system/tasks/{task.pk}/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Ход выполнения проверен", html)
+        self.assertTrue(TaskNote.objects.filter(task=task).exists())
+
+        status, html = http.post_form(
+            f"/system/tasks/{task.pk}/",
+            {
+                "action": "report",
+                "title": "Результат проверки",
+                "content": "Сквозной сценарий завершён",
+            },
+            token_page=f"/system/tasks/{task.pk}/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Результат проверки", html)
+        self.assertTrue(TaskReport.objects.filter(task=task).exists())
+
+        sp1_group = Group.objects.get(name="СП1")
+        status, html = http.post_form(
+            "/system/users/new/",
+            {
+                "username": "e2e_created_user",
+                "password1": PASSWORD,
+                "password2": PASSWORD,
+                "last_name": "Созданный",
+                "first_name": "Пользователь",
+                "org": 81001,
+                "roles": [sp1_group.pk],
+            },
+            token_page="/system/users/new/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("e2e_created_user", html)
+        created = Employee.objects.get(username="e2e_created_user")
+        self.assertTrue(created.groups.filter(pk=sp1_group.pk).exists())
+
+    def test_document_and_exchange_upload_flow_via_http(self):
+        http = self._client()
+        status, _ = http.post_form(
+            "/accounts/login/?next=/system/docs/",
+            {"username": self.admin.username, "password": PASSWORD},
+            token_page="/accounts/login/",
+        )
+        self.assertEqual(status, 200)
+
+        status, html = http.post_multipart(
+            "/system/docs/upload/",
+            {
+                "title": "Документ сквозной проверки",
+                "version": "1.0",
+                "sort_order": 0,
+            },
+            {"file": ("e2e-manual.pdf", b"%PDF-1.4\n%%EOF\n", "application/pdf")},
+            token_page="/system/docs/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Документ сквозной проверки", html)
+        document = SystemDocument.objects.get(title="Документ сквозной проверки")
+        self.assertTrue(Path(document.file.path).exists())
+
+        status, html = http.post_multipart(
+            "/exchange/upload/",
+            {"org": self.admin.org},
+            {
+                "file": (
+                    "users260911001.xml",
+                    SAMPLE_USERS_XML,
+                    "application/xml",
+                )
+            },
+            token_page="/exchange/upload/",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Протокол", html)
+        exchange_log = ImportLog.objects.get(filename="users260911001.xml")
+        self.assertEqual(exchange_log.status, ImportLog.Status.OK)
+        self.assertTrue(Employee.objects.filter(email="file-e2e@example.ru").exists())

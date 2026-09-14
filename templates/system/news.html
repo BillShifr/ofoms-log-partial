@@ -1,13 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Новости{% endblock %}
 {% block content %}
-<h1>Новости</h1>
-<p class="text-muted mb-2">Лента новостей и уведомлений ТФОМС (PRD v3 §2.7).</p>
+<header class="page-heading">
+  <div><p class="page-heading__eyebrow">Информационный центр</p><h1>Новости</h1><p class="page-heading__lead">Объявления и важные уведомления для сотрудников</p></div>
+  <div class="page-heading__metric"><strong>{{ page.paginator.count }}</strong><span>публикаций</span></div>
+</header>
 
 <div class="card mb-2">
   <details class="collapsible" data-key="news-filters">
     <summary class="collapsible__toggle">Поиск и фильтры</summary>
     <form method="get" class="filters">
+      {% if filter_error %}<div class="field field--wide"><div class="alert alert--error" role="alert">{{ filter_error }}</div></div>{% endif %}
       <div class="field">
         <label for="news-q">Поиск</label>
         <input id="news-q" type="text" name="q" value="{{ request.GET.q }}"
@@ -41,7 +44,7 @@
         </select>
       </div>
       {% endif %}
-      <div class="field field--narrow" style="align-self:flex-end">
+      <div class="field field--narrow field--submit">
         <button class="btn btn--primary" type="submit">Применить</button>
         {% if request.GET %}<a class="btn btn--ghost" href="{% url 'system:news' %}">Сброс</a>{% endif %}
       </div>
@@ -76,12 +79,12 @@
           <label for="{{ form.cover_image.id_for_label }}">Обложка</label>{{ form.cover_image }}
           {% for error in form.cover_image.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
         </div>
-        <div class="field field--narrow" style="display:flex;flex-direction:column;gap:8px">
+        <div class="field field--narrow field--checks">
           <label class="checkbox">{{ form.is_active }}{{ form.is_active.label }}</label>
           <label class="checkbox">{{ form.is_pinned }}{{ form.is_pinned.label }}</label>
         </div>
       </div>
-      <div class="form-actions" style="justify-content:flex-start">
+      <div class="form-actions form-actions--start">
         <button class="btn btn--primary" type="submit">Опубликовать</button>
       </div>
     </form>
@@ -91,10 +94,10 @@
 
 <div class="grid-2">
   {% for n in page.object_list %}
-  <a class="card report-card news-card {% if n.is_pinned %}news-card--pinned{% endif %}"
-     data-href="{% url 'system:news_detail' n.pk %}">
+  <article class="card report-card news-card {% if n.is_pinned %}news-card--pinned{% endif %}"
+     data-href="{% url 'system:news_detail' n.pk %}" tabindex="0">
     {% if n.is_pinned %}<span class="badge badge--role news-card__pinned">Закреплено</span>{% endif %}
-    {% if n.cover_image %}<img class="news-card__cover" src="{{ n.cover_image.url }}"
+    {% if n.cover_image %}<img class="news-card__cover" src="{% url 'system:news_cover' n.pk %}"
         alt="{% if n.category %}{{ n.category.name }}{% endif %}">{% endif %}
     <span class="news-card__meta">
       {% if n.category %}<span class="badge badge--result">{{ n.category.name }}</span>{% endif %}
@@ -102,7 +105,7 @@
       <span class="text-muted">{{ n.author.full_name|default:"система" }}</span>
       <span class="text-muted">просмотров: {{ n.views_count }}</span>
     </span>
-    <h3 class="report-card__title">{{ n.title }}</h3>
+    <h3 class="report-card__title"><a href="{% url 'system:news_detail' n.pk %}">{{ n.title }}</a></h3>
     <p class="report-card__desc">{{ n.summary|default:n.text|truncatechars:180 }}</p>
     {% if can_manage %}
     <div class="news-card__actions">
@@ -117,34 +120,21 @@
       </form>
     </div>
     {% endif %}
-  </a>
+  </article>
   {% empty %}
-  <p class="text-muted">Новостей пока нет.</p>
+  <div class="empty-state span-2">Новостей по заданным условиям нет</div>
   {% endfor %}
 </div>
 
 {% if page.paginator.num_pages > 1 %}
 <div class="pagination">
   {% if page.has_previous %}
-  <a href="?page={{ page.previous_page_number }}&amp;{% if request.GET.urlencode %}{{ request.GET.urlencode }}{% endif %}">‹ Назад</a>
+  <a href="{% querystring page=page.previous_page_number %}">‹ Назад</a>
   {% endif %}
   <span class="current">Стр. {{ page.number }} из {{ page.paginator.num_pages }}</span>
   {% if page.has_next %}
-  <a href="?page={{ page.next_page_number }}&amp;{% if request.GET.urlencode %}{{ request.GET.urlencode }}{% endif %}">Вперёд ›</a>
+  <a href="{% querystring page=page.next_page_number %}">Вперёд ›</a>
   {% endif %}
 </div>
 {% endif %}
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('form[data-confirm]').forEach(function (f) {
-    f.addEventListener('submit', function (e) {
-      var text = f.getAttribute('data-confirm') || 'Подтвердите действие';
-      if (!window.confirm(text)) e.preventDefault();
-    });
-  });
-});
-</script>
 {% endblock %}

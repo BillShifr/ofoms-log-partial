@@ -1,9 +1,12 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<h1>{{ title }}</h1>
+<header class="page-heading form-page-heading">
+  <div><p class="page-heading__eyebrow">Журнал обращений</p><h1>{{ title }}</h1><p class="page-heading__lead">Заполните сведения по разделам. Обязательные поля отмечены звёздочкой.</p></div>
+</header>
 
-<div class="card">
+<div class="card form-card">
   <form method="post" data-validate>
     {% csrf_token %}
 
@@ -11,9 +14,9 @@
       <div class="alert alert--error">{{ form.non_field_errors }}</div>
     {% endif %}
 
-    <h2 class="text-muted mt-1" style="font-size:1.05rem;">Обращение</h2>
+    <div class="form-section-heading"><span>01</span><div><h2>Обращение</h2><p>Регистрация, источник и содержание</p></div></div>
     <div class="form-grid">
-      <div class="field"><label>Номер (n_irp)</label>{{ form.n_irp }}{{ form.n_irp.errors }}</div>
+      <div class="field"><label>Номер обращения</label>{{ form.n_irp }}{{ form.n_irp.errors }}{% if form.n_irp.help_text %}<span class="helptext" id="{{ form.n_irp.id_for_label }}_helptext">{{ form.n_irp.help_text }}</span>{% endif %}</div>
       <div class="field"><label>Вид обращения</label>{{ form.irp_type }}{{ form.irp_type.errors }}</div>
       <div class="field"><label>Дата поступления</label>{{ form.date_create }}{{ form.date_create.errors }}</div>
       <div class="field"><label>Время поступления</label>{{ form.time_create }}{{ form.time_create.errors }}</div>
@@ -22,18 +25,18 @@
       <div class="field"><label>Способ</label>{{ form.how }}{{ form.how.errors }}</div>
       <div class="field"><label>Тема</label>{{ form.theme }}{{ form.theme.errors }}</div>
       <div class="field"><label>Комментарий к теме</label>{{ form.theme_comment }}{{ form.theme_comment.errors }}</div>
-      <div class="field"><label>Сведения о жалобе</label>{{ form.zh_d }}{{ form.zh_d.errors }}</div>
+      <div class="field" data-conditional-controller="id_irp_type" data-conditional-values="2"><label>Сведения о жалобе</label>{{ form.zh_d }}{{ form.zh_d.errors }}</div>
       <div class="field span-2"><label>Содержание обращения</label>{{ form.text }}{{ form.text.errors }}</div>
     </div>
 
-    <h2 class="text-muted mt-3" style="font-size:1.05rem;">Срок и результат</h2>
+    <div class="form-section-heading"><span>02</span><div><h2>Срок и результат</h2><p>Контроль исполнения обращения</p></div></div>
     <div class="form-grid">
       <div class="field"><label>Срок рассмотрения</label>{{ form.data_plan }}{{ form.data_plan.errors }}</div>
       <div class="field"><label>Фактическое закрытие</label>{{ form.date_close }}{{ form.date_close.errors }}</div>
       <div class="field"><label>Исход</label>{{ form.result }}{{ form.result.errors }}</div>
     </div>
 
-    <h2 class="text-muted mt-3" style="font-size:1.05rem;">Обратившийся</h2>
+    <div class="form-section-heading"><span>03</span><div><h2>Обратившийся</h2><p>Контактные и страховые данные заявителя</p></div></div>
     <div class="form-grid">
       <div class="field"><label>Фамилия</label>{{ form.z_f }}{{ form.z_f.errors }}</div>
       <div class="field"><label>Имя</label>{{ form.z_i }}{{ form.z_i.errors }}</div>
@@ -49,8 +52,9 @@
       <div class="field"><label>E-mail</label>{{ form.e_mail }}{{ form.e_mail.errors }}</div>
     </div>
 
-    <h2 class="text-muted mt-3" style="font-size:1.05rem;">Застрахованный</h2>
-    <div class="form-grid">
+    <details class="form-disclosure"{% if form.in_f.value or form.in_i.value or form.in_o.value or form.in_dr.value or form.in_enp.value or form.in_smo.value or form.in_doctype.value or form.in_docser.value or form.in_docnum.value %} open{% endif %}>
+      <summary class="form-section-heading form-disclosure__summary"><span>04</span><div><h2>Застрахованный</h2><p>Заполняется, если обращение подано за другого человека</p></div><span class="form-disclosure__action" aria-hidden="true">При необходимости</span></summary>
+      <div class="form-grid form-disclosure__content">
       <div class="field"><label>Фамилия</label>{{ form.in_f }}{{ form.in_f.errors }}</div>
       <div class="field"><label>Имя</label>{{ form.in_i }}{{ form.in_i.errors }}</div>
       <div class="field"><label>Отчество</label>{{ form.in_o }}{{ form.in_o.errors }}</div>
@@ -60,26 +64,27 @@
       <div class="field"><label>Тип документа</label>{{ form.in_doctype }}{{ form.in_doctype.errors }}</div>
       <div class="field"><label>Серия</label>{{ form.in_docser }}{{ form.in_docser.errors }}</div>
       <div class="field"><label>Номер</label>{{ form.in_docnum }}{{ form.in_docnum.errors }}</div>
-    </div>
+      </div>
+    </details>
 
-    <h2 class="text-muted mt-3" style="font-size:1.05rem;">Исполнение</h2>
+    <div class="form-section-heading"><span>05</span><div><h2>Исполнение</h2><p>Ответственные организация и сотрудники</p></div></div>
     <div class="form-grid">
       <div class="field"><label>Ответственная организация (тип)</label>{{ form.otv_t }}{{ form.otv_t.errors }}</div>
       <div class="field"><label>Ответственная организация</label>{{ form.otv_kon }}{{ form.otv_kon.errors }}</div>
-      <div class="field"><label>Принял</label>{{ form.employee_one }}{{ form.employee_one.errors }}</div>
+      <div class="field"><label>Принял</label>{{ form.employee_one }}{{ form.employee_one.errors }}{% if form.employee_one.help_text %}<span class="helptext" id="{{ form.employee_one.id_for_label }}_helptext">{{ form.employee_one.help_text }}</span>{% endif %}</div>
       <div class="field"><label>Линия принятия</label>{{ form.line_one }}{{ form.line_one.errors }}</div>
       <div class="field"><label>Ответственный</label>{{ form.employee_it }}{{ form.employee_it.errors }}</div>
       <div class="field"><label>Линия рассмотрения</label>{{ form.line_it }}{{ form.line_it.errors }}</div>
     </div>
 
-    <h2 class="text-muted mt-3" style="font-size:1.05rem;">Переадресация</h2>
+    <div class="form-section-heading"><span>06</span><div><h2>Переадресация</h2><p>Параметры направления обращения</p></div></div>
     <div class="form-grid">
       <div class="field"><label>Признак направления</label>{{ form.pr_out }}{{ form.pr_out.errors }}</div>
-      <div class="field"><label>Дата направления</label>{{ form.date_cross }}{{ form.date_cross.errors }}</div>
-      <div class="field"><label>Время направления</label>{{ form.time_cross }}{{ form.time_cross.errors }}</div>
+      <div class="field" data-conditional-controller="id_pr_out" data-conditional-values="*"><label>Дата направления</label>{{ form.date_cross }}{{ form.date_cross.errors }}</div>
+      <div class="field" data-conditional-controller="id_pr_out" data-conditional-values="*"><label>Время направления</label>{{ form.time_cross }}{{ form.time_cross.errors }}</div>
     </div>
 
-    <div class="form-actions">
+    <div class="form-actions form-actions--sticky">
       <button class="btn btn--primary" type="submit">Сохранить</button>
       {% if irp %}
         <a class="btn btn--ghost" href="{% url 'journal:detail' irp.pk %}">Отмена</a>
@@ -90,3 +95,4 @@
   </form>
 </div>
 {% endblock %}
+{% block scripts %}<script src="{% static 'js/conditional-fields.js' %}?v=20260911" defer></script>{% endblock %}

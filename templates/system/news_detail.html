@@ -2,13 +2,13 @@
 {% load system_filters %}
 {% block title %}{{ item.title }}{% endblock %}
 {% block content %}
-<a class="btn btn--ghost mb-2" href="{% url 'system:news' %}">← Все новости</a>
+<a class="module-heading__back" href="{% url 'system:news' %}">← Все новости</a>
 
 {% if can_manage and not item.is_active %}
 <div class="alert alert--error mb-2">Новость скрыта — обычные пользователи её не видят.</div>
 {% endif %}
 
-<article class="card">
+<article class="card news-article">
   <div class="news-card__meta">
     {% if item.category %}<span class="badge badge--result">{{ item.category.name }}</span>{% endif %}
     <span class="text-muted">{{ item.created_at|date:"d.m.Y H:i" }}</span>
@@ -17,7 +17,7 @@
     {% if item.is_pinned %}<span class="badge badge--role">Закреплено</span>{% endif %}
   </div>
   <h1 class="mt-1 mb-1">{{ item.title }}</h1>
-  {% if item.cover_image %}<img class="news-detail__cover" src="{{ item.cover_image.url }}"
+  {% if item.cover_image %}<img class="news-detail__cover" src="{% url 'system:news_cover' item.pk %}"
       alt="{% if item.category %}{{ item.category.name }}{% endif %}">{% endif %}
   <div class="rich-text">{{ item.text|sanitize_rich }}</div>
 
@@ -35,17 +35,4 @@
   </div>
   {% endif %}
 </article>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('form[data-confirm]').forEach(function (f) {
-    f.addEventListener('submit', function (e) {
-      var text = f.getAttribute('data-confirm') || 'Подтвердите действие';
-      if (!window.confirm(text)) e.preventDefault();
-    });
-  });
-});
-</script>
 {% endblock %}

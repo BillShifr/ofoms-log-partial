@@ -3,9 +3,9 @@
 <div class="grid-2">
   {% for d in docs %}
   <div class="card report-card">
-    <div class="flex" style="align-items:flex-start;gap:10px">
+    <div class="flex flex--start gap-10">
       <div class="doc-type">{{ d.file_type|upper|default:"DOC" }}</div>
-      <div style="flex:1">
+      <div class="flex-grow">
         <h3 class="mt-1 mb-1">{{ d.title }}</h3>
         {% if d.description %}<p class="text-muted">{{ d.description }}</p>{% endif %}
         <div class="text-muted">
@@ -16,11 +16,15 @@
         </div>
       </div>
     </div>
-    <div class="flex mt-1 mb-1" style="gap:8px">
+    <div class="flex gap-8 mt-1 mb-1">
+      {% if d.is_video %}
+      <a class="btn btn--sm btn--primary" href="{% url 'system:doc_view' d.pk %}"
+         target="_blank" rel="noopener" title="Открыть видео в защищённом просмотре">Смотреть</a>
+      {% endif %}
       <a class="btn btn--sm btn--primary" href="{% url 'system:doc_download' d.pk %}"
          title="Скачать файл (учёт загрузок)">Скачать</a>
       {% if can_manage %}
-      <form method="post" action="{% url 'system:doc_delete' d.pk %}" class="inline-form">
+      <form method="post" action="{% url 'system:doc_delete' d.pk %}" class="inline-form" data-confirm="Удалить документ «{{ d.title }}»?">
         {% csrf_token %}
         <button class="btn btn--sm btn--danger" type="submit">Удалить</button>
       </form>

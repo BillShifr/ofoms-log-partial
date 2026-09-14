@@ -4,7 +4,12 @@
 интервал (due). Запуск по требованию: управляющий планировщик (systemd
 timer / Cron) вызывает: python manage.py run_tasks
 """
-from apps.system.models import TaskJob
+from apps.system.models import (
+    TaskAlreadyRunning,
+    TaskDisabled,
+    TaskJob,
+    TaskRunSuperseded,
+)
 from django.core.management.base import BaseCommand
 
 
@@ -18,8 +23,25 @@ class Command(BaseCommand):
             dest="all_tasks",
             help="Запустить все активные задания независимо от расписания",
         )
+        parser.add_argument(
+            "--recover-only",
+            action="store_true",
+            help="Только закрыть зависшие запуски, не запускать задания",
+        )
+        parser.add_argument(
+            "--stale-after",
+            type=int,
+            help="Считать запуск зависшим после указанного числа секунд",
+        )
 
     def handle(self, *args, **opts):
+        recovered = TaskJob.recover_stale(
+            stale_after_seconds=opts.get("stale_after")
+        )
+        if recovered:
+            self.stdout.write(self.style.WARNING(f"Зависших запусков закрыто: {recovered}"))
+        if opts.get("recover_only"):
+            return
         qs = TaskJob.objects.filter(enabled=True)
         if opts.get("all_tasks"):
             qs = qs.all()
@@ -29,7 +51,25 @@ class Command(BaseCommand):
             self.stdout.write("Нет заданий для запуска.")
             return
         for task in qs:
-            run = task.run(user=None)
+            try:
+                run = task.run(user=None)
+            except TaskAlreadyRunning:
+                self.stdout.write(
+                    self.style.WARNING(f"task {task.pk}: уже выполняется, пропущено")
+                )
+                continue
+            except TaskDisabled:
+                self.stdout.write(
+                    self.style.WARNING(f"task {task.pk}: отключено, пропущено")
+                )
+                continue
+            except TaskRunSuperseded:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"task {task.pk}: запуск уже закрыт recovery, пропущено"
+                    )
+                )
+                continue
             label = run.result if run.result else "?"
             self.stdout.write(
                 self.style.WARNING(f"task {task.pk} [{task.command}]: {label}")

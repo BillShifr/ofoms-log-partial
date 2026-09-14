@@ -1,47 +1,66 @@
 {% extends "base.html" %}
+{% load static ui_components %}
 {% block title %}Журнал обращений{% endblock %}
 {% block content %}
-<h1>Единый электронный журнал обращений граждан</h1>
+<div class="page-heading">
+  <div>
+    <p class="page-heading__eyebrow">Рабочий реестр</p>
+    <h1>Обращения граждан</h1>
+    <p class="page-heading__lead">Регистрация, контроль сроков и обработка обращений в едином окне.</p>
+  </div>
+  <div class="page-heading__metric" aria-label="Найдено обращений">
+    <strong>{{ page.paginator.count }}</strong>
+    <span>найдено</span>
+  </div>
+</div>
 
 <div class="card mb-2">
   <form method="get" id="journal-filter-form">
     <details class="collapsible" id="journal-filters" data-key="journal-filters">
-      <summary class="collapsible__toggle">Фильтры</summary>
+      <summary class="collapsible__toggle">Фильтры и поиск</summary>
       <div class="filters">
-        <div class="field"><label for="id_id">ID</label>{{ form.id }}</div>
-        <div class="field"><label for="id_n_irp">Номер</label>{{ form.n_irp }}</div>
-        <div class="field"><label for="id_z_f">Фамилия заявителя</label>{{ form.z_f }}</div>
-        <div class="field"><label for="id_z_enp">ЕНП</label>{{ form.z_enp }}</div>
-        <div class="field"><label for="id_irp_type">Вид обращения</label>{{ form.irp_type }}</div>
-        <div class="field"><label for="id_how">Способ</label>{{ form.how }}</div>
-        <div class="field"><label for="id_status">Статус</label>{{ form.status }}</div>
-        <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}</div>
-        <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}</div>
+        <div class="field"><label for="id_id">ID</label>{{ form.id }}{{ form.id.errors }}</div>
+        <div class="field"><label for="id_n_irp">Номер</label>{{ form.n_irp }}{{ form.n_irp.errors }}</div>
+        <div class="field"><label for="id_z_f">Фамилия заявителя</label>{{ form.z_f }}{{ form.z_f.errors }}</div>
+        <div class="field"><label for="id_z_enp">ЕНП</label>{{ form.z_enp }}{{ form.z_enp.errors }}</div>
+        <div class="field"><label for="id_irp_type">Вид обращения</label>{{ form.irp_type }}{{ form.irp_type.errors }}</div>
+        <div class="field"><label for="id_how">Способ</label>{{ form.how }}{{ form.how.errors }}</div>
+        <div class="field"><label for="id_status">Статус</label>{{ form.status }}{{ form.status.errors }}</div>
+        <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}{{ form.date_from.errors }}</div>
+        <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}{{ form.date_to.errors }}</div>
+        {% for error in form.non_field_errors %}<div class="field field--wide"><div class="alert alert--error" role="alert">{{ error }}</div></div>{% endfor %}
       </div>
     </details>
-    <div class="form-actions">
-      <button class="btn btn--primary" type="submit">Применить</button>
-      <a class="btn btn--ghost" href="{% url 'journal:list' %}">Сбросить</a>
-      <a class="btn btn--accent" href="{% url 'journal:create' %}">+ Зарегистрировать обращение</a>
-      <a class="btn btn--ghost btn--sm" href="{% url 'system:prefs' %}">Настройки таблицы</a>
+    <div class="form-actions journal-actions">
+      <div class="journal-actions__primary">
+        <button class="btn btn--primary" type="submit">Применить фильтры</button>
+        <a class="btn btn--ghost" href="{% url 'journal:list' %}">Сбросить</a>
+      </div>
+      <div class="journal-actions__secondary">
+        <a class="btn btn--ghost btn--sm" href="{% url 'system:prefs' %}">Колонки</a>
+        <a class="btn btn--ghost btn--sm" href="{{ print_url }}" target="_blank">Печать</a>
+        <a class="btn btn--accent" href="{% url 'journal:create' %}"><span aria-hidden="true">＋</span> Новое обращение</a>
+      </div>
     </div>
   </form>
 </div>
 
-<div class="card">
-  <div class="table-wrap">
-    <table class="data {% if fixed_first %}th-sticky{% endif %}">
+<div class="card table-card">
+  {% data_table variant="wide journal" wrap_variant="journal" fixed_first=fixed_first label="Таблица обращений; на узком экране показана карточками" %}
+      <colgroup>
+        {% for col in cols %}<col class="col-{{ col.key }}">{% endfor %}
+      </colgroup>
       <thead>
         <tr class="group-row">
           {% for g in table_groups %}
-            <th colspan="{{ g.colspan }}" class="{% if not g.label %}group-row__empty{% endif %}">{{ g.label }}</th>
+            <th colspan="{{ g.colspan }}" scope="colgroup" class="{% if not g.label %}group-row__empty{% endif %}">{% if g.label %}<span class="group-row__label">{{ g.label }}</span>{% endif %}</th>
           {% endfor %}
         </tr>
         <tr>
           {% for col in cols %}
-            <th>
+            <th scope="col" class="col-{{ col.key }}"{% if col.aria_sort %} aria-sort="{{ col.aria_sort }}"{% endif %}>
               {% if col.sortable %}
-                <a href="?sort={% if sort == col.key %}-{{ col.key }}{% else %}{{ col.key }}{% endif %}">{{ col.label }}</a>
+                <a href="{{ col.sort_url }}">{{ col.label }}</a>
               {% else %}
                 {{ col.label }}
               {% endif %}
@@ -49,14 +68,14 @@
           {% endfor %}
         </tr>
       </thead>
-      <tbody>
+      <tbody data-infinite-body>
         {% for irp in page.object_list %}
         <tr class="clickable {% if not irp.is_closed and irp.is_overdue %}row--overdue{% elif not irp.is_closed and not irp.result %}row--open{% endif %}"
-            onclick="location.href='{% url 'journal:detail' irp.pk %}'">
+            data-href="{% url 'journal:detail' irp.pk %}">
           {% for col in cols %}
-            <td>
-              {% if col.key == 'id' %}{{ irp.id }}
-              {% elif col.key == 'n_irp' %}<span class="mono">{{ irp.n_irp }}</span>
+            <td class="col-{{ col.key }}{% if col.key == 'n_irp' %} cell-id{% endif %}{% if col.key == 'date_close' and not irp.date_close %} cell--empty{% elif col.key == 'z_enp' and not irp.z_enp %} cell--empty{% elif col.key == 'employee_one' and not irp.employee_one %} cell--empty{% endif %}" data-label="{{ col.label }}">
+              {% if col.key == 'id' %}<a class="table-row-link" href="{% url 'journal:detail' irp.pk %}" aria-label="Открыть обращение № {{ irp.n_irp }}">{{ irp.id }}</a>
+              {% elif col.key == 'n_irp' %}<span class="mono compact-id" title="{{ irp.n_irp }}" aria-label="Полный номер обращения: {{ irp.n_irp }}">…{{ irp.n_irp|slice:"-12:" }}</span>
               {% elif col.key == 'date_create' %}<span data-value="{{ irp.date_create|date:'Y-m-d' }}">{{ irp.date_create|date:"d.m.Y" }}</span><br><span class="text-muted">{{ irp.time_create|time:"H:i"|default:"" }}</span>
               {% elif col.key == 'data_plan' %}<span data-value="{{ irp.data_plan|date:'Y-m-d' }}">{{ irp.data_plan|date:"d.m.Y" }}</span>
               {% elif col.key == 'date_close' %}{% if irp.date_close %}<span data-value="{{ irp.date_close|date:'Y-m-d' }}">{{ irp.date_close|date:"d.m.Y" }}</span>{% endif %}
@@ -66,9 +85,9 @@
               {% elif col.key == 'z_enp' %}{{ irp.z_enp|default:"" }}
               {% elif col.key == 'employee_one' %}{{ irp.employee_one.full_name }}
               {% elif col.key == 'status' %}
-                {% if irp.is_closed %}<span class="badge badge--closed">Закрыто</span>
+                {% if irp.is_closed %}<span class="badge badge--closed">{{ irp.get_status_display }}</span>
                 {% elif irp.is_overdue %}<span class="badge badge--overdue">Просрочено</span>
-                {% else %}<span class="badge badge--open">Открыто</span>{% endif %}
+                {% else %}<span class="badge badge--open">{{ irp.get_status_display }}</span>{% endif %}
               {% endif %}
             </td>
           {% endfor %}
@@ -77,19 +96,34 @@
         <tr><td colspan="{{ cols|length }}" class="text-muted">Обращений не найдено.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 
   {% if page.paginator.num_pages > 1 %}
-  <div class="pagination">
+  <div class="infinite-scroll"
+       data-infinite-scroll
+       data-next-url="{% if page.has_next %}{% querystring page=page.next_page_number %}{% endif %}"
+       data-loaded="{{ page.end_index }}"
+       data-total="{{ page.paginator.count }}">
+    <p class="infinite-scroll__status" data-infinite-status aria-live="polite">
+      Показано {{ page.end_index }} из {{ page.paginator.count }}
+    </p>
+    <button class="btn btn--ghost btn--sm" type="button" data-infinite-retry hidden>
+      Повторить загрузку
+    </button>
+    <div class="infinite-scroll__sentinel" data-infinite-sentinel aria-hidden="true"></div>
+  </div>
+  <div class="pagination" data-page-pagination>
     {% if page.has_previous %}
-      <a href="?page={{ page.previous_page_number }}&amp;{{ request.GET.urlencode }}">‹ Назад</a>
+      <a href="{% querystring page=page.previous_page_number %}">‹ Назад</a>
     {% endif %}
     <span class="current">Стр. {{ page.number }} из {{ page.paginator.num_pages }}</span>
     {% if page.has_next %}
-      <a href="?page={{ page.next_page_number }}&amp;{{ request.GET.urlencode }}">Вперёд ›</a>
+      <a href="{% querystring page=page.next_page_number %}">Вперёд ›</a>
     {% endif %}
   </div>
   {% endif %}
 </div>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'js/infinite-scroll.js' %}?v=20260912" defer></script>
 {% endblock %}

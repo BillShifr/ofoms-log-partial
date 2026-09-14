@@ -48,12 +48,16 @@ SMO_ROLES = {Roles.SP1, Roles.SP2, Roles.SP3}
 
 
 def role_code_for_user(user) -> int | None:
-    """Код роли пользователя по группам Django (или None)."""
+    """Первичная роль в каноническом порядке (или None)."""
     if user is None or not user.is_authenticated:
         return None
-    for group in user.groups.all():
-        code = GROUP_ROLE_MAP.get(group.name)
-        if code is not None:
+    names = set(
+        user.groups.filter(name__in=ROLE_GROUP_MAP.values()).values_list(
+            "name", flat=True
+        )
+    )
+    for code, name in ROLE_GROUP_MAP.items():
+        if name in names:
             return code
     return None
 

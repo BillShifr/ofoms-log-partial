@@ -1,17 +1,116 @@
 """AuditMiddleware: сквозное журналирование HTTP-запросов (ТЗ разд. 3.4, СЗИ).
 
 Фиксирует вход, выход, критичные операции (POST с изменениями) и ошибки.
-Не логирует статику и healthz-проверки.
+Не логирует статику и liveness/readiness-проверки.
 """
 
+import contextlib
+import ipaddress
 import time
 
+from django.conf import settings
+from django.contrib.auth import SESSION_KEY, logout
 from django.http import HttpResponse
 
-from apps.core.models import EventLog
+from apps.core.models import EventLog, log_event
 
-_IGNORED_PREFIXES = ("/static/", "/media/", "/healthz", "/favicon.ico")
+_IGNORED_PREFIXES = ("/static/", "/media/", "/healthz", "/readyz", "/favicon.ico")
 _IGNORED_ADMIN_SEGMENTS = ("/admin/jsi18n",)
+_LOGIN_PATHS = ("/accounts/login/", "/accounts/token-login/", "/admin/login/")
+_LOGOUT_PATHS = ("/accounts/logout/", "/admin/logout/")
+
+
+class TrustedProxyClientIPMiddleware:
+    """Принимает forwarded headers только от настроенного proxy peer."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.trusted_networks = tuple(
+            ipaddress.ip_network(network)
+            for network in settings.TRUSTED_PROXY_IPS
+        )
+
+    def _peer_is_trusted(self, request):
+        try:
+            peer = ipaddress.ip_address(request.META.get("REMOTE_ADDR", ""))
+        except ValueError:
+            return False
+        return any(peer in network for network in self.trusted_networks)
+
+    def __call__(self, request):
+        peer_is_trusted = self._peer_is_trusted(request)
+        if not settings.TRUST_PROXY_SSL_HEADER or not peer_is_trusted:
+            request.META.pop("HTTP_X_FORWARDED_PROTO", None)
+
+        if settings.TRUST_PROXY_CLIENT_IP_HEADER and peer_is_trusted:
+            forwarded_for = request.META.pop("HTTP_X_FORWARDED_FOR", "").strip()
+            if forwarded_for and "," not in forwarded_for:
+                with contextlib.suppress(ValueError):
+                    request.META["REMOTE_ADDR"] = str(
+                        ipaddress.ip_address(forwarded_for)
+                    )
+        else:
+            request.META.pop("HTTP_X_FORWARDED_FOR", None)
+        return self.get_response(request)
+
+
+class AccountStateSessionMiddleware:
+    """Удаляет сессию, если её пользователь больше не может войти в систему."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if SESSION_KEY in request.session and not request.user.is_authenticated:
+            logout(request)
+        return self.get_response(request)
+
+
+class UploadLimitResponseMiddleware:
+    """Не запускает view после остановки чрезмерного multipart upload."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.method == "POST" and request.content_type.startswith("multipart/"):
+            _ = request.POST
+        if getattr(request, "upload_size_limit_exceeded", False):
+            return HttpResponse("Файл превышает допустимый размер.", status=413)
+        return self.get_response(request)
+
+
+class ContentSecurityPolicyMiddleware:
+    """Запрещает inline/external scripts на пользовательских экранах портала."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        response.headers.setdefault("Permissions-Policy", settings.PERMISSIONS_POLICY)
+        if not request.path.startswith("/admin/"):
+            response.headers.setdefault(
+                "Content-Security-Policy", settings.CONTENT_SECURITY_POLICY
+            )
+        return response
+
+
+class SensitiveResponseCacheMiddleware:
+    """Запрещает хранение динамических ответов портала браузером и proxy."""
+
+    _CACHE_CONTROL = "no-store, no-cache, max-age=0, private"
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if not request.path.startswith(settings.STATIC_URL):
+            response.headers["Cache-Control"] = self._CACHE_CONTROL
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
 
 
 class AuditMiddleware:
@@ -31,8 +130,9 @@ class AuditMiddleware:
             return self.get_response(request)
 
         started_at = time.perf_counter()
-        user = request.user if getattr(request, "user", None) else None
+        user_before = request.user if getattr(request, "user", None) else None
         response = self.get_response(request)
+        user_after = request.user if getattr(request, "user", None) else None
 
         duration_ms = int((time.perf_counter() - started_at) * 1000)
 
@@ -43,31 +143,31 @@ class AuditMiddleware:
 
         # Логируем вход/выход и все не-GET запросы (изменения данных)
         event_type = None
-        if request.path.startswith("/accounts/login") and request.method == "POST":
+        actor = user_before
+        if request.path in _LOGIN_PATHS and request.method == "POST":
+            actor = user_after
             event_type = (
                 EventLog.EventType.LOGIN
-                if user and user.is_authenticated
+                if actor and actor.is_authenticated
                 else EventLog.EventType.LOGIN_FAILED
             )
-        elif request.path.startswith("/accounts/logout"):
+        elif request.path in _LOGOUT_PATHS and request.method == "POST":
             event_type = EventLog.EventType.LOGOUT
         elif status >= 500 or status >= 400:
             event_type = EventLog.EventType.OTHER
 
-        if event_type is not None or (
-            request.method not in ("GET", "HEAD") and not request.path.startswith("/admin/")
-        ):
-            EventLog.objects.create(
+        if event_type is not None or request.method not in ("GET", "HEAD"):
+            if status in (401, 403):
+                result = EventLog.Result.DENIED
+            elif event_type == EventLog.EventType.LOGIN_FAILED or status >= 400:
+                result = EventLog.Result.FAILED
+            else:
+                result = EventLog.Result.OK
+            log_event(
                 module="http",
                 event_type=event_type or EventLog.EventType.OTHER,
-                result=(
-                    EventLog.Result.OK
-                    if status < 400
-                    else EventLog.Result.FAILED
-                    if status < 500
-                    else EventLog.Result.FAILED
-                ),
-                user=user if user and user.is_authenticated else None,
+                result=result,
+                user=actor if actor and actor.is_authenticated else None,
                 target=f"{request.method} {request.path}",
                 ip=request.META.get("REMOTE_ADDR"),
                 duration_ms=duration_ms,

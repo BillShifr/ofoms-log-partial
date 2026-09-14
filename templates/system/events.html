@@ -1,40 +1,44 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Журнал событий{% endblock %}
 {% block content %}
-<h1>Журнал событий</h1>
+<header class="page-heading">
+  <div><p class="page-heading__eyebrow">Аудит системы</p><h1>Журнал событий</h1><p class="page-heading__lead">Действия пользователей и результаты системных операций</p></div>
+  <div class="page-heading__metric"><strong>{{ page.paginator.count }}</strong><span>событий</span></div>
+</header>
 
 <div class="card mb-2">
   <form method="get" id="events-filter-form">
     <details class="collapsible" id="events-filters" data-key="events-filters">
       <summary class="collapsible__toggle">Фильтры</summary>
       <div class="filters">
-        <div class="field"><label for="id_module">Модуль</label>{{ form.module }}</div>
-        <div class="field"><label for="id_event_type">Тип события</label>{{ form.event_type }}</div>
-        <div class="field"><label for="id_result">Результат</label>{{ form.result }}</div>
+        <div class="field"><label for="id_module">Модуль</label>{{ form.module }}{{ form.module.errors }}</div>
+        <div class="field"><label for="id_event_type">Тип события</label>{{ form.event_type }}{{ form.event_type.errors }}</div>
+        <div class="field"><label for="id_result">Результат</label>{{ form.result }}{{ form.result.errors }}</div>
         <div class="field">
           <label for="id_user">Инициатор</label>
           <input type="hidden" id="id_user" name="user" value="{{ form.user.value|default:'' }}">
           <input type="text" class="js-event-user" autocomplete="off"
                  placeholder="ФИО или логин (не менее 3 букв)"
                  value="{{ initiator_label|default:'' }}">
+          {{ form.user.errors }}
         </div>
-        <div class="field"><label for="id_target">Объект</label>{{ form.target }}</div>
-        <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}</div>
-        <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}</div>
-        {% for error in form.non_field_errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        <div class="field"><label for="id_target">Объект</label>{{ form.target }}{{ form.target.errors }}</div>
+        <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}{{ form.date_from.errors }}</div>
+        <div class="field field--date"><label for="id_date_to">По дату</label>{{ form.date_to }}{{ form.date_to.errors }}</div>
+        {% for error in form.non_field_errors %}<div class="field field--wide"><div class="alert alert--error" role="alert">{{ error }}</div></div>{% endfor %}
       </div>
     </details>
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Применить</button>
       <a class="btn btn--ghost" href="{% url 'system:events' %}">Сбросить</a>
-      <a class="btn btn--accent" href="{% url 'system:events_export' %}?{{ request.GET.urlencode }}">Скачать Excel</a>
+      <a class="btn btn--ghost" href="{% url 'system:events_export' %}?{{ request.GET.urlencode }}">Скачать Excel</a>
     </div>
   </form>
 </div>
 
-<div class="card">
-  <div class="table-wrap">
-    <table class="data" data-client-sort>
+<div class="card table-card">
+  {% data_table variant="events" responsive=True sortable=True label="Таблица событий; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th data-type="num">ID</th>
@@ -51,37 +55,36 @@
       </thead>
       <tbody>
         {% for e in page.object_list %}
-        <tr class="js-event-row" title="{% if e.detail %}{{ e.detail }}{% else %}Событие {{ e.get_event_type_display }} (модуль {{ e.module }}){% endif %}">
-          <td data-type="num">{{ e.id }}</td>
-          <td>{{ e.started_at|date:"d.m.Y H:i:s" }}</td>
-          <td>{% if e.finished_at %}<span data-value="{{ e.finished_at|date:'Y-m-d\TH:i:s' }}">{{ e.finished_at|date:"d.m.Y H:i:s" }}</span>{% endif %}</td>
-          <td>{{ e.get_event_type_display }}</td>
-          <td>{{ e.module }}</td>
-          <td>
+        <tr class="js-event-row responsive-row" data-sort-group="event-{{ e.pk }}" title="{% if e.detail %}{{ e.detail }}{% else %}Событие {{ e.get_event_type_display }} (модуль {{ e.module }}){% endif %}">
+          <td data-label="ID" data-type="num">{{ e.id }}</td>
+          <td data-label="Начало" data-value="{{ e.started_at|date:'Y-m-d\TH:i:s' }}">{{ e.started_at|date:"d.m.Y H:i:s" }}</td>
+          <td data-label="Завершение">{% if e.finished_at %}<span data-value="{{ e.finished_at|date:'Y-m-d\TH:i:s' }}">{{ e.finished_at|date:"d.m.Y H:i:s" }}</span>{% endif %}</td>
+          <td data-label="Тип">{{ e.get_event_type_display }}</td>
+          <td data-label="Модуль">{{ e.module }}</td>
+          <td data-label="Результат">
             {% if e.result == 'ok' %}<span class="badge badge--closed">{{ e.get_result_display }}</span>
             {% elif e.result == 'failed' %}<span class="badge badge--overdue">{{ e.get_result_display }}</span>
             {% else %}<span class="badge badge--open">{{ e.get_result_display }}</span>{% endif %}
           </td>
-          <td>{{ e.user.full_name|default:"—" }}</td>
-          <td class="mono cell-long">{{ e.target }}</td>
-          <td class="mono">{{ e.ip|default:"—" }}</td>
-          <td data-type="num">{{ e.duration_ms|default:"—" }}</td>
+          <td data-label="Инициатор">{{ e.user.full_name|default:"—" }}</td>
+          <td class="mono cell-long responsive-cell--wide" data-label="Объект">{{ e.target }}</td>
+          <td class="mono" data-label="IP">{{ e.ip|default:"—" }}</td>
+          <td data-label="Длительность, мс" data-type="num">{{ e.duration_ms|default:"—" }}</td>
         </tr>
-        <tr class="row-detail js-event-detail" hidden>
+        <tr class="row-detail js-event-detail" data-sort-group="event-{{ e.pk }}" hidden>
           <td colspan="10">{{ e.detail|default:"Описание события отсутствует." }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="10" class="text-muted">Событий не найдено.</td></tr>
+        <tr class="responsive-empty"><td colspan="10" class="text-muted">Событий не найдено.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 
   {% if page.paginator.num_pages > 1 %}
   <div class="pagination">
-    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&amp;{{ request.GET.urlencode }}">‹ Назад</a>{% endif %}
+    {% if page.has_previous %}<a href="{% querystring page=page.previous_page_number %}">‹ Назад</a>{% endif %}
     <span class="current">Стр. {{ page.number }} из {{ page.paginator.num_pages }}</span>
-    {% if page.has_next %}<a href="?page={{ page.next_page_number }}&amp;{{ request.GET.urlencode }}">Вперёд ›</a>{% endif %}
+    {% if page.has_next %}<a href="{% querystring page=page.next_page_number %}">Вперёд ›</a>{% endif %}
   </div>
   {% endif %}
 </div>

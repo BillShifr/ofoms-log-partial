@@ -70,6 +70,10 @@ def _check_record(
     def err(field, comment):
         errors.append(error_result(field, comment, n_zap))
 
+    def missing(field):
+        value = d.get(field)
+        return not value or (isinstance(value, str) and not value.strip())
+
     if is_irp:
         for f in (
             "n_irp",
@@ -83,7 +87,7 @@ def _check_record(
             "data_plan",
             "employee_1",
         ):
-            if not d.get(f):
+            if missing(f):
                 err(f, "Обязательное поле не заполнено")
         if d.get("irp_type") not in [c for c, _ in IRP_TYPES]:
             err("irp_type", "Вид обращения вне справочника")
@@ -111,6 +115,15 @@ def _check_record(
             c for c, _ in ZH_TYPES
         ]:
             err("zh_d", "Сведения о жалобе вне справочника")
+        if d.get("irp_type") != 2 and d.get("zh_d") not in [None, ""]:
+            err("zh_d", "Сведения о жалобе допустимы только для жалобы")
+        if not d.get("pr_out") and (d.get("date_cross") or d.get("time_cross")):
+            err(
+                "pr_out",
+                "Дата и время направления требуют признака направления",
+            )
+        if d.get("time_cross") and not d.get("date_cross"):
+            err("date_cross", "Время направления требует даты направления")
         theme_txt = d.get("theme")
         if theme_txt:
             theme_exists = IrpTheme.objects.filter(

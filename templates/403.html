@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Недостаточно прав{% endblock %}
+
+{% block content %}
+<section class="error-page" aria-labelledby="error-title">
+  <div class="error-page__card">
+    <div class="error-page__code" aria-hidden="true">403</div>
+    <h1 class="error-page__title" id="error-title">Недостаточно прав</h1>
+    <p class="error-page__text">Этот раздел недоступен для вашей роли. Вернитесь в журнал или выберите доступный раздел в меню.</p>
+    <div class="error-page__actions">
+      <a class="btn btn--primary" href="{% url 'journal:list' %}">Перейти в журнал</a>
+      <button class="btn btn--ghost" type="button" data-ui-action="back">Вернуться назад</button>
+    </div>
+  </div>
+</section>
+{% endblock %}

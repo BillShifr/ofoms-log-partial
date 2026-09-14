@@ -1,26 +1,24 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Сопроводительное письмо № {{ irp.n_irp }}{% endblock %}
 {% block content %}
-<div class="flex mb-2 no-print">
-  <h1>Сопроводительное письмо</h1>
-  <button class="btn btn--primary" onclick="window.print()">Печать</button>
-</div>
+<div class="print-toolbar no-print"><a class="btn btn--ghost" href="{% url 'journal:detail' irp.pk %}">← К обращению</a><button class="btn btn--primary" type="button" data-ui-action="print">Печать</button></div>
 
 <div class="paper">
-  <p class="text-muted no-print">Предварительный просмотр — печатная форма формируется на бумаге А4.</p>
+  <p class="print-preview-note no-print">Предварительный просмотр · формат А4</p>
 
-  <div class="text-muted" style="text-align:right">
+  <div class="letter-recipient">
     <div>Наименование организации-получателя: {{ irp.get_otv_kon_display }}</div>
     <div>Исх. № {{ irp.n_irp }} от {{ today|date:"d.m.Y" }}</div>
   </div>
 
-  <h2 style="text-align:center">Сопроводительное письмо</h2>
+  <h1 class="letter-title">Сопроводительное письмо</h1>
 
   <p>В соответствии с законодательством Российской Федерации о защите прав
     застрахованных лиц в сфере обязательного медицинского страхования направляем
     Вам для рассмотрения и подготовки ответа обращение застрахованного лица:</p>
 
-  <table class="data" style="margin:1em 0">
+  {% data_table variant="letter" scrollable=False %}
     <tbody>
       <tr><th>Номер обращения</th><td>{{ irp.n_irp }}</td></tr>
       <tr><th>Дата поступления</th><td>{{ irp.date_create|date:"d.m.Y" }}</td></tr>
@@ -31,13 +29,13 @@
       <tr><th>Признак направления</th><td>{{ irp.get_pr_out_display|default:"—" }}</td></tr>
       <tr><th>Дата направления</th><td>{{ irp.date_cross|date:"d.m.Y"|default:"—" }}</td></tr>
     </tbody>
-  </table>
+  {% end_data_table %}
 
   <p>Просим рассмотреть обращение в установленный срок — до
     {{ irp.data_plan|date:"d.m.Y" }} — и направить результат рассмотрения
     в адрес {{ irp.employee_one.full_name|default:"ТФОМС ХМАО — Югры" }}.</p>
 
-  <div style="margin-top:3em">
+  <div class="letter-signature">
     <div>{{ irp.employee_one.full_name|default:"—" }}</div>
     <div class="text-muted">{{ irp.employee_one.job_title|default:"" }}</div>
   </div>

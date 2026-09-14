@@ -63,17 +63,45 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # Middleware
 # ---------------------------------------------------------------------------
 MIDDLEWARE = [
+    "apps.core.middleware.TrustedProxyClientIPMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.core.middleware.AccountStateSessionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.core.middleware.ContentSecurityPolicyMiddleware",
+    "apps.core.middleware.SensitiveResponseCacheMiddleware",
     # Приказ ФСТЭК № 17 (2 класс): аудит действий пользователя
     "apps.core.middleware.AuditMiddleware",
+    "apps.core.middleware.UploadLimitResponseMiddleware",
 ]
+
+FILE_UPLOAD_HANDLERS = [
+    "apps.core.uploads.BoundedUploadHandler",
+    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+]
+DATA_UPLOAD_MAX_NUMBER_FILES = 1
+
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self'; "
+    "img-src 'self' data:; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "media-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'"
+)
+PERMISSIONS_POLICY = (
+    "camera=(), geolocation=(), microphone=(), payment=(), usb=()"
+)
 
 ROOT_URLCONF = "config.urls"
 
@@ -125,6 +153,12 @@ AUTHENTICATION_BACKENDS = [
     "apps.core.auth.TFOMSAuthBackend",
 ]
 
+# В dev/tests X-Forwarded-For считается недоверенным. Production включает его
+# только вместе с контрактом reverse proxy, который обязан перезаписывать header.
+TRUST_PROXY_CLIENT_IP_HEADER = False
+TRUST_PROXY_SSL_HEADER = False
+TRUSTED_PROXY_IPS = ("127.0.0.1/32", "::1/128")
+
 # Парольная политика (ТЗ разд. 3.1): ≥8 символов, верх/низ/цифры/спецсимволы.
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -153,7 +187,14 @@ SECURITY_FAILED_LOGIN_MEMORY = 15 * 60  # окно (сек) для накопл�
 # Сквозная авторизация: временные токены
 JWT_SECRET = os.getenv("JWT_SECRET", SECRET_KEY)
 JWT_ALGORITHM = "HS256"
+JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "ejournal").strip() or "ejournal"
 JWT_TTL = int(os.getenv("JWT_TTL", "300"))  # сек — жизнь временного токена
+TOKEN_LOGIN_TRUSTED_ORIGINS = tuple(
+    origin.strip()
+    for origin in os.getenv("TOKEN_LOGIN_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+)
+TASK_STALE_AFTER_SECONDS = int(os.getenv("TASK_STALE_AFTER_SECONDS", "3600"))
 
 # ---------------------------------------------------------------------------
 # Локализация

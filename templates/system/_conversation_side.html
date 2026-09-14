@@ -1,10 +1,11 @@
-<form method="get" class="filters" style="align-items:center;gap:8px;margin-bottom:10px">
-  <div class="field" style="flex:1">
+<div class="messenger__side-heading"><strong>Диалоги</strong><span>{{ conversations|length }}</span></div>
+<form method="get" class="conversation-search">
+  <div class="field field--grow">
     <label for="conversation-q">Поиск</label>
     <input id="conversation-q" type="text" name="q" value="{{ q }}" placeholder="Участник, тема или текст">
   </div>
-  <div class="field field--narrow">
-    <button class="btn btn--primary btn--sm" type="submit">Найти</button>
+  <div class="conversation-search__actions">
+    <button class="btn btn--primary btn--sm" type="submit" aria-label="Найти диалог">Найти</button>
     {% if q %}<a class="btn btn--ghost btn--sm" href="{% url 'system:messages' %}">Сброс</a>{% endif %}
   </div>
 </form>
@@ -23,6 +24,6 @@
     {% endif %}
   </a>
   {% empty %}
-  <p class="text-muted">Диалогов пока нет.</p>
+  <div class="empty-state">Диалогов пока нет</div>
   {% endfor %}
 </div>

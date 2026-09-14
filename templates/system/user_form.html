@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<h1>{{ title }}</h1>
-<div class="card">
+<header class="module-heading"><a class="module-heading__back" href="{% url 'system:users' %}">← Все учётные записи</a><p class="page-heading__eyebrow">Управление доступом</p><h1>{{ title }}</h1><p>Личные данные, организация и набор разрешённых ролей.</p></header>
+<div class="card management-form">
   <form method="post" data-validate>
     {% csrf_token %}
     <details class="collapsible" data-key="user-section-auth">
@@ -39,7 +40,7 @@
         <div class="field"><label for="{{ form.org.id_for_label }}">Организация</label>{{ form.org }}{% for error in form.org.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         {% for field in form %}
           {% if field.name == "is_staff" or field.name == "is_active" %}
-          <div class="field field--narrow"><label class="checkbox">{{ field }}{{ field.label }}</label></div>
+          <div class="field field--narrow"><label class="checkbox">{{ field }}{{ field.label }}</label>{% for error in field.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
           {% endif %}
         {% endfor %}
       </div>
@@ -50,12 +51,31 @@
       <summary class="collapsible__toggle">Роли и доступы</summary>
       <div class="field field--roles">
         <label>Роли (группы)</label>
+        {% if user == request.user %}<span class="text-muted">Собственную активность и роль администратора снять нельзя — это защищает доступ к управлению системой.</span>{% endif %}
         {{ form.roles }}
+        {% for error in form.roles.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
       </div>
     </details>
     {% endif %}
 
-    <div class="form-actions">
+    <details class="collapsible" data-key="user-section-access-matrix">
+      <summary class="collapsible__toggle">Матрица прав ролей</summary>
+      <p class="text-muted">Матрица отражает фактическую серверную политику. Права нескольких назначенных ролей объединяются.</p>
+      {% data_table variant="capabilities" responsive=True label="Матрица прав; на узком экране показана карточками" %}
+          <thead><tr><th>Роль</th>{% for label in capability_headers %}<th>{{ label }}</th>{% endfor %}</tr></thead>
+          <tbody>
+          {% for row in capability_matrix %}
+            <tr class="responsive-row"><th class="responsive-cell--wide" scope="row" data-label="Роль">{{ row.role }}</th>
+            {% for item in row.capabilities %}
+              <td data-label="{{ item.label }}">{% if item.allowed %}<span class="badge badge--closed">Да</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            {% endfor %}
+            </tr>
+          {% endfor %}
+          </tbody>
+      {% end_data_table %}
+    </details>
+
+    <div class="form-actions form-actions--sticky">
       <button class="btn btn--primary" type="submit">Сохранить</button>
       <a class="btn btn--ghost" href="{% url 'system:users' %}">Отмена</a>
     </div>

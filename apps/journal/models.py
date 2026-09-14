@@ -8,8 +8,12 @@
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
+from apps.core.storage import delete_field_file_after_commit
 from apps.employee.models import ORGS, Employee
+from apps.system.validators import validate_attachment_file
 
 # ---------------------------------------------------------------------------
 # Справочники (коды закреплены форматом обмена, МИС/реестрами)
@@ -134,6 +138,24 @@ class XmlFiles(models.Model):
         verbose_name = "Файл с обращениями"
         verbose_name_plural = "Файлы с обращениями"
         ordering = ["-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(smo__in=tuple(code for code, _ in ORGS)),
+                name="xmlfiles_smo_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(year__regex=r"^[0-9]{4}$")
+                    & models.Q(month__regex=r"^(0[1-9]|1[0-2])$")
+                    & models.Q(day__regex=r"^(0[1-9]|[12][0-9]|3[01])$")
+                ),
+                name="xmlfiles_date_parts_valid",
+            ),
+            models.CheckConstraint(
+                condition=(~models.Q(filename="") & ~models.Q(real_filename="")),
+                name="xmlfiles_names_present",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.filename}"
@@ -161,6 +183,13 @@ class IrpTheme(models.Model):
 
 
 class Irp(models.Model):
+    class Status(models.TextChoices):
+        REGISTERED = "registered", "Зарегистрировано"
+        IN_PROGRESS = "in_progress", "В работе"
+        REDIRECTED = "redirected", "Переадресовано"
+        PRELIMINARY = "preliminary", "Предварительный ответ"
+        CLOSED = "closed", "Закрыто"
+
     """Обращение гражданина (запись журнала)."""
 
     input_file = models.ForeignKey(
@@ -226,6 +255,13 @@ class Irp(models.Model):
     result = models.SmallIntegerField(
         blank=True, null=True, choices=RESULTS, verbose_name="Исход обращения"
     )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.REGISTERED,
+        db_index=True,
+        verbose_name="Статус",
+    )
 
     # ---- Заявитель (z_*) ----
     z_f = models.CharField(max_length=40, blank=True, null=True, verbose_name="Фамилия")
@@ -237,7 +273,7 @@ class Irp(models.Model):
         blank=True, null=True, choices=ORGS, verbose_name="Страховая принадлежность"
     )
     z_doctype = models.SmallIntegerField(
-        default=14, blank=True, null=True, choices=DOC_TYPES,
+        blank=True, null=True, choices=DOC_TYPES,
         verbose_name="Тип документа, удостоверяющего личность",
     )
     z_docser = models.CharField(max_length=10, blank=True, null=True, verbose_name="Серия")
@@ -275,18 +311,155 @@ class Irp(models.Model):
         verbose_name = "Обращение"
         verbose_name_plural = "Обращения"
         ordering = ["-date_create", "-id"]
+        indexes = [
+            models.Index(fields=["date_create", "id"], name="journal_date_id_idx"),
+            models.Index(fields=["date_close", "data_plan"], name="journal_close_plan_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(n_irp__regex=r"^\s*$"),
+                name="irp_n_irp_not_blank",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(irp_type=2)
+                    | models.Q(zh_d__isnull=True)
+                    | models.Q(zh_d="")
+                ),
+                name="irp_complaint_details_match_type",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(pr_out__isnull=False)
+                    | models.Q(date_cross__isnull=True, time_cross__isnull=True)
+                ),
+                name="irp_redirect_details_match_flag",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(time_cross__isnull=True)
+                    | models.Q(date_cross__isnull=False)
+                ),
+                name="irp_redirect_time_has_date",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status="closed",
+                        date_close__isnull=False,
+                        result__isnull=False,
+                    )
+                    | (
+                        ~models.Q(status="closed")
+                        & models.Q(date_close__isnull=True, result__isnull=True)
+                    )
+                ),
+                name="irp_closed_status_has_date_and_result",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=("registered", "in_progress", "redirected", "preliminary", "closed")
+                ),
+                name="irp_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(data_plan__gte=models.F("date_create")),
+                name="irp_plan_not_before_created",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(date_close__isnull=True)
+                    | models.Q(date_close__gte=models.F("date_create"))
+                ),
+                name="irp_close_not_before_created",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.n_irp
 
     def clean(self):
         super().clean()
+        if self.irp_type != 2 and self.zh_d:
+            raise ValidationError(
+                {"zh_d": "Сведения о жалобе допустимы только для жалобы."}
+            )
+        if not self.pr_out and (self.date_cross or self.time_cross):
+            raise ValidationError(
+                {
+                    "pr_out": (
+                        "Дата и время направления допустимы только при наличии "
+                        "признака направления."
+                    )
+                }
+            )
+        if self.time_cross and not self.date_cross:
+            raise ValidationError(
+                {"date_cross": "Для времени направления укажите дату направления."}
+            )
         if self.way == 5 and not self.way_n:
             raise ValidationError({"way_n": "Укажите организацию"})
+        if bool(self.date_close) != bool(self.result):
+            raise ValidationError(
+                "Для закрытия обращения одновременно укажите дату и исход."
+            )
+        if self.data_plan and self.date_create and self.data_plan < self.date_create:
+            raise ValidationError(
+                {"data_plan": "Плановый срок не может быть раньше даты поступления."}
+            )
+        if self.date_close and self.date_create and self.date_close < self.date_create:
+            raise ValidationError(
+                {"date_close": "Дата закрытия не может быть раньше даты поступления."}
+            )
+        if self.status == self.Status.CLOSED and not self.date_close:
+            raise ValidationError(
+                {"date_close": "Для статуса «Закрыто» укажите дату и исход."}
+            )
 
     @property
     def is_closed(self) -> bool:
-        return bool(self.date_close)
+        return self.status == self.Status.CLOSED
+
+    def can_transition_to(self, target: str) -> bool:
+        allowed = {
+            self.Status.REGISTERED: {
+                self.Status.IN_PROGRESS,
+                self.Status.REDIRECTED,
+                self.Status.PRELIMINARY,
+                self.Status.CLOSED,
+            },
+            self.Status.IN_PROGRESS: {
+                self.Status.REDIRECTED,
+                self.Status.PRELIMINARY,
+                self.Status.CLOSED,
+            },
+            self.Status.REDIRECTED: {
+                self.Status.PRELIMINARY,
+                self.Status.CLOSED,
+            },
+            self.Status.PRELIMINARY: {
+                self.Status.PRELIMINARY,
+                self.Status.CLOSED,
+            },
+            self.Status.CLOSED: set(),
+        }
+        return target == self.status or target in allowed[self.status]
+
+    def synchronize_imported_status(self) -> None:
+        """Восстанавливает lifecycle для импорта, не открывая закрытые записи."""
+        if self.date_close and self.result:
+            target = self.Status.CLOSED
+        elif self.pk and self.answers.filter(is_preliminary=True).exists():
+            target = self.Status.PRELIMINARY
+        elif self.date_cross or self.pr_out:
+            target = self.Status.REDIRECTED
+        else:
+            target = self.Status.REGISTERED
+        if self.pk and self.status == self.Status.CLOSED and target != self.Status.CLOSED:
+            raise ValidationError(
+                {"status": "Пакетный импорт не может повторно открыть обращение."}
+            )
+        self.status = target
 
     @property
     def is_overdue(self) -> bool:
@@ -364,7 +537,11 @@ class IrpFile(models.Model):
         null=True, blank=True, related_name="files",
         on_delete=models.CASCADE, verbose_name="Ответ",
     )
-    file = models.FileField(upload_to=irp_file_path, verbose_name="Файл")
+    file = models.FileField(
+        upload_to=irp_file_path,
+        validators=[validate_attachment_file],
+        verbose_name="Файл",
+    )
     uploader = models.ForeignKey(
         Employee, on_delete=models.PROTECT, verbose_name="Загрузил"
     )
@@ -377,3 +554,9 @@ class IrpFile(models.Model):
 
     def __str__(self) -> str:
         return f"{self.irp.n_irp}: {self.file.name}"
+
+
+@receiver(post_delete, sender=IrpFile)
+def delete_irp_file_after_commit(sender, instance, **kwargs):
+    """Удаляет вложение после успешного удаления файла, ответа или обращения."""
+    delete_field_file_after_commit(instance.file)

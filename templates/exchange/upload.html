@@ -1,45 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Загрузка файла обмена{% endblock %}
 {% block content %}
-<h1>Загрузка файла обмена</h1>
-<p class="text-muted">
-  Способ 2/3 регистрации: XML (Приложение №10) или Excel. Выполняется единый
-  форматно-логический контроль; протокол обработки (FLCP) будет доступен ниже.
-</p>
+<header class="module-heading"><a class="module-heading__back" href="{% url 'exchange:logs' %}">← Журнал загрузок</a><p class="page-heading__eyebrow">Обмен данными</p><h1>Загрузка файла</h1><p>XML или Excel будет автоматически проверен. После обработки откроется подробный протокол ФЛК.</p></header>
 
-<div class="card">
-  <form method="post" enctype="multipart/form-data" id="upload-form">
+<div class="card upload-card">
+  <form method="post" enctype="multipart/form-data" id="upload-form"
+        data-max-file-size="20971520"
+        data-file-error="Файл должен быть G1*.xml, users*.xml или *.xlsx не более 20 МБ">
     {% csrf_token %}
     <div class="grid-2">
-      <div class="field"><label for="id_org">Организация (отправитель)</label>{{ form.org }}{% for error in form.org.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
-      <div class="field"><label for="id_file">Файл обмена</label>{{ form.file }}{% for error in form.file.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_org">Организация-отправитель</label>{{ form.org }}{% for error in form.org.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_file">Файл обмена</label>{{ form.file }}<span class="helptext">G1*.xml, users*.xml или XLSX, не более 20 МБ</span>{% for error in form.file.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
     </div>
     {% for error in form.non_field_errors %}<div class="alert alert--error">{{ error }}</div>{% endfor %}
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Загрузить и обработать</button>
-      <a class="btn btn--ghost" href="{% url 'exchange:logs' %}">Журнал загрузок</a>
+      <a class="btn btn--ghost" href="{% url 'exchange:logs' %}">Отмена</a>
     </div>
   </form>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  var form = document.getElementById('upload-form');
-  if (!form) return;
-  var fileInput = form.querySelector('[type="file"]');
-  form.addEventListener('submit', function (e) {
-    if (!fileInput.files.length) return;
-    var f = fileInput.files[0];
-    var name = (f.name || '').toLowerCase();
-    var ok = (name.startsWith('users') || name.startsWith('g1')) && name.endsWith('.xml') || name.endsWith('.xlsx') || name.endsWith('.xls');
-    if (!ok || f.size > 10 * 1024 * 1024) {
-      e.preventDefault();
-      fileInput.classList.add('is-invalid');
-      if (window.toast) toast.error('Файл должен быть G1*.xml, users*.xml или *.xlsx не более 10 МБ');
-    }
-  });
-})();
-</script>
 {% endblock %}

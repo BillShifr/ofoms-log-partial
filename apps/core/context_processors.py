@@ -6,34 +6,38 @@ from django.conf import settings
 def system_meta(request):
     """Передаёт SYSTEM_META, текущую роль, признак администратора и число
     непрочитанных сообщений (для пунктов меню base.html)."""
-    from apps.core.roles import Roles, role_code_for_user
+    from apps.core.policy import role_codes_for_user, user_is_system_admin
+    from apps.core.roles import ROLE_CHOICES, ROLE_GROUP_MAP
 
     user = getattr(request, "user", None)
-    is_admin = bool(
-        user
-        and user.is_authenticated
-        and (user.is_superuser or role_code_for_user(user) == Roles.ADMIN)
+    role_codes = role_codes_for_user(user)
+    role_code = next(
+        (code for code, _label in ROLE_CHOICES if code in role_codes), None
     )
+    is_admin = user_is_system_admin(user)
     unread = 0
     if user is not None and user.is_authenticated:
         from apps.system.models import MessageReply
 
-        replies = (
+        unread = (
             MessageReply.objects.filter(thread__conversation__participants=user)
             .exclude(author=user)
-            .select_related("thread__conversation")
+            .exclude(read_by=user)
+            .values("thread__conversation_id")
+            .distinct()
+            .count()
         )
-        seen = set()
-        for r in replies:
-            if not r.read_by.filter(pk=user.pk).exists():
-                conv_id = r.thread.conversation_id
-                if conv_id not in seen:
-                    seen.add(conv_id)
-        unread = len(seen)
+
+    role_label = ", ".join(
+        ROLE_GROUP_MAP[code] for code, _label in ROLE_CHOICES if code in role_codes
+    )
+    if user and user.is_authenticated and user.is_superuser and not role_label:
+        role_label = "Суперпользователь"
 
     return {
         "SYSTEM_META": settings.SYSTEM_META,
-        "SYSTEM_ROLE": role_code_for_user(user),
+        "SYSTEM_ROLE": role_code,
+        "SYSTEM_ROLE_LABEL": role_label,
         "can_manage_system": is_admin,
         "unread_messages": unread,
     }

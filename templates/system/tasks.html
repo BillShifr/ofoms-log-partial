@@ -1,16 +1,15 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% load system_filters %}
 {% block title %}Задачи{% endblock %}
 {% block content %}
-<h1>Автоматизированные задания</h1>
+<header class="page-heading page-heading--action">
+  <div><p class="page-heading__eyebrow">Системные операции</p><h1>Автоматизированные задания</h1><p class="page-heading__lead">Запуск, расписание и контроль служебных процессов</p></div>
+  <a class="btn btn--primary" href="{% url 'system:task_create' %}">+ Новое задание</a>
+</header>
 
-<div class="flex mb-2">
-  <a class="btn btn--accent" href="{% url 'system:task_create' %}">+ Новое задание</a>
-</div>
-
-<div class="card">
-  <div class="table-wrap">
-    <table class="data" data-client-sort>
+<div class="card table-card">
+  {% data_table variant="tasks" wrap_variant="tasks" sortable=True label="Таблица заданий; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th>Наименование</th>
@@ -20,49 +19,48 @@
           <th>Приоритет</th>
           <th>Режим</th>
           <th>Последний запуск</th>
-          <th></th>
+          <th data-no-sort></th>
         </tr>
       </thead>
       <tbody>
         {% for t in tasks %}
-        <tr data-href="{% url 'system:task_update' t.pk %}">
-          <td>{{ t.name }}</td>
-          <td class="mono" data-tip="{{ command_tips|get_item:t.command|default:t.command }}">{{ t.command }}</td>
-          <td>
+        <tr class="task-row" data-href="{% url 'system:task_update' t.pk %}" data-sort-group="task-{{ t.pk }}">
+          <td class="task-cell--name" data-label="Наименование">{{ t.name }}</td>
+          <td class="mono" data-label="Команда" data-tip="{{ command_tips|get_item:t.command|default:t.command }}">{{ t.command }}</td>
+          <td data-label="Статус">
             {% if t.status == 'completed' %}<span class="badge badge--closed">{{ t.get_status_display }}</span>
             {% elif t.status == 'failed' %}<span class="badge badge--overdue">{{ t.get_status_display }}</span>
             {% elif t.status == 'running' %}<span class="badge badge--running">{{ t.get_status_display }}</span>
             {% elif t.status == 'cancelled' %}<span class="badge badge--cancelled">{{ t.get_status_display }}</span>
             {% else %}<span class="badge badge--open">{{ t.get_status_display }}</span>{% endif %}
           </td>
-          <td>{% if t.assigned_to %}{{ t.assigned_to.full_name }}{% else %}—{% endif %}</td>
-          <td>
+          <td data-label="Исполнитель">{% if t.assigned_to %}{{ t.assigned_to.full_name }}{% else %}—{% endif %}</td>
+          <td data-label="Приоритет">
             {% if t.priority == 2 %}<span class="badge badge--overdue">Высокий</span>
             {% elif t.priority == 1 %}<span class="badge badge--open">Средний</span>
             {% else %}<span class="badge badge--cancelled">Низкий</span>{% endif %}
           </td>
-          <td>{{ t.get_run_mode_display }}</td>
-          <td>{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
-          <td class="text-nowrap">
+          <td data-label="Режим">{{ t.get_run_mode_display }}</td>
+          <td data-label="Последний запуск" data-value="{{ t.last_finished_at|date:'Y-m-d\TH:i:s' }}">{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
+          <td class="text-nowrap task-cell--actions" data-label="Действия"><div class="table-actions">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:task_update' t.pk %}">Карточка</a>
             <form method="post" action="{% url 'system:task_run' t.pk %}" class="inline-form">{% csrf_token %}
-              <button class="btn btn--sm btn--primary" type="submit">Запустить</button>
+              <button class="btn btn--sm btn--primary" type="submit"{% if not t.enabled %} disabled title="Сначала включите задание"{% endif %}>Запустить</button>
             </form>
             <form method="post" action="{% url 'system:task_toggle' t.pk %}" class="inline-form">{% csrf_token %}
               <button class="btn btn--sm btn--ghost" type="submit">{{ t.enabled|yesno:"Стоп,Вкл" }}</button>
             </form>
-          </td>
+          </div></td>
         </tr>
         {% if t.last_log %}
-        <tr class="task-log-row" data-href="{% url 'system:task_update' t.pk %}">
+        <tr class="task-log-row" data-href="{% url 'system:task_update' t.pk %}" data-sort-group="task-{{ t.pk }}">
           <td colspan="8" class="text-muted mono">{{ t.last_log|slice:":500" }}</td>
         </tr>
         {% endif %}
         {% empty %}
-        <tr><td colspan="8" class="text-muted">Заданий не создано.</td></tr>
+        <tr><td colspan="8" class="text-muted table-empty">Заданий не создано.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 </div>
 {% endblock %}

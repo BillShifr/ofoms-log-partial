@@ -1,0 +1,105 @@
+"""Central deny-by-default capability policy for regulated business actions."""
+
+from apps.core.roles import GROUP_ROLE_MAP, SMO_ROLES, TFOMS_ROLES, Roles
+
+JOURNAL_CREATE = "journal.create"
+JOURNAL_CHANGE = "journal.change"
+JOURNAL_REDIRECT = "journal.redirect"
+JOURNAL_READ = "journal.read"
+EXCHANGE_UPLOAD = "exchange.upload"
+EXCHANGE_READ = "exchange.read"
+REPORTS_READ = "reports.read"
+
+CAPABILITY_LABELS = {
+    JOURNAL_READ: "Просмотр журнала",
+    JOURNAL_CREATE: "Регистрация обращений",
+    JOURNAL_CHANGE: "Обработка обращений",
+    JOURNAL_REDIRECT: "Переадресация",
+    EXCHANGE_READ: "Просмотр обмена",
+    EXCHANGE_UPLOAD: "Загрузка обмена",
+    REPORTS_READ: "Просмотр отчётности",
+}
+
+ALL_ROLES = {
+    Roles.OP1,
+    Roles.OP2,
+    Roles.SP1,
+    Roles.SP2,
+    Roles.SP3,
+    Roles.ADMIN,
+    Roles.CALL_ADMIN,
+}
+
+CAPABILITY_ROLES = {
+    JOURNAL_READ: ALL_ROLES,
+    JOURNAL_CREATE: {Roles.OP1, Roles.SP1, Roles.ADMIN},
+    JOURNAL_CHANGE: {
+        Roles.OP1,
+        Roles.OP2,
+        Roles.SP1,
+        Roles.SP2,
+        Roles.SP3,
+        Roles.ADMIN,
+    },
+    JOURNAL_REDIRECT: {Roles.OP1, Roles.SP1, Roles.ADMIN},
+    EXCHANGE_UPLOAD: {Roles.OP1, Roles.SP1, Roles.ADMIN},
+    EXCHANGE_READ: ALL_ROLES,
+    REPORTS_READ: ALL_ROLES,
+}
+
+
+def role_codes_for_user(user) -> set[int]:
+    if user is None or not user.is_authenticated:
+        return set()
+    from apps.employee.models import TFOMS
+
+    assigned = {
+        code
+        for name in user.groups.values_list("name", flat=True)
+        if (code := GROUP_ROLE_MAP.get(name)) is not None
+    }
+    compatible = TFOMS_ROLES if user.org == TFOMS else SMO_ROLES
+    return assigned & compatible
+
+
+def user_has_capability(user, capability: str) -> bool:
+    if user is None or not user.is_authenticated or not user.is_active:
+        return False
+    if user.is_superuser:
+        return True
+    allowed = CAPABILITY_ROLES.get(capability)
+    return allowed is not None and bool(role_codes_for_user(user) & allowed)
+
+
+def user_is_system_admin(user) -> bool:
+    """Administrative portal role with its mandatory organization boundary."""
+    from apps.employee.models import TFOMS
+
+    return bool(
+        user
+        and user.is_authenticated
+        and user.is_active
+        and (
+            user.is_superuser
+            or (
+                user.org == TFOMS
+                and Roles.ADMIN in role_codes_for_user(user)
+            )
+        )
+    )
+
+
+def capability_matrix():
+    """Строки фактической RBAC-матрицы для административного UI."""
+    from apps.core.roles import ROLE_CHOICES
+
+    return [
+        {
+            "role": role_label,
+            "capabilities": [
+                {"label": label, "allowed": role_code in CAPABILITY_ROLES[capability]}
+                for capability, label in CAPABILITY_LABELS.items()
+            ],
+        }
+        for role_code, role_label in ROLE_CHOICES
+    ]

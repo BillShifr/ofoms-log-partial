@@ -1,18 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Сообщения{% endblock %}
 {% block content %}
-<h1>Сообщения</h1>
-<p class="text-muted mb-2">Внутренний мессенджер: диалоги, темы и ответы (PRD v3 §2.6).</p>
+<header class="page-heading messages-heading">
+  <div><p class="page-heading__eyebrow">Совместная работа</p><h1>Сообщения</h1><p class="page-heading__lead">Диалоги и рабочие обсуждения сотрудников</p></div>
+</header>
 
 <div class="messenger">
   <aside class="messenger__side">
-    <div class="card" style="padding:14px">
+    <div class="card messenger__side-card">
       {% include "system/_conversation_side.html" %}
     </div>
   </aside>
 
   <section class="messenger__main">
-    <div class="card">
+    <div class="card messenger__create">
       <details class="collapsible" data-key="new-conversation">
         <summary class="collapsible__toggle">Новый диалог</summary>
         <form method="post" action="{% url 'system:conversation_create' %}" data-validate>
@@ -26,57 +27,24 @@
             <div class="field field--wide">
               <label for="participant-search">Участники</label>
               <input id="participant-search" type="text"
+                     data-suggest-url="{% url 'system:users_suggest' %}"
                      placeholder="Введите ФИО (от 3 символов) — совпадения отмечаются автоматически"
                      autocomplete="off">
               <div class="participant-pick">{{ form.participants }}</div>
               {% for error in form.participants.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
             </div>
           </div>
-          <div class="form-actions" style="justify-content:flex-start">
+          <div class="form-actions form-actions--start">
             <button class="btn btn--primary" type="submit">Создать диалог</button>
           </div>
         </form>
       </details>
     </div>
-    <div class="card">
-      <p class="text-muted">Выберите диалог слева или создайте новый.</p>
+    <div class="card messenger__welcome">
+      <span class="messenger__welcome-mark" aria-hidden="true">↗</span>
+      <h2>Начните обсуждение</h2>
+      <p>Выберите диалог в списке или создайте новый для нужных участников.</p>
     </div>
   </section>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  var search = document.getElementById('participant-search');
-  if (!search) return;
-  var list = document.querySelector('.participant-pick');
-  if (!list) return;
-
-  // Ввод имени отмечает подходящий чекбокс участника (PRD v3 §2.0.6)
-  var labels = Array.prototype.map.call(list.querySelectorAll('label'), function (l) {
-    return l.textContent.trim();
-  });
-  var boxes = Array.prototype.slice.call(list.querySelectorAll('input'));
-
-  search.addEventListener('input', function () {
-    var q = search.value.trim();
-    if (q.length < 3) return;
-    fetch('/system/messages/users/suggest/?q=' + encodeURIComponent(q))
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        (data.suggestions || []).forEach(function (label) {
-          var idx = labels.indexOf(label);
-          if (idx === -1) return;
-          var box = boxes[idx];
-          if (box && !box.checked) {
-            box.checked = true;
-            search.value = '';
-          }
-        });
-      })
-      .catch(function () {});
-  });
-})();
-</script>
 {% endblock %}

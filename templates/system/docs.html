@@ -2,12 +2,14 @@
 {% load system_filters %}
 {% block title %}Документация{% endblock %}
 {% block content %}
-<h1>Документация</h1>
-<p class="text-muted mb-2">Действующая эксплуатационная документация, сгруппированная по разделам (ТЗ разд. 3.7, PRD v3 §2.8).</p>
+<header class="page-heading">
+  <div><p class="page-heading__eyebrow">База знаний</p><h1>Документация</h1><p class="page-heading__lead">Инструкции, регламенты и эксплуатационные материалы</p></div>
+  <div class="page-heading__metric"><strong>{{ categories|length }}</strong><span>разделов</span></div>
+</header>
 
 <div class="card mb-2">
-  <form method="get" class="filters" style="align-items:center">
-    <div class="field" style="flex:1">
+  <form method="get" class="filters filters--center">
+    <div class="field field--grow">
       <label for="search-docs">Поиск по документам</label>
       <input id="search-docs" type="text" name="q" value="{{ request.GET.q }}" data-autocomplete="doc" data-autocomplete-url="{% url 'system:doc_suggest' %}" placeholder="Введите название (от 3 символов)">
     </div>
@@ -32,9 +34,9 @@
         <div class="field"><label for="{{ form.version.id_for_label }}">Версия</label>{{ form.version }}{% for error in form.version.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field"><label for="{{ form.sort_order.id_for_label }}">Порядок</label>{{ form.sort_order }}{% for error in form.sort_order.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field field--wide"><label for="{{ form.description.id_for_label }}">Описание</label>{{ form.description }}{% for error in form.description.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
-        <div class="field field--wide"><label for="{{ form.file.id_for_label }}">Файл</label>{{ form.file }}{% for error in form.file.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field field--wide"><label for="{{ form.file.id_for_label }}">Файл</label>{{ form.file }}<span class="text-muted">Документы и архивы — до 20 МБ; видео MP4, WebM или OGV — до 200 МБ.</span>{% for error in form.file.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
       </div>
-      <div class="form-actions" style="justify-content:flex-start">
+      <div class="form-actions form-actions--start">
         <button class="btn btn--primary" type="submit">Загрузить</button>
       </div>
     </form>
@@ -54,17 +56,17 @@
     <div class="cat-icon" aria-hidden="true">{{ cat.icon|default:"DOC" }}</div>
     <h3 class="mt-1 mb-1">{{ cat.name }}</h3>
     {% if cat.description %}<p class="text-muted">{{ cat.description }}</p>{% endif %}
-    <span class="badge badge--role">Документов: {{ cat.docs_count }}</span>
+    <span class="badge badge--role">Документов: {{ cat.docs_total }}</span>
   </a>
   {% empty %}
-  <p class="text-muted">Категорий пока нет.</p>
+  <div class="empty-state span-2">Разделы документации пока не созданы</div>
   {% endfor %}
 </div>
 
 {% if category or docs %}
 <div class="card mt-2">
-  <div class="flex-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-    <h2 style="flex:1;font-size:1.2rem" class="mt-1 mb-1">
+  <div class="section-bar">
+    <h2 class="section-bar__title mt-1 mb-1">
       {% if category %}{{ category.name }}{% else %}Без категории{% endif %}
     </h2>
     {% if category %}<a class="btn btn--ghost btn--sm" href="{% url 'system:docs' %}">← Все разделы</a>{% endif %}
@@ -73,24 +75,8 @@
 </div>
 {% else %}
 <div class="card mt-2">
-  <p class="text-muted">Документация ещё не загружена.</p>
+  <div class="empty-state">Документация ещё не загружена</div>
 </div>
 {% endif %}
 {% endif %}
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  var fileInput = document.querySelector('#id_file');
-  var titleInput = document.querySelector('#id_title');
-  if (fileInput && titleInput) {
-    fileInput.addEventListener('change', function () {
-      if (!titleInput.value && fileInput.files.length) {
-        titleInput.value = (fileInput.files[0].name || '').replace(/\.[^.]+$/, '').slice(0, 200);
-      }
-    });
-  }
-})();
-</script>
 {% endblock %}

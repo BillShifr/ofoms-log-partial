@@ -1,45 +1,152 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+    compress: "true"
+
+x-app-build: &app-build
+  context: .
+  args:
+    VCS_REF: ${VCS_REF:?VCS_REF must be the full Git commit SHA}
+
+x-app-security: &app-security
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:size=256m,mode=1777
+
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     environment:
       POSTGRES_DB: ${DB_NAME:-ejournal}
       POSTGRES_USER: ${DB_USER:-ejournal}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-ejournal}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ejournal}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+    logging: *default-logging
+
+  volume-init:
+    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
+    build: *app-build
+    user: "0:0"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    command: ["sh", "-c", "chown -R 10001:10001 /app/media /app/exchange"]
+    volumes:
+      - media:/app/media
+      - exchange:/app/exchange
+    restart: "no"
+    logging: *default-logging
 
   web:
-    build: .
-    command: >
-      sh -c "
-        .venv/bin/python manage.py migrate --noinput --settings config.settings.prod &&
-        .venv/bin/gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60
-      "
+    <<: *app-security
+    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
+    build: *app-build
+    init: true
+    command: [".venv/bin/gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60"]
     environment: &web_env
       DJANGO_SETTINGS_MODULE: config.settings.prod
       DB_NAME: ${DB_NAME:-ejournal}
       DB_USER: ${DB_USER:-ejournal}
-      DB_PASSWORD: ${DB_PASSWORD:-ejournal}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       DB_HOST: db
       DB_PORT: "5432"
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-4}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-3}
+      DB_CONNECT_TIMEOUT: ${DB_CONNECT_TIMEOUT:-3}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-ejournal}
+      JWT_TTL: ${JWT_TTL:-300}
+      TOKEN_LOGIN_TRUSTED_ORIGINS: ${TOKEN_LOGIN_TRUSTED_ORIGINS:-}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
       DEBUG: "False"
-      SESSION_COOKIE_SECURE: "False"
-      SECURE_SSL_REDIRECT: "False"
+      MAX_FAILED_LOGIN_ATTEMPTS: ${MAX_FAILED_LOGIN_ATTEMPTS:-10}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-True}
+      SESSION_COOKIE_AGE: ${SESSION_COOKIE_AGE:-28800}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-True}
+      TRUST_PROXY_SSL_HEADER: ${TRUST_PROXY_SSL_HEADER:-True}
+      TRUST_PROXY_CLIENT_IP_HEADER: ${TRUST_PROXY_CLIENT_IP_HEADER:-True}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-127.0.0.1/32,::1/128}
+      SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-31536000}
+      TASK_STALE_AFTER_SECONDS: ${TASK_STALE_AFTER_SECONDS:-3600}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - media:/app/media
+      - exchange:/app/exchange
     ports:
-      - "8000:8000"
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:8000:8000"
     depends_on:
       db:
         condition: service_healthy
+      volume-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - .venv/bin/python
+        - -c
+        - >-
+          import http.client,sys; c=http.client.HTTPConnection('127.0.0.1',8000,timeout=3);
+          c.request('GET','/readyz',headers={'X-Forwarded-Proto':'https'}); r=c.getresponse();
+          sys.exit(0 if r.status == 200 else 1)
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+    stop_grace_period: 75s
+    logging: *default-logging
+
+  migrate:
+    <<: *app-security
+    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
+    build: *app-build
+    command: [".venv/bin/python", "manage.py", "migrate", "--noinput"]
+    environment: *web_env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+
+  scheduler:
+    <<: *app-security
+    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
+    build: *app-build
+    init: true
+    command: [".venv/bin/python", "manage.py", "run_scheduler", "--interval", "60"]
+    environment: *web_env
+    volumes:
+      - media:/app/media
+      - exchange:/app/exchange
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 75s
+    logging: *default-logging
 
 volumes:
   pgdata:
+  media:
+  exchange:

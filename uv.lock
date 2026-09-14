@@ -148,7 +148,7 @@ wheels = [
 [[package]]
 name = "ejournal-portal-tfoms"
 version = "2.0.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "django" },
     { name = "django-admin-list-filter-dropdown" },

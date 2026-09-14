@@ -1,8 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Вход{% endblock %}
+{% block anonymous_header_action %}{% endblock %}
 {% block content %}
-<div class="card" style="max-width:440px; margin:40px auto;">
-  <h1 class="mt-1">Вход в систему</h1>
+<div class="card login-card">
+  <div class="login-card__mark" aria-hidden="true">Э</div>
+  <p class="page-heading__eyebrow">Единый электронный журнал</p>
+  <h1>Вход в систему</h1>
+  <p class="login-card__lead">Используйте корпоративную учётную запись</p>
   {% if form.non_field_errors %}
     <div class="alert alert--error">{{ form.non_field_errors }}</div>
     <p class="text-muted">Учётная запись блокируется после 10 неудачных попыток входа
@@ -10,7 +14,7 @@
   {% endif %}
   <form method="post" data-validate>
     {% csrf_token %}
-    <div class="form-grid" style="grid-template-columns:1fr;">
+    <div class="form-grid login-card__fields">
       <div class="field">
         <label for="id_username">Логин</label>{{ form.username }}{{ form.username.errors }}
       </div>
@@ -19,7 +23,7 @@
       </div>
     </div>
     <input type="hidden" name="next" value="{{ next }}">
-    <div class="form-actions">
+    <div class="form-actions login-card__actions">
       <button class="btn btn--primary" type="submit">Войти</button>
     </div>
   </form>

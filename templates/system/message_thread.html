@@ -4,18 +4,29 @@
 {% block content %}
 <div class="messenger">
   <aside class="messenger__side">
-    <div class="card" style="padding:14px">
+    <div class="card messenger__side-card">
       {% include "system/_conversation_side.html" %}
     </div>
   </aside>
 
   <section class="messenger__main">
-    <div class="flex-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <a class="btn btn--ghost" href="{% url 'system:conversation' conv.pk %}">← {{ conv.display_title }}</a>
-      <h1 style="flex:1;margin:0">{{ thread.title }}</h1>
-      {% if thread.is_closed %}<span class="badge badge--open">Закрыта</span>{% endif %}
-    </div>
-    <p class="text-muted">Тему создал: {{ thread.created_by.full_name }} · {{ thread.created_at|date:"d.m.Y H:i" }}</p>
+    <header class="conversation-heading">
+      <a class="conversation-heading__back" href="{% url 'system:conversation' conv.pk %}">← {{ conv.display_title }}</a>
+      <div class="conversation-heading__title"><p class="page-heading__eyebrow">Тема обсуждения</p><h1>{{ thread.title }}</h1></div>
+      <div class="flex flex--wrap gap-6">
+        {% if thread.is_closed %}<span class="badge badge--open">Закрыта</span>{% endif %}
+        {% if can_manage_thread %}
+          <form method="post" action="{% url 'system:thread_toggle' thread.pk %}" class="inline-form">
+            {% csrf_token %}
+            <button class="btn btn--ghost btn--sm" type="submit"
+                    {% if not thread.is_closed %}data-confirm="Закрыть тему? Новые ответы станут недоступны."{% endif %}>
+              {% if thread.is_closed %}Открыть тему{% else %}Закрыть тему{% endif %}
+            </button>
+          </form>
+        {% endif %}
+      </div>
+      <p>Создал {{ thread.created_by.full_name }} · {{ thread.created_at|date:"d.m.Y H:i" }}</p>
+    </header>
 
     <div class="card">
       <div class="chat">
@@ -30,9 +41,9 @@
           </div>
           <p class="msg__body">{{ r.body }}</p>
           {% if r.attachments.all %}
-            <div class="flex" style="gap:6px;flex-wrap:wrap">
+            <div class="flex flex--wrap gap-6">
               {% for a in r.attachments.all %}
-                <a class="attachment-chip" href="{{ a.file.url }}" target="_blank">Загрузить: {{ a.file.name|cut:"messages/" }}</a>
+                <a class="attachment-chip" href="{% url 'system:message_attachment_download' a.pk %}">Загрузить: {{ a.file.name|cut:"messages/" }}</a>
               {% endfor %}
             </div>
           {% endif %}
@@ -52,7 +63,7 @@
           </form>
         </div>
         {% empty %}
-        <p class="text-muted">В теме пока нет сообщений.</p>
+        <div class="empty-state">В теме пока нет сообщений</div>
         {% endfor %}
       </div>
 
@@ -66,7 +77,7 @@
         </div>
         <div class="field">
           <label for="id_attachment">Вложение (необязательно)</label>
-          <input type="file" id="id_attachment" name="attachment">
+          <input type="file" id="id_attachment" name="attachment" accept=".doc,.docx,.odt,.ods,.pdf,.rtf,.txt,.xls,.xlsx,.zip">
           <span class="text-muted">PDF, DOC/XLS, до 20 МБ</span>
         </div>
         <button class="btn btn--primary" type="submit">Отправить</button>

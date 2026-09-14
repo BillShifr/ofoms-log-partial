@@ -1,26 +1,29 @@
 {% extends "base.html" %}
+{% load ui_components %}
 {% block title %}Пользователи{% endblock %}
 {% block content %}
-<h1>Каталог учётных записей</h1>
+<header class="page-heading page-heading--action">
+  <div><p class="page-heading__eyebrow">Управление доступом</p><h1>Учётные записи</h1><p class="page-heading__lead">Сотрудники, организации, роли и состояние доступа</p></div>
+  <a class="btn btn--primary" href="{% url 'system:user_create' %}">+ Новая учётная запись</a>
+</header>
 
 <div class="card mb-2">
   <form method="get">
     <div class="filters">
-      <div class="field"><label for="id_q">Поиск</label>{{ form.q }}</div>
-      <div class="field"><label for="id_org">Организация</label>{{ form.org }}</div>
-      <div class="field"><label class="checkbox" for="id_locked">{{ form.locked }} Только заблокированные</label></div>
+      <div class="field"><label for="id_q">Поиск</label>{{ form.q }}{{ form.q.errors }}</div>
+      <div class="field"><label for="id_org">Организация</label>{{ form.org }}{{ form.org.errors }}</div>
+      <div class="field"><label class="checkbox" for="id_locked">{{ form.locked }} Только заблокированные</label>{{ form.locked.errors }}</div>
+      {% for error in form.non_field_errors %}<div class="field field--wide"><div class="alert alert--error" role="alert">{{ error }}</div></div>{% endfor %}
     </div>
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Применить</button>
       <a class="btn btn--ghost" href="{% url 'system:users' %}">Сбросить</a>
-      <a class="btn btn--accent" href="{% url 'system:user_create' %}">+ Новая учётная запись</a>
     </div>
   </form>
 </div>
 
-<div class="card">
-  <div class="table-wrap">
-    <table class="data" data-client-sort>
+<div class="card table-card">
+  {% data_table variant="users" responsive=True sortable=True label="Таблица пользователей; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th>ФИО</th>
@@ -34,41 +37,40 @@
       </thead>
       <tbody>
         {% for u in page.object_list %}
-        <tr data-href="{% url 'system:user_update' u.pk %}">
-          <td>{{ u.full_name }}</td>
-          <td class="mono">{{ u.username }}</td>
-          <td>{{ u.get_org_display }}</td>
-          <td>{{ u.job_title|default:"—" }}</td>
-          <td>
+        <tr class="responsive-row" data-href="{% url 'system:user_update' u.pk %}">
+          <td class="responsive-cell--wide" data-label="ФИО">{{ u.full_name }}</td>
+          <td class="mono" data-label="Логин">{{ u.username }}</td>
+          <td data-label="Организация">{{ u.get_org_display }}</td>
+          <td data-label="Должность">{{ u.job_title|default:"—" }}</td>
+          <td data-label="Роли">
             {% for g in u.groups.all %}<span class="badge badge--role">{{ g.name }}</span>{% empty %}<span class="text-muted">—</span>{% endfor %}
           </td>
-          <td>
+          <td data-label="Статус">
             {% if not u.is_active or u.is_locked %}<span class="badge badge--overdue">Заблокирован</span>
             {% else %}<span class="badge badge--closed">Активен</span>{% endif %}
           </td>
-          <td class="text-nowrap">
+          <td class="text-nowrap responsive-cell--wide responsive-cell--actions" data-label="Действия"><div class="table-actions">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:user_update' u.pk %}">Изменить</a>
             {% if u.pk != request.user.pk %}
               {% if u.is_active and not u.is_locked %}
-                <form method="post" action="{% url 'system:user_block' u.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--sm btn--danger" type="submit">Блок</button></form>
+                <form method="post" action="{% url 'system:user_block' u.pk %}" class="inline-form" data-confirm="Заблокировать пользователя {{ u.username }}?">{% csrf_token %}<button class="btn btn--sm btn--danger" type="submit">Блок</button></form>
               {% else %}
                 <form method="post" action="{% url 'system:user_unblock' u.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--sm btn--primary" type="submit">Разблок.</button></form>
               {% endif %}
             {% endif %}
-          </td>
+          </div></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-muted">Пользователи не найдены.</td></tr>
+        <tr class="responsive-empty"><td colspan="7" class="text-muted table-empty">Пользователи не найдены.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
-  </div>
+  {% end_data_table %}
 
   {% if page.paginator.num_pages > 1 %}
   <div class="pagination">
-    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&amp;{{ request.GET.urlencode }}">‹ Назад</a>{% endif %}
+    {% if page.has_previous %}<a href="{% querystring page=page.previous_page_number %}">‹ Назад</a>{% endif %}
     <span class="current">Стр. {{ page.number }} из {{ page.paginator.num_pages }}</span>
-    {% if page.has_next %}<a href="?page={{ page.next_page_number }}&amp;{{ request.GET.urlencode }}">Вперёд ›</a>{% endif %}
+    {% if page.has_next %}<a href="{% querystring page=page.next_page_number %}">Вперёд ›</a>{% endif %}
   </div>
   {% endif %}
 </div>

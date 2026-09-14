@@ -4,8 +4,9 @@ import datetime
 import uuid
 
 from django import forms
+from django.db.models import Q
 
-from apps.employee.models import ORGS, Employee
+from apps.employee.models import ORGS, TFOMS, Employee
 from apps.journal.models import (
     IRP_HOW,
     IRP_TYPES,
@@ -13,6 +14,21 @@ from apps.journal.models import (
     IrpAnswer,
     IrpTheme,
 )
+
+
+def _has_global_org_scope(user):
+    return user.is_superuser or user.org == TFOMS
+
+
+def _assignable_employees(user, current_id=None):
+    """Активные исполнители в доступном org scope плюс текущее назначение."""
+    scope = Q() if _has_global_org_scope(user) else Q(org__in=(user.org, TFOMS))
+    availability = Q(is_active=True)
+    if current_id:
+        availability |= Q(pk=current_id)
+    return Employee.objects.filter(scope & availability).order_by(
+        "last_name", "first_name", "pk"
+    )
 
 
 class IrpForm(forms.ModelForm):
@@ -24,13 +40,29 @@ class IrpForm(forms.ModelForm):
         self.fields["theme"].queryset = IrpTheme.objects.filter(version=3)
         if user is not None:
             self.fields["theme"].empty_label = "— выберите тему —"
+            self.fields["otv_kon"].choices = [
+                org
+                for org in ORGS
+                if _has_global_org_scope(user) or org[0] == user.org
+            ]
+            self.fields["employee_one"].disabled = True
+            self.fields["employee_one"].help_text = (
+                "Первичный исполнитель фиксируется при регистрации."
+            )
+            if self.instance.pk is not None:
+                self.fields["n_irp"].disabled = True
+                self.fields["n_irp"].help_text = (
+                    "Уникальный номер фиксируется при регистрации."
+                )
+            self.fields["employee_it"].queryset = _assignable_employees(
+                user, self.instance.employee_it_id
+            )
             if self.instance.pk is None:
                 # По умолчанию: исполнитель = текущий пользователь,
                 # организация-ответственный = организация пользователя
                 self.fields["employee_one"].initial = user
                 self.fields["employee_it"].initial = user
                 self.fields["otv_kon"].initial = user.org
-                self.fields["otv_kon"].choices = [o for o in ORGS if o[0] == user.org or user.org == 81000]
                 # Уникальный номер генерируется сервером при отсутствии явного
                 self.fields["n_irp"].required = False
                 self.fields["n_irp"].initial = str(uuid.uuid4())
@@ -73,6 +105,26 @@ class IrpForm(forms.ModelForm):
         # Ограничение выбора в соответствии с организацией пользователя
         value = self.cleaned_data.get("otv_t")
         return value
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("irp_type") != 2:
+            cleaned["zh_d"] = None
+        if not cleaned.get("pr_out"):
+            cleaned["date_cross"] = None
+            cleaned["time_cross"] = None
+        date_close = cleaned.get("date_close")
+        result = cleaned.get("result")
+        if bool(date_close) != bool(result):
+            raise forms.ValidationError(
+                "Для закрытия обращения одновременно укажите дату и исход."
+            )
+        date_create = cleaned.get("date_create")
+        if date_close and date_create and date_close < date_create:
+            self.add_error(
+                "date_close", "Дата закрытия не может быть раньше даты поступления."
+            )
+        return cleaned
 
 
 class IrpFilterForm(forms.Form):
@@ -147,10 +199,14 @@ class IrpRedirectForm(forms.ModelForm):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["otv_kon"].choices = [o for o in ORGS if o[0] == user.org or user.org == 81000]
-        self.fields["employee_it"].queryset = (
-            Employee.objects.filter(org=user.org) | Employee.objects.filter(org=81000)
-        ).distinct()
+        self.fields["otv_kon"].choices = [
+            org
+            for org in ORGS
+            if _has_global_org_scope(user) or org[0] == user.org
+        ]
+        self.fields["employee_it"].queryset = _assignable_employees(
+            user, self.instance.employee_it_id
+        )
 
     def clean_date_cross(self):
         value = self.cleaned_data.get("date_cross")

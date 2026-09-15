@@ -31,7 +31,7 @@
       {% for error in form.non_field_errors %}<div class="alert alert--error">{{ error }}</div>{% endfor %}
     </details>
     <div class="form-actions">
-      <button class="btn btn--primary" type="submit">Сформировать</button>
+      <button class="btn btn--primary" type="submit">Сформировать отчёт</button>
       {% if rows %}
       <a class="btn btn--ghost" href="{% url 'reports:export' report.slug 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a>
       <a class="btn btn--ghost" href="{% url 'reports:export' report.slug 'pdf' %}?{{ request.GET.urlencode }}">PDF</a>

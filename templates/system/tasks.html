@@ -9,7 +9,7 @@
 </header>
 
 <div class="card table-card">
-  {% data_table variant="tasks" wrap_variant="tasks" sortable=True label="Таблица заданий; на узком экране показана карточками" %}
+  {% data_table variant="tasks" wrap_variant="tasks" sortable=True table_key="system-tasks" label="Таблица заданий; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th>Наименование</th>
@@ -25,8 +25,8 @@
       <tbody>
         {% for t in tasks %}
         <tr class="task-row" data-href="{% url 'system:task_update' t.pk %}" data-sort-group="task-{{ t.pk }}">
-          <td class="task-cell--name" data-label="Наименование">{{ t.name }}</td>
-          <td class="mono" data-label="Команда" data-tip="{{ command_tips|get_item:t.command|default:t.command }}">{{ t.command }}</td>
+          <td class="task-cell--name cell-long" data-label="Наименование"><span class="cell-clip">{{ t.name }}</span></td>
+          <td class="mono cell-long" data-label="Команда" data-tip="{{ command_tips|get_item:t.command|default:t.command }}"><span class="cell-clip">{{ t.command }}</span></td>
           <td data-label="Статус">
             {% if t.status == 'completed' %}<span class="badge badge--closed">{{ t.get_status_display }}</span>
             {% elif t.status == 'failed' %}<span class="badge badge--overdue">{{ t.get_status_display }}</span>
@@ -34,7 +34,7 @@
             {% elif t.status == 'cancelled' %}<span class="badge badge--cancelled">{{ t.get_status_display }}</span>
             {% else %}<span class="badge badge--open">{{ t.get_status_display }}</span>{% endif %}
           </td>
-          <td data-label="Исполнитель">{% if t.assigned_to %}{{ t.assigned_to.full_name }}{% else %}—{% endif %}</td>
+          <td class="cell-long" data-label="Исполнитель"><span class="cell-clip">{% if t.assigned_to %}{{ t.assigned_to.full_name }}{% else %}—{% endif %}</span></td>
           <td data-label="Приоритет">
             {% if t.priority == 2 %}<span class="badge badge--overdue">Высокий</span>
             {% elif t.priority == 1 %}<span class="badge badge--open">Средний</span>

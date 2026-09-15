@@ -2,7 +2,7 @@
 {% block title %}Настройки{% endblock %}
 {% block content %}
 <header class="page-heading">
-  <div><p class="page-heading__eyebrow">Персонализация</p><h1>Настройки интерфейса</h1><p class="page-heading__lead">Оформление и состав рабочих таблиц сохраняются для следующих сеансов</p></div>
+  <div><p class="page-heading__eyebrow">Персонализация</p><h1>Настройки интерфейса</h1><p class="page-heading__lead">Тема, размер шрифта и контраст сохраняются для следующих сеансов</p></div>
 </header>
 
 <div class="card mb-2">
@@ -35,21 +35,4 @@
   </div>
 </div>
 
-<div class="grid-2">
-  {% for key, meta in tables.items %}
-    <div class="card report-card">
-      <h3 class="mt-1 mb-1">{{ meta.title }}</h3>
-      <p class="text-muted mb-1">
-        {% for p in prefs %}
-          {% if p.table_key == key %}
-            Колонок: {{ p.columns|length }}{% if p.sorting.field %}, сортировка: {{ p.sorting.field }} ({{ p.sorting.dir|default:"-" }}){% endif %}
-          {% endif %}
-        {% empty %}
-          По умолчанию
-        {% endfor %}
-      </p>
-      <a class="btn btn--sm btn--primary" href="{% url 'system:table_prefs' key %}">Настроить</a>
-    </div>
-  {% endfor %}
-</div>
 {% endblock %}

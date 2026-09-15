@@ -18,7 +18,7 @@ from django.core.paginator import InvalidPage, Paginator
 from django.db import transaction
 from django.db.models import CharField, Count, F, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce, Concat
-from django.http import FileResponse, Http404, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_safe
@@ -770,6 +770,8 @@ def thread_react(request, pk):
             MessageReply.objects.select_related("thread__conversation"), pk=pk
         )
         _participant_or_404(request.user, reply.thread.conversation)
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Недопустимая реакция."}, status=400)
         return redirect("system:thread", reply.thread_id)
     with transaction.atomic():
         reply = get_object_or_404(
@@ -802,6 +804,10 @@ def thread_react(request, pk):
             ip=request.META.get("REMOTE_ADDR"),
             detail=emoji,
         )
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        counts = {item: len(reactions.get(item, [])) for item in EMOJI_SET}
+        pressed = {item: request.user.pk in reactions.get(item, []) for item in EMOJI_SET}
+        return JsonResponse({"ok": True, "counts": counts, "pressed": pressed})
     return redirect("system:thread", reply.thread_id)
 
 

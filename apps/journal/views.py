@@ -169,6 +169,7 @@ def irp_list(request):
             "form": form,
             "sort": sort,
             "cols": cols,
+            "table_key": JOURNAL_TABLE_KEY,
             "table_groups": _table_groups(cols),
             "fixed_first": pref.fixed_first,
             "active_nav": "journal",

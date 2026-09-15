@@ -170,7 +170,6 @@ def irp_list(request):
             "sort": sort,
             "cols": cols,
             "table_key": JOURNAL_TABLE_KEY,
-            "table_groups": _table_groups(cols),
             "fixed_first": pref.fixed_first,
             "active_nav": "journal",
             "status_map": dict(RESULTS),
@@ -188,19 +187,6 @@ def irp_list_print(request):
     mutable_query["print_view"] = "1"
     request.GET = mutable_query
     return irp_list(request)
-
-
-def _table_groups(cols):
-    """Строит строку групповой шапки (group -> colspan) для видимых колонок."""
-    groups = []
-    for col in cols:
-        label = col["group"]
-        if groups and groups[-1]["label"] == label:
-            groups[-1]["colspan"] += 1
-        else:
-            groups.append({"label": label, "colspan": 1})
-    return groups
-
 
 def _paginate_irp(request, qs):
     """Курсорная (keyset) пагинация по ключу (id)."""

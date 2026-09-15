@@ -296,7 +296,7 @@ class ReportScreenTests(BaseReportTestCase):
         self.assertContains(resp, "Качество услуг")
         self.assertContains(
             resp,
-            'class="data data--reports data--responsive" data-client-sort',
+            'class="data data--responsive" data-client-sort data-table-key="reports-detail"',
         )
         self.assertContains(resp, 'class="responsive-row')
         self.assertContains(resp, 'data-label="Причина"')

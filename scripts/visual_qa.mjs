@@ -158,7 +158,7 @@ async function evaluate(expression) {
 async function prepareRoute(name) {
   if (name !== "user-form") return;
   await evaluate(`(() => {
-    const table = document.querySelector('.data--capabilities');
+    const table = document.querySelector('table.data[data-table-key="system-capabilities"]');
     const details = table?.closest('details');
     if (!details) return;
     details.open = true;
@@ -182,39 +182,13 @@ async function settleAnimations() {
 
 async function measureJournalLayout() {
   return evaluate(`(async () => {
-    const wrap = document.querySelector('.table-wrap--journal');
-    const table = wrap?.querySelector('table.data--journal');
+    const table = document.querySelector('table.data[data-table-key="journal"]');
+    const wrap = table?.closest('.table-wrap');
     const row = table?.tBodies[0]?.rows[0];
-    const groupCells = table?.tHead?.rows[0]?.cells;
     if (!wrap || !table || !row) return null;
-    const mobile = innerWidth <= 900;
+    const mobile = false;
     const tableRect = table.getBoundingClientRect();
-    const firstGroupRect = groupCells?.[0]?.getBoundingClientRect();
-    const lastGroupRect = groupCells?.[groupCells.length - 1]?.getBoundingClientRect();
-    const groupCoversTable = mobile || Boolean(firstGroupRect && lastGroupRect &&
-      Math.abs(firstGroupRect.left - tableRect.left) <= 1 &&
-      Math.abs(lastGroupRect.right - tableRect.right) <= 1);
-    const cardBackground = getComputedStyle(wrap.closest('.card')).backgroundColor;
-    const groupCellsNeutral = mobile || [...groupCells].every((cell) =>
-      getComputedStyle(cell).backgroundColor === cardBackground);
-    const groupLabelsBounded = mobile || [...table.querySelectorAll('.group-row__label')]
-      .every((label) => {
-        const labelRect = label.getBoundingClientRect();
-        const cellRect = label.closest('th').getBoundingClientRect();
-        return getComputedStyle(label).display === 'inline-flex' &&
-          labelRect.width < cellRect.width - 4;
-      });
-    const statusRowsNeutral = [...table.tBodies[0].querySelectorAll('tr.row--overdue, tr.row--open')]
-      .every((bodyRow) => getComputedStyle(bodyRow).backgroundColor === cardBackground);
-    if (mobile) return {
-      mobile,
-      cardGrid: getComputedStyle(row).display === 'grid',
-      headerHidden: getComputedStyle(table.tHead).display === 'none',
-      groupCoversTable,
-      groupCellsNeutral,
-      groupLabelsBounded,
-      statusRowsNeutral
-    };
+    const groupRowsRemoved = table.querySelectorAll('.group-row, .group-row__label').length === 0;
     wrap.scrollLeft = wrap.scrollWidth;
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const wrapRect = wrap.getBoundingClientRect();
@@ -241,10 +215,7 @@ async function measureJournalLayout() {
         })
         .filter((item) => item.rightOverflow > 1)
         .slice(0, 8),
-      groupCoversTable,
-      groupCellsNeutral,
-      groupLabelsBounded,
-      statusRowsNeutral,
+      groupRowsRemoved,
       firstPinned: getComputedStyle(firstCell).position === 'sticky' &&
         Math.abs(firstRect.left - wrapRect.left) <= 2,
       statusSticky,
@@ -257,8 +228,8 @@ async function measureJournalLayout() {
 
 async function measureTaskLayout() {
   return evaluate(`(() => {
-    const wrap = document.querySelector('.table-wrap--tasks');
-    const table = wrap?.querySelector('table.data--tasks');
+    const table = document.querySelector('table.data[data-table-key="system-tasks"]');
+    const wrap = table?.closest('.table-wrap');
     const row = table?.querySelector('tbody tr.task-row');
     const actions = row?.querySelector('.table-actions');
     if (!wrap || !table || !row || !actions) return null;
@@ -270,6 +241,54 @@ async function measureTaskLayout() {
       headerHidden: getComputedStyle(table.tHead).display === 'none',
       cardGrid: getComputedStyle(row).display === 'grid',
       actionsVisible: actionsRect.left >= wrapRect.left - 1 && actionsRect.right <= wrapRect.right + 1
+    };
+  })()`);
+}
+
+async function measureSharedTableStyles(name) {
+  return evaluate(`(() => {
+    const table = document.querySelector('table.data');
+    const wrap = table?.closest('.table-wrap');
+    const header = table?.tHead?.querySelector('th');
+    const row = table?.tBodies[0]?.rows[0];
+    const cell = row?.cells[0];
+    if (!wrap || !table || !header || !cell) return null;
+    const root = getComputedStyle(document.documentElement);
+    const headerStyle = getComputedStyle(header);
+    const rowStyle = getComputedStyle(row);
+    const cellStyle = getComputedStyle(cell);
+    const tableStyle = getComputedStyle(table);
+    const token = (name) => root.getPropertyValue(name).trim();
+    const colorToken = (name) => {
+      const probe = document.createElement('span');
+      probe.style.color = token(name);
+      document.body.appendChild(probe);
+      const value = getComputedStyle(probe).color;
+      probe.remove();
+      return value;
+    };
+    const compactResponsive = table.classList.contains('data--responsive') && innerWidth <= 900;
+    return {
+      key: table.dataset.tableKey || null,
+      className: table.className,
+      hasForbiddenModifier: [...table.classList].some((className) =>
+        /^data--(journal|tasks|users|events|exchange|reports|protocol|capabilities|letter|wide)$/.test(className)
+      ),
+      compactResponsive,
+      headerBgMatches: compactResponsive || headerStyle.backgroundColor === colorToken('--table-header-bg'),
+      headerTextMatches: compactResponsive || headerStyle.color === colorToken('--table-text'),
+      rowBgMatches: compactResponsive || rowStyle.backgroundColor === colorToken('--table-row-bg'),
+      cellTextMatches: compactResponsive || cellStyle.color === colorToken('--table-text'),
+      borderMatches: compactResponsive || cellStyle.borderBottomColor === colorToken('--table-border') ||
+        cellStyle.borderBottomStyle === 'none' || cellStyle.borderBottomWidth === '0px',
+      tableBgMatches: tableStyle.backgroundColor === colorToken('--table-bg'),
+      rowHeight: Math.round(cell.getBoundingClientRect().height),
+      expectedRowHeight: parseInt(token('--table-row-height'), 10),
+      headerHeight: Math.round(header.getBoundingClientRect().height),
+      expectedHeaderHeight: parseInt(token('--table-header-height'), 10),
+      paddingX: cellStyle.paddingLeft,
+      expectedPaddingX: token('--table-cell-padding-x'),
+      inspectedRoute: ${JSON.stringify(name)}
     };
   })()`);
 }
@@ -439,6 +458,7 @@ try {
       metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
       metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
       metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
+      metrics.sharedTableStyles = await measureSharedTableStyles(name);
       metrics.browserErrors = browserErrors.slice(errorStart);
       const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
       const filename = `${name}-${width}x${height}-light.png`;
@@ -481,6 +501,7 @@ try {
         metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
         metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
         metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
+        metrics.sharedTableStyles = await measureSharedTableStyles(name);
         metrics.browserErrors = browserErrors.slice(errorStart);
         const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
         const filename = `${name}-${width}x${height}-${theme}-${font}-${contrast}.png`;
@@ -549,23 +570,28 @@ try {
       item.appliedMode.font !== item.font ||
       item.appliedMode.contrast !== (item.contrast || "default"),
     journalLayoutMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
-      item.name === "journal" && (!item.journalLayout ||
-      !item.journalLayout.groupCoversTable ||
-      !item.journalLayout.groupCellsNeutral || !item.journalLayout.groupLabelsBounded ||
-      !item.journalLayout.statusRowsNeutral ||
-      (item.journalLayout.mobile
-        ? (!item.journalLayout.cardGrid || !item.journalLayout.headerHidden)
-        : (!item.journalLayout.firstPinned || !item.journalLayout.statusPinned ||
-          (item.width >= 1366 && item.journalLayout.internalOverflow)))),
+      item.name === "journal" && item.width >= 1024 && (!item.journalLayout ||
+      !item.journalLayout.groupRowsRemoved ||
+      !item.journalLayout.statusPinned),
     taskLayoutMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
-      item.name === "tasks" && item.width <= 1100 &&
-      (!item.taskLayout || !item.taskLayout.compact || !item.taskLayout.headerHidden ||
-        !item.taskLayout.cardGrid || !item.taskLayout.actionsVisible),
+      item.name === "tasks" && [1280, 1366].includes(item.width) &&
+      (!item.taskLayout || !item.taskLayout.actionsVisible || item.taskLayout.compact),
     responsiveTableMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
       responsiveRouteNames.has(item.name) && item.width <= 900 &&
       (!item.responsiveTable || !item.responsiveTable.compact ||
         !item.responsiveTable.headerHidden || !item.responsiveTable.cardGrid ||
         item.responsiveTable.horizontallyScrollable || !item.responsiveTable.actionsVisible),
+    sharedTableStyleMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
+      item.sharedTableStyles && (item.sharedTableStyles.hasForbiddenModifier ||
+        !item.sharedTableStyles.headerBgMatches || !item.sharedTableStyles.headerTextMatches ||
+        !item.sharedTableStyles.rowBgMatches || !item.sharedTableStyles.cellTextMatches ||
+        !item.sharedTableStyles.borderMatches || !item.sharedTableStyles.tableBgMatches ||
+        (!item.sharedTableStyles.compactResponsive &&
+          item.sharedTableStyles.rowHeight < item.sharedTableStyles.expectedRowHeight) ||
+        (!item.sharedTableStyles.compactResponsive &&
+          item.sharedTableStyles.headerHeight < item.sharedTableStyles.expectedHeaderHeight) ||
+        (!item.sharedTableStyles.compactResponsive &&
+          item.sharedTableStyles.paddingX !== item.sharedTableStyles.expectedPaddingX)),
     printLayoutMismatch: item.name.startsWith("print-") && (!item.printLayout ||
       !item.printLayout.screenControlsHidden || !item.printLayout.sheetReset ||
       !item.printLayout.tableHeadersStatic || !item.printLayout.letterRowsNeutral),
@@ -582,7 +608,7 @@ try {
       item.httpStatus !== item.expectedStatus ||
       item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch ||
       item.journalLayoutMismatch || item.taskLayoutMismatch || item.responsiveTableMismatch ||
-      item.printLayoutMismatch || item.activeAnimations
+      item.sharedTableStyleMismatch || item.printLayoutMismatch || item.activeAnimations
     ),
     results: checkedResults,
   };

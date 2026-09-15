@@ -7,23 +7,6 @@ from django.utils.safestring import mark_safe
 
 register = template.Library()
 
-TABLE_VARIANTS = frozenset(
-    {
-        "capabilities",
-        "events",
-        "exchange",
-        "journal",
-        "letter",
-        "protocol",
-        "reports",
-        "tasks",
-        "users",
-        "wide",
-    }
-)
-TABLE_WRAP_VARIANTS = frozenset({"journal", "tasks"})
-
-
 class DataTableNode(template.Node):
     """Render the common table shell while allowing arbitrary row markup."""
 
@@ -36,8 +19,6 @@ class DataTableNode(template.Node):
             key: expression.resolve(context)
             for key, expression in self.options.items()
         }
-        variant = str(options.get("variant", "")).strip()
-        wrap_variant = str(options.get("wrap_variant", "")).strip()
         label = str(options.get("label", "")).strip()
         table_key = str(options.get("table_key", "")).strip()
         responsive = bool(options.get("responsive", False))
@@ -45,21 +26,7 @@ class DataTableNode(template.Node):
         fixed_first = bool(options.get("fixed_first", False))
         scrollable = bool(options.get("scrollable", True))
 
-        variants = variant.split()
-        unknown_variants = set(variants) - TABLE_VARIANTS
-        if unknown_variants:
-            raise template.TemplateSyntaxError(
-                f"unknown data_table variant: {sorted(unknown_variants)[0]}"
-            )
-        wrap_variants = wrap_variant.split()
-        unknown_wrap_variants = set(wrap_variants) - TABLE_WRAP_VARIANTS
-        if unknown_wrap_variants:
-            raise template.TemplateSyntaxError(
-                f"unknown data_table wrap variant: {sorted(unknown_wrap_variants)[0]}"
-            )
-
         table_classes = ["data"]
-        table_classes.extend(f"data--{name}" for name in variants)
         if responsive:
             table_classes.append("data--responsive")
         if fixed_first:
@@ -76,7 +43,6 @@ class DataTableNode(template.Node):
             return table_markup
 
         wrap_classes = ["table-wrap"]
-        wrap_classes.extend(f"table-wrap--{name}" for name in wrap_variants)
         if responsive:
             wrap_classes.append("table-wrap--responsive")
         return format_html(
@@ -93,7 +59,7 @@ def do_data_table(parser, token):
 
     Usage::
 
-        {% data_table variant="users" responsive=True sortable=True label="Users" %}
+        {% data_table responsive=True sortable=True table_key="users" label="Users" %}
           <thead>...</thead><tbody>...</tbody>
         {% end_data_table %}
     """
@@ -106,8 +72,6 @@ def do_data_table(parser, token):
         )
 
     allowed = {
-        "variant",
-        "wrap_variant",
         "label",
         "table_key",
         "responsive",

@@ -67,16 +67,11 @@
       <span aria-hidden="true">⚙</span>
     </a>
   </div>
-  {% data_table variant="wide journal" wrap_variant="journal" fixed_first=fixed_first table_key=table_key label="Таблица обращений; на узком экране показана карточками" %}
+  {% data_table fixed_first=fixed_first table_key=table_key label="Таблица обращений; на узком экране показана карточками" %}
       <colgroup>
         {% for col in cols %}<col class="col-{{ col.key }}">{% endfor %}
       </colgroup>
       <thead>
-        <tr class="group-row">
-          {% for g in table_groups %}
-            <th colspan="{{ g.colspan }}" scope="colgroup" class="{% if not g.label %}group-row__empty{% endif %}">{% if g.label %}<span class="group-row__label">{{ g.label }}</span>{% endif %}</th>
-          {% endfor %}
-        </tr>
         <tr>
           {% for col in cols %}
             <th scope="col" class="col-{{ col.key }}"{% if col.aria_sort %} aria-sort="{{ col.aria_sort }}"{% endif %}>

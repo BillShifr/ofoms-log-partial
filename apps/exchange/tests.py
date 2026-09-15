@@ -979,9 +979,7 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
         resp = self.client.get(reverse("exchange:logs"))
         self.assertContains(resp, "a.xml")
         self.assertNotContains(resp, "b.xml")
-        self.assertContains(
-            resp, 'class="data data--exchange data--responsive"'
-        )
+        self.assertContains(resp, 'class="data data--responsive" data-client-sort data-table-key="exchange-logs"')
         self.assertContains(resp, 'class="responsive-row"')
         self.assertContains(resp, 'data-label="Действия"')
 
@@ -1012,9 +1010,7 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
         response = self.client.get(reverse("exchange:protocol", args=[log.pk]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response, 'class="data data--protocol data--responsive"'
-        )
+        self.assertContains(response, 'class="data data--responsive" data-client-sort data-table-key="exchange-protocol"')
         self.assertContains(response, 'class="responsive-row"')
         self.assertContains(response, 'data-label="Комментарий"')
         self.assertContains(response, "Обязательное поле не заполнено")

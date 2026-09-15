@@ -740,6 +740,49 @@ td.cell-actions .btn--sm { padding-inline: 10px; }
 .field--roles label { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; background: var(--card); }
 .field--roles label:has(input:checked) { background: var(--chip-green); border-color: var(--accent); }
 .field--roles input[type="checkbox"] { accent-color: var(--accent); }
+.access-matrix > .text-muted {
+  display: block;
+  margin: 14px 16px 0;
+}
+.access-matrix .table-wrap {
+  margin-top: 12px;
+  border-top: 1px solid var(--table-border);
+  max-width: 100%;
+  overflow-x: auto;
+}
+.access-matrix table.data {
+  min-width: 1080px;
+  table-layout: auto;
+}
+.access-matrix table.data th,
+.access-matrix table.data td {
+  width: auto;
+  max-width: none;
+  white-space: nowrap;
+}
+.access-matrix table.data th:first-child,
+.access-matrix table.data td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  width: 260px;
+  min-width: 260px;
+  background: var(--table-bg);
+  box-shadow: inset -1px 0 var(--table-border);
+}
+.access-matrix table.data th:first-child {
+  z-index: 7;
+  background: var(--table-header-bg);
+}
+.access-matrix table.data td:not(:first-child),
+.access-matrix table.data th:not(:first-child) {
+  min-width: 132px;
+  text-align: center;
+}
+.access-matrix .badge {
+  justify-content: center;
+  min-width: 38px;
+}
 .field--wide { flex-basis: 100% !important; }
 .field--grow, .flex-grow { flex: 1; min-width: 0; }
 .field--submit { align-self: flex-end; }

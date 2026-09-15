@@ -270,6 +270,31 @@ async function measureCollapsibleLayout() {
   })()`);
 }
 
+async function measureAccessMatrixLayout() {
+  return evaluate(`(() => {
+    const table = document.querySelector('table.data[data-table-key="system-capabilities"]');
+    const wrap = table?.closest('.table-wrap');
+    const row = table?.tBodies[0]?.rows[0];
+    if (!table || !wrap || !row) return null;
+    const firstCell = row.cells[0];
+    const badge = row.querySelector('.badge');
+    const firstCellStyle = getComputedStyle(firstCell);
+    const badgeRect = badge?.getBoundingClientRect();
+    const cells = [...row.cells];
+    return {
+      firstColumnSticky: firstCellStyle.position === 'sticky',
+      tableLayoutAuto: getComputedStyle(table).tableLayout === 'auto',
+      rowCellsAligned: cells.every((cell) => Math.abs(cell.getBoundingClientRect().top - row.getBoundingClientRect().top) <= 1),
+      badgeInsideCell: !badgeRect || cells.slice(1).some((cell) => {
+        const rect = cell.getBoundingClientRect();
+        return badgeRect.left >= rect.left - 1 && badgeRect.right <= rect.right + 1 &&
+          badgeRect.top >= rect.top - 1 && badgeRect.bottom <= rect.bottom + 1;
+      }),
+      wrappedInOwnScroller: wrap.scrollWidth > wrap.clientWidth
+    };
+  })()`);
+}
+
 async function measureSharedTableStyles(name) {
   return evaluate(`(() => {
     const table = document.querySelector('table.data');
@@ -483,6 +508,7 @@ try {
       metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
       metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
       metrics.collapsibleLayout = await measureCollapsibleLayout();
+      metrics.accessMatrixLayout = name === "user-form" ? await measureAccessMatrixLayout() : null;
       metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
       metrics.sharedTableStyles = await measureSharedTableStyles(name);
       metrics.browserErrors = browserErrors.slice(errorStart);
@@ -527,6 +553,7 @@ try {
         metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
         metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
         metrics.collapsibleLayout = await measureCollapsibleLayout();
+        metrics.accessMatrixLayout = name === "user-form" ? await measureAccessMatrixLayout() : null;
         metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
         metrics.sharedTableStyles = await measureSharedTableStyles(name);
         metrics.browserErrors = browserErrors.slice(errorStart);
@@ -625,6 +652,11 @@ try {
       item.collapsibleLayout && (!item.collapsibleLayout.closed ||
         !item.collapsibleLayout.hasBorder || !item.collapsibleLayout.hasLeftStateBar ||
         !item.collapsibleLayout.hasStateText || !item.collapsibleLayout.minTapHeight),
+    accessMatrixLayoutMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
+      item.name === "user-form" && item.width >= 1024 && (!item.accessMatrixLayout ||
+        !item.accessMatrixLayout.firstColumnSticky || !item.accessMatrixLayout.tableLayoutAuto ||
+        !item.accessMatrixLayout.rowCellsAligned || !item.accessMatrixLayout.badgeInsideCell ||
+        !item.accessMatrixLayout.wrappedInOwnScroller),
     printLayoutMismatch: item.name.startsWith("print-") && (!item.printLayout ||
       !item.printLayout.screenControlsHidden || !item.printLayout.sheetReset ||
       !item.printLayout.tableHeadersStatic || !item.printLayout.letterRowsNeutral),
@@ -642,7 +674,7 @@ try {
       item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch ||
       item.journalLayoutMismatch || item.taskLayoutMismatch || item.responsiveTableMismatch ||
       item.sharedTableStyleMismatch || item.collapsibleLayoutMismatch ||
-      item.printLayoutMismatch || item.activeAnimations
+      item.accessMatrixLayoutMismatch || item.printLayoutMismatch || item.activeAnimations
     ),
     results: checkedResults,
   };

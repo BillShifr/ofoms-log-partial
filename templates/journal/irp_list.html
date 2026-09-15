@@ -67,14 +67,14 @@
       <span aria-hidden="true">⚙</span>
     </a>
   </div>
-  {% data_table fixed_first=fixed_first table_key=table_key label="Таблица обращений; на узком экране показана карточками" %}
+  {% data_table fixed_first=fixed_first sortable=True table_key=table_key label="Таблица обращений; на узком экране показана карточками" %}
       <colgroup>
         {% for col in cols %}<col class="col-{{ col.key }}">{% endfor %}
       </colgroup>
       <thead>
         <tr>
           {% for col in cols %}
-            <th scope="col" class="col-{{ col.key }}"{% if col.aria_sort %} aria-sort="{{ col.aria_sort }}"{% endif %}>
+            <th scope="col" class="col-{{ col.key }}{% if col.sortable %} data-sort{% endif %}"{% if col.aria_sort %} aria-sort="{{ col.aria_sort }}"{% endif %}>
               {% if col.sortable %}
                 <a href="{{ col.sort_url }}">{{ col.label }}</a>
               {% else %}

@@ -32,7 +32,7 @@
           <th>Должность</th>
           <th>Роли (группы)</th>
           <th>Статус</th>
-          <th>Действия</th>
+          <th class="cell-actions" data-no-sort>Действия</th>
         </tr>
       </thead>
       <tbody>
@@ -49,7 +49,7 @@
             {% if not u.is_active or u.is_locked %}<span class="badge badge--overdue">Заблокирован</span>
             {% else %}<span class="badge badge--closed">Активен</span>{% endif %}
           </td>
-          <td class="text-nowrap responsive-cell--wide responsive-cell--actions" data-label="Действия"><div class="table-actions">
+          <td class="text-nowrap cell-actions responsive-cell--wide responsive-cell--actions" data-label="Действия"><div class="table-actions">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:user_update' u.pk %}">Изменить</a>
             {% if u.pk != request.user.pk %}
               {% if u.is_active and not u.is_locked %}

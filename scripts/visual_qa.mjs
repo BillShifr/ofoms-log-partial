@@ -197,6 +197,7 @@ async function measureJournalLayout() {
     const firstRect = firstCell.getBoundingClientRect();
     const lastRect = lastCell.getBoundingClientRect();
     const statusSticky = getComputedStyle(lastCell).position === 'sticky';
+    const sortableHeaders = [...table.tHead.querySelectorAll('th[aria-sort]')];
     const result = {
       mobile,
       internalOverflow: wrap.scrollLeft > 1,
@@ -219,7 +220,10 @@ async function measureJournalLayout() {
       firstPinned: getComputedStyle(firstCell).position === 'sticky' &&
         Math.abs(firstRect.left - wrapRect.left) <= 2,
       statusSticky,
-      statusPinned: !statusSticky || Math.abs(lastRect.right - wrapRect.right) <= 2
+      statusPinned: !statusSticky || Math.abs(lastRect.right - wrapRect.right) <= 2,
+      sortableHeaders: sortableHeaders.length,
+      sortIndicatorsVisible: sortableHeaders.length > 0 &&
+        sortableHeaders.every((header) => getComputedStyle(header, '::after').content !== 'none')
     };
     wrap.scrollLeft = 0;
     return result;
@@ -240,6 +244,7 @@ async function measureTaskLayout() {
       compact,
       headerHidden: getComputedStyle(table.tHead).display === 'none',
       cardGrid: getComputedStyle(row).display === 'grid',
+      actionCellSticky: getComputedStyle(actions.closest('td')).position === 'sticky',
       actionsVisible: actionsRect.left >= wrapRect.left - 1 && actionsRect.right <= wrapRect.right + 1
     };
   })()`);
@@ -572,10 +577,12 @@ try {
     journalLayoutMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
       item.name === "journal" && item.width >= 1024 && (!item.journalLayout ||
       !item.journalLayout.groupRowsRemoved ||
-      !item.journalLayout.statusPinned),
+      !item.journalLayout.statusPinned ||
+      !item.journalLayout.sortIndicatorsVisible),
     taskLayoutMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
       item.name === "tasks" && [1280, 1366].includes(item.width) &&
-      (!item.taskLayout || !item.taskLayout.actionsVisible || item.taskLayout.compact),
+      (!item.taskLayout || !item.taskLayout.actionCellSticky ||
+        !item.taskLayout.actionsVisible || item.taskLayout.compact),
     responsiveTableMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
       responsiveRouteNames.has(item.name) && item.width <= 900 &&
       (!item.responsiveTable || !item.responsiveTable.compact ||

@@ -19,7 +19,7 @@
           <th>Приоритет</th>
           <th>Режим</th>
           <th>Последний запуск</th>
-          <th data-no-sort></th>
+          <th class="cell-actions" data-no-sort></th>
         </tr>
       </thead>
       <tbody>
@@ -42,7 +42,7 @@
           </td>
           <td data-label="Режим">{{ t.get_run_mode_display }}</td>
           <td data-label="Последний запуск" data-value="{{ t.last_finished_at|date:'Y-m-d\TH:i:s' }}">{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
-          <td class="text-nowrap task-cell--actions" data-label="Действия"><div class="table-actions">
+          <td class="text-nowrap cell-actions task-cell--actions" data-label="Действия"><div class="table-actions">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:task_update' t.pk %}">Карточка</a>
             <form method="post" action="{% url 'system:task_run' t.pk %}" class="inline-form">{% csrf_token %}
               <button class="btn btn--sm btn--primary" type="submit"{% if not t.enabled %} disabled title="Сначала включите задание"{% endif %}>Запустить</button>

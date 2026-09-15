@@ -205,16 +205,16 @@ def user_update(request, pk):
     return render(
         request,
         "system/user_form.html",
-        _user_form_context(form, f"Пользователь: {user.username}", user=user),
+        _user_form_context(form, f"Пользователь: {user.username}", target_user=user),
     )
 
 
-def _user_form_context(form, title, *, user=None):
+def _user_form_context(form, title, *, target_user=None):
     from apps.core.policy import CAPABILITY_LABELS, capability_matrix
 
     return {
         "form": form,
-        "user": user,
+        "target_user": target_user,
         "title": title,
         "capability_headers": CAPABILITY_LABELS.values(),
         "capability_matrix": capability_matrix(),

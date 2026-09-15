@@ -323,6 +323,25 @@ class UserManagementTests(BaseSystemTestCase):
         user.refresh_from_db()
         self.assertTrue(user.groups.filter(name="ОП1").exists())
 
+    def test_user_edit_header_keeps_authenticated_actor(self):
+        self.admin.last_name = "Текущий"
+        self.admin.first_name = "Администратор"
+        self.admin.save(update_fields=["last_name", "first_name"])
+        user = Employee.objects.create_user(
+            username="edited_user",
+            password=PASSWORD,
+            org=81000,
+            last_name="Редактируемый",
+            first_name="Пользователь",
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("system:user_update", args=[user.pk]))
+
+        self.assertContains(response, "Текущий Администратор")
+        self.assertContains(response, "Пользователь: edited_user")
+        self.assertNotContains(response, "Редактируемый Пользователь")
+
     def test_user_update_rolls_back_profile_and_roles_when_audit_fails(self):
         user = Employee.objects.create_user(
             username="rollback_update", password=PASSWORD, org=81000

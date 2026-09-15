@@ -63,6 +63,13 @@
   }
 
   function initSort() {
+    document.querySelectorAll('table.data th[aria-sort]').forEach(function (th) {
+      th.classList.add('data-sort');
+      var link = th.querySelector('a');
+      if (link && !link.getAttribute('aria-label')) {
+        link.setAttribute('aria-label', th.textContent.trim() + ': сортировать');
+      }
+    });
     document.querySelectorAll('table.data[data-client-sort]').forEach(function (table) {
       Array.prototype.forEach.call(table.tHead.rows[table.tHead.rows.length - 1].cells, function (th, i) {
         if (th.hasAttribute('data-no-sort') || isInteractive(th) || th.querySelector('a')) return;

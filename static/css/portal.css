@@ -4,6 +4,21 @@
    Токены: палитра, шрифты Golos Text / Unbounded, радиусы, тени.
    ============================================================== */
 
+@font-face {
+  font-family: "DejaVu Sans Local";
+  src: url("../fonts/DejaVuSans.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DejaVu Sans Local";
+  src: url("../fonts/DejaVuSans-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ---------- Токены (светлая тема) ---------- */
 :root {
   --ink: #0e2433;
@@ -25,13 +40,13 @@
   --chip-green: #e2f3ea;
   --chip-red: #fbe5e5;
   --chip-yellow: #faf0dd;
-  --fs: 17px;
+  --fs: 16px;
   --r: 14px;
   --r-lg: 22px;
   --wrap: 1200px;
   --header-h: 72px;
-  --font-main: "Golos Text", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Unbounded", "Golos Text", sans-serif;
+  --font-main: "DejaVu Sans Local", "Segoe UI", Arial, system-ui, sans-serif;
+  --font-display: var(--font-main);
   --shadow: 0 4px 18px rgba(14, 36, 51, 0.08);
   --shadow-lg: 0 12px 34px rgba(14, 36, 51, 0.14);
   --surface: var(--card);
@@ -47,10 +62,10 @@
   --table-muted: color-mix(in srgb, var(--ink) 58%, transparent);
   --table-header-height: 48px;
   --table-row-height: 54px;
-  --table-cell-padding-x: 14px;
+  --table-cell-padding-x: 16px;
   --table-cell-padding-y: 12px;
-  --table-font-size: .875rem;
-  --table-header-font-size: .76rem;
+  --table-font-size: .92rem;
+  --table-header-font-size: .78rem;
   --table-radius: var(--r-lg);
   --table-focus: var(--accent);
   --table-scrollbar: color-mix(in srgb, var(--primary) 45%, var(--line));
@@ -86,9 +101,9 @@ html[data-theme="dark"] .header__org,
 html[data-theme="dark"] .header__user-role { color: #9ccfff; }
 
 /* ---------- Масштаб шрифта (2.12) ---------- */
-html[data-font="a"] { --fs: 19px; }
-html[data-font="a-plus"] { --fs: 23px; }
-html[data-font="a-plus-plus"] { --fs: 27px; }
+html[data-font="a"] { --fs: 18px; }
+html[data-font="a-plus"] { --fs: 21px; }
+html[data-font="a-plus-plus"] { --fs: 24px; }
 .btn--active { outline: 2px solid var(--primary); outline-offset: 1px; }
 
 /* Режим контраста имеет приоритет над выбранной цветовой темой. */
@@ -155,7 +170,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 h1, h2, h3, h4 { font-weight: 700; margin: 0 0 .5em; line-height: 1.2; }
-h1 { font-size: clamp(1.65rem, 2.5vw, 2.25rem); letter-spacing: -.025em; }
+h1 { font-size: clamp(1.65rem, 2.1vw, 2.1rem); letter-spacing: 0; }
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
@@ -515,8 +530,8 @@ table.data td.cell-actions {
   position: sticky;
   right: 0;
   z-index: 5;
-  width: 290px;
-  max-width: 290px;
+  width: 330px;
+  max-width: 330px;
   overflow: visible;
   background: inherit;
   box-shadow: inset 1px 0 color-mix(in srgb, var(--ink) 12%, var(--table-border));
@@ -636,16 +651,35 @@ td.cell-actions .btn--sm { padding-inline: 10px; }
 .form-section-heading > span:first-child { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; background: var(--card); color: var(--primary); font-size: .72rem; font-weight: 800; box-shadow: inset 0 0 0 1px var(--line); }
 .form-section-heading h2 { margin: 0; font-size: 1.06rem; }
 .form-section-heading p { margin: 3px 0 0; color: color-mix(in srgb, var(--ink) 60%, transparent); font-size: .8rem; }
-.form-disclosure { margin: 0 -26px; }
-.form-disclosure__summary { margin-inline: 0; cursor: pointer; list-style: none; align-items: center; }
+.form-disclosure { margin: 0 -26px; border-block: 1px solid var(--line); background: color-mix(in srgb, var(--chip-blue) 18%, var(--card)); }
+.form-disclosure__summary { margin-inline: 0; margin-bottom: 0; cursor: pointer; list-style: none; align-items: center; }
 .form-disclosure__summary::-webkit-details-marker { display: none; }
-.form-disclosure__summary::before { content: "›"; order: 3; color: var(--primary); font-size: 1.5rem; line-height: 1; transition: transform .16s ease; }
+.form-disclosure__summary::before {
+  content: "›";
+  order: 3;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--primary);
+  font-size: 1.35rem;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: transform .16s ease, background .16s ease, color .16s ease;
+}
 .form-disclosure[open] .form-disclosure__summary::before { transform: rotate(90deg); }
+.form-disclosure:not([open]) .form-disclosure__summary {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--chip-yellow) 42%, var(--card)), color-mix(in srgb, var(--chip-blue) 48%, var(--card)));
+}
+.form-disclosure__summary:hover::before { background: var(--primary); color: #fff; }
 .form-disclosure__summary:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
 .form-disclosure__summary > div { flex: 1; min-width: 0; }
 .form-disclosure__action { flex: 0 0 auto; padding: 6px 10px; border-radius: 9px; background: var(--card); color: var(--primary); font-size: .78rem; font-weight: 800; box-shadow: inset 0 0 0 1px var(--line); }
 .form-disclosure[open] .form-disclosure__action { display: none; }
-.form-disclosure__content { margin-inline: 26px; }
+.form-disclosure__content { margin: 18px 26px 26px; }
 .form-card .form-grid { margin-bottom: 26px; }
 .field:has(:required) > label::after { content: " *"; color: var(--danger); }
 .form-actions--sticky { position: sticky; bottom: 0; z-index: 3; margin: 8px -26px 0; padding: 14px 26px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--card) 94%, transparent); box-shadow: 0 -8px 20px rgba(14,36,51,.06); backdrop-filter: blur(10px); }
@@ -699,7 +733,7 @@ td.cell-actions .btn--sm { padding-inline: 10px; }
   flex: 1 1 150px;
   min-width: 0;
 }
-.collapsible .filters, .collapsible .form-grid { padding-top: 12px; }
+.collapsible .filters, .collapsible .form-grid { padding: 14px 16px 16px; }
 .form-section { font-size: 1rem; font-weight: 600; margin: 18px 0 8px; padding-top: 14px; border-top: 1px solid var(--line); }
 .form-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
 .field--roles ul { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 8px 0 0; }
@@ -941,7 +975,11 @@ tbody tr.js-event-row { cursor: pointer; }
 .docs-row__body p { margin: 2px 0 0; }
 .docs-row__meta { color: var(--muted); font-size: .82rem; }
 .docs-row__actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
-.collapsible--sm .collapsible__toggle { font-size: .82rem; color: var(--primary); padding: 4px 0; }
+.collapsible--sm {
+  border: 0;
+  background: transparent;
+}
+.collapsible--sm .collapsible__toggle { font-size: .82rem; color: var(--primary); padding: 4px 0; box-shadow: none; }
 .filter-form { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
 .filter-form .field { flex: 1; min-width: 190px; }
 
@@ -962,16 +1000,56 @@ tbody tr.js-event-row { cursor: pointer; }
 .is-invalid { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
 
 /* ---------- Accordion / Collapsible (2.2, 2.10) ---------- */
-.collapsible { border-radius: var(--radius-lg); }
+.collapsible {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg) 24%, var(--card));
+}
 .collapsible__toggle {
-  display: flex; align-items: center; width: 100%; padding: 14px 20px;
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 13px 16px;
   margin: 0; border: none; background: transparent; font: inherit;
-  font-size: 1.05rem; color: var(--secondary); cursor: pointer; text-align: left;
+  font-size: .96rem; font-weight: 750; color: var(--secondary); cursor: pointer; text-align: left;
   list-style: none; /* убираем стандартный маркер */
 }
 .collapsible__toggle::-webkit-details-marker { display: none; }
-.collapsible__toggle::before { content: "▸ "; margin-right: 6px; font-weight: 600; }
-.collapsible[open] > .collapsible__toggle::before { content: "▾ "; }
+.collapsible__toggle::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-right: 2px solid var(--primary);
+  border-bottom: 2px solid var(--primary);
+  transform: rotate(-45deg);
+  transition: transform .16s ease;
+}
+.collapsible__toggle::after {
+  content: "Развернуть";
+  margin-left: auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--primary);
+  font-size: .72rem;
+  font-weight: 750;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.collapsible[open] > .collapsible__toggle {
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--chip-blue) 42%, var(--card));
+}
+.collapsible[open] > .collapsible__toggle::before { transform: rotate(45deg) translate(-2px, -2px); }
+.collapsible[open] > .collapsible__toggle::after { content: "Свернуть"; }
+.collapsible:not([open]) > .collapsible__toggle {
+  box-shadow: inset 4px 0 var(--primary);
+}
+.collapsible:not([open]) > .collapsible__toggle:hover {
+  background: color-mix(in srgb, var(--chip-green) 32%, var(--card));
+}
+.collapsible--sm {
+  border: 0;
+  background: transparent;
+}
+.collapsible--sm .collapsible__toggle::after { display: none; }
 .row-total td { font-weight: 600; background: var(--chip-yellow); }
 
 /* ---------- Версия для слабовидящих (А/А+/А++) ---------- */

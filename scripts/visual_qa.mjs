@@ -250,6 +250,26 @@ async function measureTaskLayout() {
   })()`);
 }
 
+async function measureCollapsibleLayout() {
+  return evaluate(`(() => {
+    const panel = document.querySelector('details.collapsible');
+    const toggle = panel?.querySelector('.collapsible__toggle');
+    if (!panel || !toggle) return null;
+    if (panel.open) return null;
+    const panelStyle = getComputedStyle(panel);
+    const toggleStyle = getComputedStyle(toggle);
+    const markerContent = getComputedStyle(toggle, '::after').content;
+    const toggleRect = toggle.getBoundingClientRect();
+    return {
+      closed: !panel.open,
+      hasBorder: panelStyle.borderTopStyle !== 'none' && panelStyle.borderTopWidth !== '0px',
+      hasLeftStateBar: toggleStyle.boxShadow !== 'none',
+      hasStateText: markerContent !== 'none' && markerContent !== '""',
+      minTapHeight: toggleRect.height >= 40
+    };
+  })()`);
+}
+
 async function measureSharedTableStyles(name) {
   return evaluate(`(() => {
     const table = document.querySelector('table.data');
@@ -462,6 +482,7 @@ try {
       }))()`);
       metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
       metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
+      metrics.collapsibleLayout = await measureCollapsibleLayout();
       metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
       metrics.sharedTableStyles = await measureSharedTableStyles(name);
       metrics.browserErrors = browserErrors.slice(errorStart);
@@ -505,6 +526,7 @@ try {
         }))()`);
         metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
         metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
+        metrics.collapsibleLayout = await measureCollapsibleLayout();
         metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
         metrics.sharedTableStyles = await measureSharedTableStyles(name);
         metrics.browserErrors = browserErrors.slice(errorStart);
@@ -599,6 +621,10 @@ try {
           item.sharedTableStyles.headerHeight < item.sharedTableStyles.expectedHeaderHeight) ||
         (!item.sharedTableStyles.compactResponsive &&
           item.sharedTableStyles.paddingX !== item.sharedTableStyles.expectedPaddingX)),
+    collapsibleLayoutMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
+      item.collapsibleLayout && (!item.collapsibleLayout.closed ||
+        !item.collapsibleLayout.hasBorder || !item.collapsibleLayout.hasLeftStateBar ||
+        !item.collapsibleLayout.hasStateText || !item.collapsibleLayout.minTapHeight),
     printLayoutMismatch: item.name.startsWith("print-") && (!item.printLayout ||
       !item.printLayout.screenControlsHidden || !item.printLayout.sheetReset ||
       !item.printLayout.tableHeadersStatic || !item.printLayout.letterRowsNeutral),
@@ -615,7 +641,8 @@ try {
       item.httpStatus !== item.expectedStatus ||
       item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch ||
       item.journalLayoutMismatch || item.taskLayoutMismatch || item.responsiveTableMismatch ||
-      item.sharedTableStyleMismatch || item.printLayoutMismatch || item.activeAnimations
+      item.sharedTableStyleMismatch || item.collapsibleLayoutMismatch ||
+      item.printLayoutMismatch || item.activeAnimations
     ),
     results: checkedResults,
   };

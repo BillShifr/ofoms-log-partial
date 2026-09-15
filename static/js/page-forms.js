@@ -202,7 +202,12 @@
     if (!search || !selectBox || !search.dataset.suggestUrl) return;
     var select = selectBox.querySelector("select");
     var panel = null;
-    selectBox.hidden = true;
+    if (select) {
+      select.addEventListener("change", function () {
+        var option = select.options[select.selectedIndex];
+        search.value = option && option.value ? option.textContent.trim() : "";
+      });
+    }
 
     function removePanel() {
       if (panel) panel.remove();
@@ -248,6 +253,21 @@
     });
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape") removePanel();
+    });
+  }
+
+  function initConditionalFields() {
+    document.querySelectorAll("[data-conditional-controller][data-conditional-values]").forEach(function (field) {
+      var controller = document.getElementById(field.dataset.conditionalController);
+      if (!controller) return;
+      var values = field.dataset.conditionalValues.split(",").map(function (value) {
+        return value.trim();
+      });
+      function sync() {
+        field.hidden = values.indexOf(controller.value) === -1;
+      }
+      controller.addEventListener("change", sync);
+      sync();
     });
   }
 
@@ -305,6 +325,7 @@
     initParticipants();
     initTaskTabs();
     initAssigneeSearch();
+    initConditionalFields();
     initReactions();
   });
 })();

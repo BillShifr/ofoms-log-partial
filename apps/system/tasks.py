@@ -6,7 +6,7 @@ JSON-поля params. Реестр расширяется здесь же; вы�
 """
 
 TASK_COMMAND_LABELS = {
-    "noop": "Проверка (no-op)",
+    "noop": "Проверка доступности задания",
     "exchange_import": "Автозагрузка файлов обмена (XML/Excel)",
 }
 

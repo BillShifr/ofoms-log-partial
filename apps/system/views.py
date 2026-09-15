@@ -1541,6 +1541,9 @@ def table_prefs(request, table_key):
     meta = _tables_meta().get(table_key)
     if meta is None:
         raise Http404
+    is_modal = request.GET.get("modal") == "1" or request.headers.get(
+        "x-requested-with"
+    ) == "XMLHttpRequest"
     default_columns = [c["key"] for c in meta["columns"]]
     if request.method == "POST":
         selected = request.POST.getlist("columns")
@@ -1583,6 +1586,8 @@ def table_prefs(request, table_key):
                 ip=request.META.get("REMOTE_ADDR"),
             )
         messages.success(request, "Настройки таблицы сохранены.")
+        if is_modal:
+            return JsonResponse({"ok": True})
         return redirect("journal:list")
 
     pref = UserTableViewPref.for_table(request.user, table_key, default_columns)
@@ -1594,9 +1599,10 @@ def table_prefs(request, table_key):
         meta["columns"],
         key=lambda column: order_by_key.get(column["key"], len(order_by_key) + 1),
     )
+    template_name = "system/table_prefs_modal.html" if is_modal else "system/table_prefs.html"
     return render(
         request,
-        "system/table_prefs.html",
+        template_name,
         {
             "table_key": table_key,
             "meta": meta,
@@ -1607,5 +1613,6 @@ def table_prefs(request, table_key):
             "sort_field": sorting.get("field", ""),
             "sort_dir": sorting.get("dir", "-"),
             "active_nav": "prefs",
+            "is_modal": is_modal,
         },
     )

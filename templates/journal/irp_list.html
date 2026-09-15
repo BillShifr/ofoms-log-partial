@@ -58,16 +58,8 @@
 </div>
 
 <div class="card table-card">
-  <div class="table-toolbar" aria-label="Действия с таблицей обращений">
-    <div>
-      <p class="table-toolbar__title">Реестр обращений</p>
-      <p class="table-toolbar__meta">Настройки применяются только к этой таблице.</p>
-    </div>
-    <a class="btn btn--ghost btn--icon" href="{% url 'system:table_prefs' table_key %}" aria-label="Настроить колонки таблицы обращений" title="Настроить колонки">
-      <span aria-hidden="true">⚙</span>
-    </a>
-  </div>
-  {% data_table fixed_first=fixed_first sortable=True table_key=table_key label="Таблица обращений; на узком экране показана карточками" %}
+  {% url 'system:table_prefs' table_key as table_settings_url %}
+  {% data_table responsive=True fixed_first=fixed_first sortable=True table_key=table_key title="Реестр обращений" settings_url=table_settings_url label="Таблица обращений; на узком экране показана карточками" %}
       <colgroup>
         {% for col in cols %}<col class="col-{{ col.key }}">{% endfor %}
       </colgroup>
@@ -86,7 +78,7 @@
       </thead>
       <tbody data-infinite-body>
         {% for irp in page.object_list %}
-        <tr class="clickable {% if not irp.is_closed and irp.is_overdue %}row--overdue{% elif not irp.is_closed and not irp.result %}row--open{% endif %}"
+        <tr class="responsive-row clickable {% if not irp.is_closed and irp.is_overdue %}row--overdue{% elif not irp.is_closed and not irp.result %}row--open{% endif %}"
             data-href="{% url 'journal:detail' irp.pk %}">
           {% for col in cols %}
             <td class="col-{{ col.key }}{% if col.key == 'n_irp' %} cell-id{% endif %}{% if col.key == 'theme' or col.key == 'z_f' or col.key == 'z_enp' or col.key == 'employee_one' %} cell-long{% endif %}{% if col.key == 'date_close' and not irp.date_close %} cell--empty{% elif col.key == 'z_enp' and not irp.z_enp %} cell--empty{% elif col.key == 'employee_one' and not irp.employee_one %} cell--empty{% endif %}" data-label="{{ col.label }}">
@@ -109,7 +101,7 @@
           {% endfor %}
         </tr>
         {% empty %}
-        <tr><td colspan="{{ cols|length }}" class="text-muted">Обращений не найдено.</td></tr>
+        <tr class="responsive-empty"><td colspan="{{ cols|length }}" class="text-muted">Обращений не найдено.</td></tr>
         {% endfor %}
       </tbody>
   {% end_data_table %}

@@ -146,7 +146,7 @@
 {% if history %}
 <section class="card record-section record-section--full">
   <div class="section-heading"><div><p class="section-heading__index">07</p><h2>История изменений</h2></div><span>Аудит карточки</span></div>
-  {% data_table responsive=True sortable=True table_key="journal-history" label="История изменений; на узком экране показана карточками" %}
+  {% data_table responsive=True sortable=True table_key="journal-history" title="История изменений" label="История изменений; на узком экране показана карточками" %}
       <thead><tr><th>Когда</th><th>Кем</th><th>Поле</th><th>Было</th><th>Стало</th></tr></thead>
       <tbody>
         {% for h in history %}

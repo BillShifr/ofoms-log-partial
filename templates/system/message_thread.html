@@ -84,7 +84,15 @@
         <button class="btn btn--primary" type="submit">Отправить</button>
       </form>
       {% else %}
-      <p class="text-muted">Тема закрыта — новые сообщения недоступны.</p>
+      <div class="closed-thread-actions">
+        <p class="text-muted">Тема закрыта — новые сообщения недоступны.</p>
+        {% if can_manage_thread %}
+        <form method="post" action="{% url 'system:thread_toggle' thread.pk %}" class="inline-form">
+          {% csrf_token %}
+          <button class="btn btn--ghost" type="submit">Открыть тему</button>
+        </form>
+        {% endif %}
+      </div>
       {% endif %}
     </div>
   </section>

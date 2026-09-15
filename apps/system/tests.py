@@ -5,6 +5,7 @@ import datetime
 import io
 import tempfile
 import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
@@ -819,6 +820,22 @@ class MessageTests(BaseSystemTestCase):
         thread.refresh_from_db()
         self.assertFalse(thread.is_closed)
 
+    def test_closed_thread_shows_reopen_action_near_reply_area_for_manager(self):
+        conv = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=conv,
+            created_by=self.operator,
+            title="Закрытая тема",
+            is_closed=True,
+        )
+        self.client.force_login(self.operator)
+
+        response = self.client.get(reverse("system:thread", args=[thread.pk]))
+
+        self.assertContains(response, "Тема закрыта — новые сообщения недоступны.")
+        self.assertContains(response, 'class="closed-thread-actions"')
+        self.assertContains(response, ">Открыть тему</button>")
+
     def test_regular_participant_cannot_change_foreign_thread_state(self):
         conv = self._conv()
         thread = MessageThread.objects.create(
@@ -1200,18 +1217,19 @@ class MessageTests(BaseSystemTestCase):
 class DocTests(BaseSystemTestCase):
     def test_upload_document(self):
         self.client.force_login(self.admin)
+        filename = f"manual-{uuid.uuid4().hex}.pdf"
         resp = self.client.post(
             reverse("system:doc_upload"),
             {
                 "title": "Руководство пользователя",
                 "sort_order": "1",
-                "file": SimpleUploadedFile("manual.pdf", b"%PDF-1.4", content_type="application/pdf"),
+                "file": SimpleUploadedFile(filename, b"%PDF-1.4", content_type="application/pdf"),
             },
         )
         self.assertEqual(resp.status_code, 302)
         doc = SystemDocument.objects.get()
         self.assertEqual(doc.title, "Руководство пользователя")
-        self.assertTrue(doc.file.name.endswith("manual.pdf"))
+        self.assertTrue(doc.file.name.endswith(filename))
 
     def test_document_upload_rollback_removes_storage_object(self):
         self.client.force_login(self.admin)
@@ -1421,6 +1439,21 @@ class DocTests(BaseSystemTestCase):
         resp = self.client.get(reverse("system:docs"))
         self.assertContains(resp, "Смотреть")
         self.assertContains(resp, reverse("system:doc_view", args=[SystemDocument.objects.get().pk]))
+
+    def test_non_video_document_has_single_download_action_label(self):
+        doc = SystemDocument.objects.create(
+            title="Инструкция",
+            file=SimpleUploadedFile("manual.pdf", b"%PDF-1.4", content_type="application/pdf"),
+            file_type="pdf",
+            uploaded_by=self.admin,
+        )
+        self.client.force_login(self.operator)
+
+        response = self.client.get(reverse("system:docs"))
+
+        self.assertContains(response, reverse("system:doc_download", args=[doc.pk]))
+        self.assertContains(response, ">Скачать</span>")
+        self.assertNotContains(response, ">Открыть</span>")
 
     def test_doc_suggest(self):
         SystemDocument.objects.create(
@@ -2001,6 +2034,17 @@ class TaskTests(BaseSystemTestCase):
         self.assertContains(response, '<select name="command"')
         self.assertFalse(TaskJob.objects.filter(name="Неизвестная команда").exists())
 
+    def test_task_form_uses_clear_command_and_assignee_list_copy(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("system:task_create"))
+
+        self.assertContains(response, "Проверка доступности задания")
+        self.assertContains(response, "Действие")
+        self.assertContains(response, "data-assignee-search")
+        self.assertContains(response, 'id="assignee-select"')
+        self.assertContains(response, "data-conditional-values=\"scheduled\"")
+
     def test_manual_mode_clears_stale_interval(self):
         task = self._make_task(
             run_mode=TaskJob.RunMode.SCHEDULED,
@@ -2070,8 +2114,8 @@ class TaskTests(BaseSystemTestCase):
         response = self.client.get(reverse("system:tasks"))
         self.assertContains(response, f'data-sort-group="task-{task.pk}"', count=2)
         self.assertContains(response, "data-no-sort")
-        self.assertContains(response, 'class="data" data-client-sort data-table-key="system-tasks"')
-        self.assertContains(response, 'class="task-row"')
+        self.assertContains(response, 'class="data data--responsive" data-client-sort data-table-key="system-tasks"')
+        self.assertContains(response, 'class="responsive-row task-row"')
         self.assertContains(response, 'data-label="Действия"')
 
         css = (settings.BASE_DIR / "static/css/portal.css").read_text(encoding="utf-8")
@@ -2904,6 +2948,18 @@ class PrefTests(BaseSystemTestCase):
         self.assertContains(response, 'class="data data--responsive"')
         self.assertContains(response, 'class="responsive-row"')
         self.assertContains(response, 'data-label="Колонка"')
+
+    def test_table_preferences_can_render_as_modal_fragment(self):
+        self.client.force_login(self.operator)
+
+        response = self.client.get(
+            reverse("system:table_prefs", args=[JOURNAL_TABLE_KEY]),
+            {"modal": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-table-prefs-form")
+        self.assertNotContains(response, "<html")
 
     def test_journal_uses_pref_sort(self):
         self._make_irp()

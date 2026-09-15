@@ -14,7 +14,21 @@
     <details class="collapsible" id="report-filters" data-key="report-filters"{% if form.errors %} open{% endif %}>
       <summary class="collapsible__toggle">Параметры отчёта</summary>
       <div class="filters">
+        <div class="date-range" aria-label="Период регистрации">
+          <div class="field">
+            <label for="{{ form.date_from.id_for_label }}">{{ form.date_from.label }}</label>
+            {{ form.date_from }}
+            {% for error in form.date_from.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+          </div>
+          <span class="date-range__separator">по</span>
+          <div class="field">
+            <label for="{{ form.date_to.id_for_label }}">Регистрация по</label>
+            {{ form.date_to }}
+            {% for error in form.date_to.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+          </div>
+        </div>
         {% for field in form %}
+        {% if field.name != "date_from" and field.name != "date_to" %}
         {% if field.field.widget.input_type == "checkbox" %}
         <div class="field field--narrow">
           <label class="checkbox">{{ field }}{{ field.label }}</label>
@@ -25,6 +39,7 @@
           {{ field }}
           {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
         </div>
+        {% endif %}
         {% endif %}
         {% endfor %}
       </div>
@@ -42,7 +57,7 @@
 
 {% if rows is not None %}
 <div class="card table-card">
-  {% data_table responsive=True sortable=True table_key="reports-detail" label="Таблица отчёта; на узком экране показана карточками" %}
+  {% data_table responsive=True sortable=True table_key="reports-detail" title="Результат отчёта" label="Таблица отчёта; на узком экране показана карточками" %}
       <thead>
         <tr>
           {% for label in report.labels %}<th>{{ label }}</th>{% endfor %}

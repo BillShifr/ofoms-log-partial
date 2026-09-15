@@ -290,7 +290,7 @@ class TaskForm(forms.ModelForm):
 
     command = forms.ChoiceField(
         choices=TASK_COMMAND_CHOICES,
-        label="Команда",
+        label="Действие",
     )
 
     class Meta:

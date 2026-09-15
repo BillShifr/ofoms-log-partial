@@ -1785,6 +1785,21 @@ class ErrorPageTests(TestCase):
 
 
 class TemplateHygieneTests(TestCase):
+    VISUAL_TABLE_MODIFIERS = (
+        "data--journal",
+        "data--tasks",
+        "data--users",
+        "data--events",
+        "data--exchange",
+        "data--reports",
+        "data--protocol",
+        "data--capabilities",
+        "data--letter",
+        "data--wide",
+        "table-wrap--journal",
+        "table-wrap--tasks",
+    )
+
     def _screen_templates(self):
         templates_root = Path(settings.BASE_DIR) / "templates"
         return [
@@ -1817,7 +1832,7 @@ class TemplateHygieneTests(TestCase):
     def test_data_table_component_renders_shared_accessible_shell(self):
         rendered = Template(
             "{% load ui_components %}"
-            "{% data_table variant='users wide' responsive=True sortable=True "
+            "{% data_table responsive=True sortable=True "
             "fixed_first=fixed table_key='users-list' label=label %}"
             "<thead><tr><th>ФИО</th></tr></thead>"
             "<tbody><tr><td>Иванов</td></tr></tbody>"
@@ -1827,10 +1842,7 @@ class TemplateHygieneTests(TestCase):
         self.assertIn('class="table-wrap table-wrap--responsive"', rendered)
         self.assertIn('tabindex="0"', rendered)
         self.assertIn('aria-label="Сотрудники &quot;ТФОМС&quot;"', rendered)
-        self.assertIn(
-            'class="data data--users data--wide data--responsive th-sticky"',
-            rendered,
-        )
+        self.assertIn('class="data data--responsive th-sticky"', rendered)
         self.assertIn('data-table-key="users-list"', rendered)
         self.assertIn("data-client-sort", rendered)
         self.assertEqual(rendered.count("<table"), 1)
@@ -1862,16 +1874,59 @@ class TemplateHygieneTests(TestCase):
         for rule in ("display: inline-flex", "max-width:", "white-space: normal", "overflow-wrap: anywhere"):
             self.assertIn(rule, body)
 
-    def test_data_table_component_rejects_undeclared_variant(self):
-        component = Template(
-            "{% load ui_components %}"
-            "{% data_table variant='one-off' %}{% end_data_table %}"
-        )
+    def test_data_table_component_rejects_visual_variants(self):
         with self.assertRaisesMessage(
             TemplateSyntaxError,
-            "unknown data_table variant: one-off",
+            "unknown data_table argument: variant",
         ):
-            component.render(Context())
+            Template(
+                "{% load ui_components %}"
+                "{% data_table variant='one-off' %}{% end_data_table %}"
+            )
+
+    def test_tables_do_not_use_visual_table_modifiers(self):
+        roots = [
+            Path(settings.BASE_DIR) / "templates",
+            Path(settings.BASE_DIR) / "static" / "css",
+        ]
+        violations = []
+        for root in roots:
+            for path in root.rglob("*"):
+                if path.suffix not in {".html", ".css"}:
+                    continue
+                text = path.read_text(encoding="utf-8-sig")
+                used = [name for name in self.VISUAL_TABLE_MODIFIERS if name in text]
+                if used:
+                    violations.append(
+                        f"{path.relative_to(settings.BASE_DIR)}: {', '.join(used)}"
+                    )
+        self.assertEqual(violations, [])
+
+    def test_table_design_tokens_are_defined_and_used(self):
+        css = (Path(settings.BASE_DIR) / "static" / "css" / "portal.css").read_text(
+            encoding="utf-8-sig"
+        )
+        tokens = [
+            "--table-bg",
+            "--table-header-bg",
+            "--table-row-bg",
+            "--table-row-alt-bg",
+            "--table-row-hover-bg",
+            "--table-border",
+            "--table-text",
+            "--table-muted",
+            "--table-header-height",
+            "--table-row-height",
+            "--table-cell-padding-x",
+            "--table-cell-padding-y",
+            "--table-font-size",
+            "--table-header-font-size",
+            "--table-radius",
+            "--table-focus",
+            "--table-scrollbar",
+        ]
+        missing = [token for token in tokens if css.count(token) < 2]
+        self.assertEqual(missing, [])
 
     def test_templates_do_not_embed_style_or_event_attributes(self):
         templates_root = Path(settings.BASE_DIR) / "templates"

@@ -61,7 +61,7 @@
     <details class="collapsible" data-key="user-section-access-matrix">
       <summary class="collapsible__toggle">Матрица прав ролей</summary>
       <p class="text-muted">Матрица отражает фактическую серверную политику. Права нескольких назначенных ролей объединяются.</p>
-      {% data_table variant="capabilities" responsive=True table_key="system-capabilities" label="Матрица прав; на узком экране показана карточками" %}
+      {% data_table responsive=True table_key="system-capabilities" label="Матрица прав; на узком экране показана карточками" %}
           <thead><tr><th>Роль</th>{% for label in capability_headers %}<th>{{ label }}</th>{% endfor %}</tr></thead>
           <tbody>
           {% for row in capability_matrix %}

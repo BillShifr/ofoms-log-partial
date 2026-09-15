@@ -172,7 +172,7 @@ class AccessTests(BaseSystemTestCase):
         self.assertContains(response, reverse("system:events"))
         self.assertContains(response, "/admin/")
         self.assertContains(response, "nav__menu-link--active")
-        self.assertContains(response, 'class="data data--users data--responsive"')
+        self.assertContains(response, 'class="data data--responsive" data-client-sort data-table-key="system-users"')
         self.assertContains(response, 'class="responsive-row"')
         self.assertContains(response, 'data-label="Действия"')
 
@@ -371,7 +371,7 @@ class UserManagementTests(BaseSystemTestCase):
         self.assertContains(response, "СП3 — страховой представитель 3 уровня")
         self.assertContains(
             response,
-            'class="data data--capabilities data--responsive"',
+            'class="data data--responsive" data-table-key="system-capabilities"',
         )
         self.assertContains(response, 'class="responsive-row"')
         self.assertContains(response, 'scope="row" data-label="Роль"')
@@ -509,9 +509,7 @@ class EventLogScreenTests(BaseSystemTestCase):
         self.assertContains(resp, "irp:1")
         event = EventLog.objects.filter(target="irp:1").get()
         self.assertContains(resp, f'data-sort-group="event-{event.pk}"', count=2)
-        self.assertContains(
-            resp, 'class="data data--events data--responsive"'
-        )
+        self.assertContains(resp, 'class="data data--responsive" data-client-sort data-table-key="system-events"')
         self.assertContains(resp, 'class="js-event-row responsive-row"')
         self.assertContains(resp, 'data-label="Длительность, мс"')
         visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text(encoding="utf-8")
@@ -2053,13 +2051,13 @@ class TaskTests(BaseSystemTestCase):
         response = self.client.get(reverse("system:tasks"))
         self.assertContains(response, f'data-sort-group="task-{task.pk}"', count=2)
         self.assertContains(response, "data-no-sort")
-        self.assertContains(response, 'class="data data--tasks"')
+        self.assertContains(response, 'class="data" data-client-sort data-table-key="system-tasks"')
         self.assertContains(response, 'class="task-row"')
         self.assertContains(response, 'data-label="Действия"')
 
         css = (settings.BASE_DIR / "static/css/portal.css").read_text(encoding="utf-8")
-        self.assertIn("@media (max-width: 1100px)", css)
-        self.assertIn(".data--tasks tbody tr.task-row", css)
+        self.assertNotIn(".data--tasks", css)
+        self.assertIn(".data--responsive tbody tr.responsive-row", css)
         visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text(encoding="utf-8")
         self.assertIn("taskLayoutMismatch", visual_qa)
 

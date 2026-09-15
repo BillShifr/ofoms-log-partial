@@ -27,7 +27,7 @@
     Протокол контроля отсутствует или повреждён. Нельзя подтвердить отсутствие нарушений; повторите обработку файла или обратитесь к администратору.
   </div>
   {% else %}
-  {% data_table variant="protocol" responsive=True sortable=True table_key="exchange-protocol" label="Протокол ФЛК; на узком экране показан карточками" %}
+  {% data_table responsive=True sortable=True table_key="exchange-protocol" label="Протокол ФЛК; на узком экране показан карточками" %}
       <thead><tr><th>Код</th><th>Поле</th><th data-type="num">Обращение</th><th>Комментарий</th></tr></thead>
       <tbody>
         {% for pr in prs %}

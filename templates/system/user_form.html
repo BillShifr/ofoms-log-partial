@@ -51,14 +51,14 @@
       <summary class="collapsible__toggle">Роли и доступы</summary>
       <div class="field field--roles">
         <label>Роли (группы)</label>
-        {% if user == request.user %}<span class="text-muted">Собственную активность и роль администратора снять нельзя — это защищает доступ к управлению системой.</span>{% endif %}
+        {% if target_user == request.user %}<span class="text-muted">Собственную активность и роль администратора снять нельзя — это защищает доступ к управлению системой.</span>{% endif %}
         {{ form.roles }}
         {% for error in form.roles.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
       </div>
     </details>
     {% endif %}
 
-    <details class="collapsible" data-key="user-section-access-matrix">
+    <details class="collapsible access-matrix" data-key="user-section-access-matrix">
       <summary class="collapsible__toggle">Матрица прав ролей</summary>
       <p class="text-muted">Матрица отражает фактическую серверную политику. Права нескольких назначенных ролей объединяются.</p>
       {% data_table responsive=True table_key="system-capabilities" label="Матрица прав; на узком экране показана карточками" %}

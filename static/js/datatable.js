@@ -195,6 +195,7 @@
 
   function initResize() {
     document.querySelectorAll('table.data[data-table-key]').forEach(function (table) {
+      if (table.getAttribute('data-table-key') === 'system-capabilities') return;
       var headerRow = table.tHead && table.tHead.rows[table.tHead.rows.length - 1];
       if (!headerRow) return;
       indexColumns(table);

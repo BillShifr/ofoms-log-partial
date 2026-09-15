@@ -263,9 +263,63 @@ async function measureCollapsibleLayout() {
     return {
       closed: !panel.open,
       hasBorder: panelStyle.borderTopStyle !== 'none' && panelStyle.borderTopWidth !== '0px',
+      clipsRoundedHeader: panelStyle.overflow !== 'visible',
       hasLeftStateBar: toggleStyle.boxShadow !== 'none',
       hasStateText: markerContent !== 'none' && markerContent !== '""',
       minTapHeight: toggleRect.height >= 40
+    };
+  })()`);
+}
+
+async function measureFormContainment() {
+  return evaluate(`(() => {
+    const containers = [...document.querySelectorAll('.card, details.collapsible, fieldset.field-group, .form-grid, .filters')];
+    const inspectable = [...document.querySelectorAll('.field, .field-group, .form-grid, input, select, textarea, .collapsible__toggle, .form-section-heading')]
+      .filter((element) => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return element.type !== 'hidden' && !element.closest('.table-wrap') &&
+          style.display !== 'none' && style.visibility !== 'hidden' &&
+          rect.width > 0 && rect.height > 0;
+      });
+    const overflowing = [];
+    const containerFor = (element) => {
+      if (element.matches('input, select, textarea')) return element.closest('.field, fieldset.field-group, details.collapsible, .card');
+      if (element.matches('.field')) return element.closest('fieldset.field-group, .form-grid, .filters, details.collapsible, .card');
+      if (element.matches('.field-group')) return element.closest('.filters, details.collapsible, .card');
+      if (element.matches('.form-grid')) return element.closest('details.collapsible, .card');
+      return element.closest('details.collapsible, .card');
+    };
+    for (const element of inspectable) {
+      const container = containerFor(element);
+      if (!container) continue;
+      const rect = element.getBoundingClientRect();
+      const bounds = container.getBoundingClientRect();
+      const overflow = Math.max(0, rect.right - bounds.right, bounds.left - rect.left);
+      if (overflow > 1) {
+        overflowing.push({
+          tag: element.tagName.toLowerCase(),
+          className: typeof element.className === 'string' ? element.className : '',
+          container: container.tagName.toLowerCase() + (container.className ? '.' + String(container.className).replace(/\\s+/g, '.') : ''),
+          overflow: Math.round(overflow)
+        });
+      }
+    }
+    const adjacentCollapsibles = [...document.querySelectorAll('details.collapsible + details.collapsible')];
+    const gaps = adjacentCollapsibles.map((panel) => {
+      const previous = panel.previousElementSibling;
+      if (!previous) return 0;
+      return Math.round(panel.getBoundingClientRect().top - previous.getBoundingClientRect().bottom);
+    });
+    return {
+      containerCount: containers.length,
+      overflowCount: overflowing.length,
+      overflowing: overflowing.slice(0, 8),
+      adjacentCollapsibleCount: adjacentCollapsibles.length,
+      adjacentCollapsiblesSpaced: gaps.every((gap) => gap >= 10),
+      gaps,
+      roundedCollapsiblesClip: [...document.querySelectorAll('details.collapsible:not(.collapsible--sm)')]
+        .every((panel) => getComputedStyle(panel).overflow !== 'visible')
     };
   })()`);
 }
@@ -508,6 +562,7 @@ try {
       metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
       metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
       metrics.collapsibleLayout = await measureCollapsibleLayout();
+      metrics.formContainment = await measureFormContainment();
       metrics.accessMatrixLayout = name === "user-form" ? await measureAccessMatrixLayout() : null;
       metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
       metrics.sharedTableStyles = await measureSharedTableStyles(name);
@@ -553,6 +608,7 @@ try {
         metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
         metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
         metrics.collapsibleLayout = await measureCollapsibleLayout();
+        metrics.formContainment = await measureFormContainment();
         metrics.accessMatrixLayout = name === "user-form" ? await measureAccessMatrixLayout() : null;
         metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
         metrics.sharedTableStyles = await measureSharedTableStyles(name);
@@ -650,8 +706,14 @@ try {
           item.sharedTableStyles.paddingX !== item.sharedTableStyles.expectedPaddingX)),
     collapsibleLayoutMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
       item.collapsibleLayout && (!item.collapsibleLayout.closed ||
-        !item.collapsibleLayout.hasBorder || !item.collapsibleLayout.hasLeftStateBar ||
+        !item.collapsibleLayout.hasBorder || !item.collapsibleLayout.clipsRoundedHeader ||
+        !item.collapsibleLayout.hasLeftStateBar ||
         !item.collapsibleLayout.hasStateText || !item.collapsibleLayout.minTapHeight),
+    formContainmentMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
+      item.formContainment && (item.formContainment.overflowCount > 0 ||
+        !item.formContainment.roundedCollapsiblesClip ||
+        (item.formContainment.adjacentCollapsibleCount > 0 &&
+          !item.formContainment.adjacentCollapsiblesSpaced)),
     accessMatrixLayoutMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
       item.name === "user-form" && item.width >= 1024 && (!item.accessMatrixLayout ||
         !item.accessMatrixLayout.firstColumnSticky || !item.accessMatrixLayout.tableLayoutAuto ||
@@ -674,7 +736,8 @@ try {
       item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch ||
       item.journalLayoutMismatch || item.taskLayoutMismatch || item.responsiveTableMismatch ||
       item.sharedTableStyleMismatch || item.collapsibleLayoutMismatch ||
-      item.accessMatrixLayoutMismatch || item.printLayoutMismatch || item.activeAnimations
+      item.formContainmentMismatch || item.accessMatrixLayoutMismatch ||
+      item.printLayoutMismatch || item.activeAnimations
     ),
     results: checkedResults,
   };

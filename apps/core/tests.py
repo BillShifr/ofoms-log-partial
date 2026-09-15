@@ -1785,20 +1785,40 @@ class ErrorPageTests(TestCase):
 
 
 class TemplateHygieneTests(TestCase):
+    def _screen_templates(self):
+        templates_root = Path(settings.BASE_DIR) / "templates"
+        return [
+            path
+            for path in templates_root.rglob("*.html")
+            if "_print" not in path.stem and path.stem not in {"irp_print"}
+        ]
+
     def test_all_product_tables_use_shared_component(self):
         templates_root = Path(settings.BASE_DIR) / "templates"
         violations = []
-        for template_path in templates_root.rglob("*.html"):
+        for template_path in self._screen_templates():
             text = template_path.read_text(encoding="utf-8-sig")
             if re.search(r"<\s*/?\s*table\b", text, re.IGNORECASE):
                 violations.append(str(template_path.relative_to(templates_root)))
         self.assertEqual(violations, [])
 
+    def test_screen_data_tables_have_stable_keys(self):
+        templates_root = Path(settings.BASE_DIR) / "templates"
+        missing = []
+        tag = re.compile(r"{%\s*data_table\b(?P<args>.*?)%}")
+        for template_path in self._screen_templates():
+            text = template_path.read_text(encoding="utf-8-sig")
+            for match in tag.finditer(text):
+                args = match.group("args")
+                if "table_key=" not in args:
+                    missing.append(str(template_path.relative_to(templates_root)))
+        self.assertEqual(missing, [])
+
     def test_data_table_component_renders_shared_accessible_shell(self):
         rendered = Template(
             "{% load ui_components %}"
             "{% data_table variant='users wide' responsive=True sortable=True "
-            "fixed_first=fixed label=label %}"
+            "fixed_first=fixed table_key='users-list' label=label %}"
             "<thead><tr><th>ФИО</th></tr></thead>"
             "<tbody><tr><td>Иванов</td></tr></tbody>"
             "{% end_data_table %}"
@@ -1811,9 +1831,36 @@ class TemplateHygieneTests(TestCase):
             'class="data data--users data--wide data--responsive th-sticky"',
             rendered,
         )
+        self.assertIn('data-table-key="users-list"', rendered)
         self.assertIn("data-client-sort", rendered)
         self.assertEqual(rendered.count("<table"), 1)
         self.assertEqual(rendered.count("</table>"), 1)
+
+    def test_datatable_javascript_exposes_required_interactions(self):
+        script = (
+            Path(settings.BASE_DIR) / "static" / "js" / "datatable.js"
+        ).read_text(encoding="utf-8-sig")
+        required = [
+            "localeCompare(String(bv), 'ru')",
+            "aria-sort",
+            "keydown",
+            "pointerdown",
+            "localStorage.setItem(storageKey(table)",
+            "datatable-widths:",
+            "ResizeObserver",
+        ]
+        missing = [needle for needle in required if needle not in script]
+        self.assertEqual(missing, [])
+
+    def test_badge_css_keeps_text_inside_badge_box(self):
+        css = (Path(settings.BASE_DIR) / "static" / "css" / "portal.css").read_text(
+            encoding="utf-8-sig"
+        )
+        badge_block = re.search(r"\.badge\s*{(?P<body>[^}]+)}", css, re.MULTILINE)
+        self.assertIsNotNone(badge_block)
+        body = badge_block.group("body")
+        for rule in ("display: inline-flex", "max-width:", "white-space: normal", "overflow-wrap: anywhere"):
+            self.assertIn(rule, body)
 
     def test_data_table_component_rejects_undeclared_variant(self):
         component = Template(

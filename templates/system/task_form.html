@@ -77,7 +77,7 @@
 
   <div class="tab-panel is-active" data-panel="runs">
     {% if runs %}
-    {% data_table responsive=True label="История запусков; на узком экране показана карточками" %}
+    {% data_table responsive=True table_key="system-task-runs" label="История запусков; на узком экране показана карточками" %}
         <thead>
           <tr><th>Начало</th><th>Завершение</th><th>Инициатор</th><th>Результат</th><th>Лог</th></tr>
         </thead>
@@ -88,7 +88,7 @@
             <td data-label="Завершение">{{ r.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
             <td data-label="Инициатор">{% if r.triggered_by == "auto" %}Автоматически{% elif r.triggered_by == "legacy" %}Исторический запуск{% else %}Пользователь{% endif %}</td>
             <td data-label="Результат">{% if r.result == 'ok' %}<span class="badge badge--closed">успешно</span>{% elif r.result == 'failed' %}<span class="badge badge--overdue">ошибка</span>{% else %}<span class="badge badge--open">{{ r.result }}</span>{% endif %}</td>
-            <td class="mono cell-long responsive-cell--wide" data-label="Лог" title="{{ r.log }}">{{ r.log|truncatechars:160 }}</td>
+            <td class="mono cell-long responsive-cell--wide" data-label="Лог"><span class="cell-clip">{{ r.log }}</span></td>
           </tr>
           {% endfor %}
         </tbody>

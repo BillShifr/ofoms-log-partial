@@ -23,7 +23,7 @@
 </div>
 
 <div class="card table-card">
-  {% data_table variant="users" responsive=True sortable=True label="Таблица пользователей; на узком экране показана карточками" %}
+  {% data_table variant="users" responsive=True sortable=True table_key="system-users" label="Таблица пользователей; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th>ФИО</th>
@@ -38,10 +38,10 @@
       <tbody>
         {% for u in page.object_list %}
         <tr class="responsive-row" data-href="{% url 'system:user_update' u.pk %}">
-          <td class="responsive-cell--wide" data-label="ФИО">{{ u.full_name }}</td>
+          <td class="cell-long responsive-cell--wide" data-label="ФИО"><span class="cell-clip">{{ u.full_name }}</span></td>
           <td class="mono" data-label="Логин">{{ u.username }}</td>
           <td data-label="Организация">{{ u.get_org_display }}</td>
-          <td data-label="Должность">{{ u.job_title|default:"—" }}</td>
+          <td class="cell-long" data-label="Должность"><span class="cell-clip">{{ u.job_title|default:"—" }}</span></td>
           <td data-label="Роли">
             {% for g in u.groups.all %}<span class="badge badge--role">{{ g.name }}</span>{% empty %}<span class="text-muted">—</span>{% endfor %}
           </td>

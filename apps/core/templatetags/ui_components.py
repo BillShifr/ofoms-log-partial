@@ -66,10 +66,10 @@ class DataTableNode(template.Node):
             table_classes.append("th-sticky")
 
         table_attrs = format_html(' class="{}"', " ".join(table_classes))
-        if table_key:
-            table_attrs = format_html('{} data-table-key="{}"', table_attrs, table_key)
         if sortable:
             table_attrs = format_html("{} data-client-sort", table_attrs)
+        if table_key:
+            table_attrs = format_html('{} data-table-key="{}"', table_attrs, table_key)
         content = self.nodelist.render(context)
         table_markup = format_html("<table{}>{}</table>", table_attrs, mark_safe(content))
         if not scrollable:

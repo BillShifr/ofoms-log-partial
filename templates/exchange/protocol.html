@@ -27,7 +27,7 @@
     Протокол контроля отсутствует или повреждён. Нельзя подтвердить отсутствие нарушений; повторите обработку файла или обратитесь к администратору.
   </div>
   {% else %}
-  {% data_table variant="protocol" responsive=True sortable=True label="Протокол ФЛК; на узком экране показан карточками" %}
+  {% data_table variant="protocol" responsive=True sortable=True table_key="exchange-protocol" label="Протокол ФЛК; на узком экране показан карточками" %}
       <thead><tr><th>Код</th><th>Поле</th><th data-type="num">Обращение</th><th>Комментарий</th></tr></thead>
       <tbody>
         {% for pr in prs %}
@@ -36,7 +36,7 @@
               <span class="badge badge--overdue" data-tip="Код 41: ошибка формата данных (нарушена структура XML-элемента)">41</span>{% endif %}</td>
           <td data-label="Поле">{{ pr.IM_POL|default:"—" }}</td>
           <td class="mono" data-label="Обращение" data-type="num">{{ pr.N_ZAP|default:"—" }}</td>
-          <td class="responsive-cell--wide" data-label="Комментарий">{{ pr.COMMENT }}</td>
+          <td class="cell-long responsive-cell--wide" data-label="Комментарий"><span class="cell-clip">{{ pr.COMMENT }}</span></td>
         </tr>
         {% empty %}
         <tr class="responsive-empty"><td colspan="4" class="table-empty">Нарушений не зафиксировано.</td></tr>

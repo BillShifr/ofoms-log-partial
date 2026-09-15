@@ -565,14 +565,16 @@ td.cell-actions .btn--sm { padding-inline: 10px; }
 .table-empty { padding: 40px 20px !important; text-align: center !important; }
 
 /* ---------- Формы ---------- */
-.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px 20px; }
-.field { display: flex; flex-direction: column; gap: 6px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px 20px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field[hidden] { display: none; }
 .field .field-error { color: var(--danger); font-size: .85rem; }
 .field label, .field-label { font-weight: 600; font-size: .9rem; }
 .field input,
 .field select,
 .field textarea {
+  width: 100%;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -690,7 +692,7 @@ td.cell-actions .btn--sm { padding-inline: 10px; }
 .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .filters--journal {
   display: grid;
-  grid-template-columns: minmax(220px, .9fr) minmax(260px, 1fr) minmax(420px, 1.6fr) minmax(300px, 1fr);
+  grid-template-columns: minmax(180px, .85fr) minmax(220px, 1fr) minmax(320px, 1.4fr) minmax(240px, .95fr);
   gap: 14px;
   align-items: start;
 }
@@ -712,6 +714,7 @@ td.cell-actions .btn--sm { padding-inline: 10px; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   min-width: 0;
+  max-width: 100%;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -1047,13 +1050,16 @@ tbody tr.js-event-row { cursor: pointer; }
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--bg) 24%, var(--card));
+  overflow: hidden;
 }
+.collapsible + .collapsible { margin-top: 14px; }
 .collapsible__toggle {
-  display: flex; align-items: center; gap: 10px; width: 100%; padding: 13px 16px;
+  display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 13px 16px;
   margin: 0; border: none; background: transparent; font: inherit;
   font-size: .96rem; font-weight: 750; color: var(--secondary); cursor: pointer; text-align: left;
   list-style: none; /* убираем стандартный маркер */
 }
+.collapsible__toggle > * { min-width: 0; }
 .collapsible__toggle::-webkit-details-marker { display: none; }
 .collapsible__toggle::before {
   content: "";
@@ -1091,6 +1097,7 @@ tbody tr.js-event-row { cursor: pointer; }
 .collapsible--sm {
   border: 0;
   background: transparent;
+  overflow: visible;
 }
 .collapsible--sm .collapsible__toggle::after { display: none; }
 .row-total td { font-weight: 600; background: var(--chip-yellow); }
@@ -1282,7 +1289,7 @@ td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; whit
 /* ---------- Адаптивность (2.0.1) ---------- */
 @media (min-width: 1920px) { :root { --wrap: 1440px; --fs: 18px; } }
 @media (min-width: 1440px) and (max-width: 1919px) { :root { --wrap: 1320px; } }
-@media (max-width: 1320px) {
+@media (max-width: 1380px) {
   .filters--journal { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 720px) {

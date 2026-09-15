@@ -2016,6 +2016,29 @@ class TemplateHygieneTests(TestCase):
         self.assertIn("QA_EXPECT_STATUSES", visual_qa)
         self.assertIn("item.httpStatus !== item.expectedStatus", visual_qa)
 
+    def test_forms_have_responsive_containment_contract(self):
+        css = (Path(settings.BASE_DIR) / "static/css/portal.css").read_text(
+            encoding="utf-8"
+        )
+        visual_qa = (
+            Path(settings.BASE_DIR) / "scripts" / "visual_qa.mjs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+            css,
+        )
+        self.assertIn(
+            ".field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }",
+            css,
+        )
+        self.assertIn("width: 100%;\n  min-width: 0;", css)
+        self.assertIn(".collapsible + .collapsible { margin-top: 14px; }", css)
+        self.assertIn("overflow: hidden;", css)
+        self.assertIn("formContainmentMismatch", visual_qa)
+        self.assertIn("clipsRoundedHeader", visual_qa)
+        self.assertIn("adjacentCollapsiblesSpaced", visual_qa)
+
     def test_component_css_color_fallbacks_stay_in_token_layer(self):
         css = (Path(settings.BASE_DIR) / "static/css/portal.css").read_text(
             encoding="utf-8"

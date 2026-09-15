@@ -16,6 +16,12 @@ const expectedForbidden = new Set(
 const requestedRoutes = new Set(
   (process.env.QA_ROUTE_NAMES || "").split(",").map((value) => value.trim()).filter(Boolean),
 );
+const expectedStatuses = new Map(Object.entries(
+  process.env.QA_EXPECT_STATUSES ? JSON.parse(process.env.QA_EXPECT_STATUSES) : {},
+).map(([name, status]) => [name, Number(status)]));
+if ([...expectedStatuses.values()].some((status) => !Number.isInteger(status) || status < 100 || status > 599)) {
+  throw new Error("QA_EXPECT_STATUSES must map route names to valid HTTP status codes");
+}
 
 if (!username || !password) {
   console.error("Set QA_USERNAME and QA_PASSWORD for a local non-production account.");
@@ -23,12 +29,26 @@ if (!username || !password) {
 }
 
 const viewports = [
-  [694, 869],
+  [390, 844],
+  [768, 1024],
   [1024, 768],
   [1280, 800],
   [1366, 768],
   [1440, 900],
   [1920, 1080],
+];
+const sampledModeViewports = [
+  [390, 844],
+  [768, 1024],
+  [1024, 768],
+  [1920, 1080],
+];
+const accessibilityModes = [
+  ["dark", "base", "default"],
+  ["light", "a", "default"],
+  ["light", "a-plus-plus", "default"],
+  ["light", "base", "black"],
+  ["light", "base", "white"],
 ];
 const routes = [
   ["journal", "/journal/"],
@@ -72,11 +92,14 @@ if (process.env.QA_EXTRA_ROUTES) {
   routes.push(...extraRoutes);
 }
 if (requestedRoutes.size) {
-  const knownRoutes = new Set(routes.map(([name]) => name));
+  const knownRoutes = new Set([...routes, ...printRoutes].map(([name]) => name));
   const unknownRoutes = [...requestedRoutes].filter((name) => !knownRoutes.has(name));
   if (unknownRoutes.length) throw new Error(`Unknown QA_ROUTE_NAMES: ${unknownRoutes.join(", ")}`);
   for (let index = routes.length - 1; index >= 0; index -= 1) {
     if (!requestedRoutes.has(routes[index][0])) routes.splice(index, 1);
+  }
+  for (let index = printRoutes.length - 1; index >= 0; index -= 1) {
+    if (!requestedRoutes.has(printRoutes[index][0])) printRoutes.splice(index, 1);
   }
 }
 
@@ -164,7 +187,7 @@ async function measureJournalLayout() {
     const row = table?.tBodies[0]?.rows[0];
     const groupCells = table?.tHead?.rows[0]?.cells;
     if (!wrap || !table || !row) return null;
-    const mobile = innerWidth <= 720;
+    const mobile = innerWidth <= 900;
     const tableRect = table.getBoundingClientRect();
     const firstGroupRect = groupCells?.[0]?.getBoundingClientRect();
     const lastGroupRect = groupCells?.[groupCells.length - 1]?.getBoundingClientRect();
@@ -345,8 +368,8 @@ try {
   for (const [width, height] of viewports) {
     await captureLogin(width, height, "light", "base", "default");
   }
-  for (const [theme, font, contrast] of [["dark", "base", "default"], ["light", "a-plus-plus", "default"], ["light", "a", "black"]]) {
-    for (const [width, height] of [[694, 869], [1024, 768], [1920, 1080]]) {
+  for (const [theme, font, contrast] of accessibilityModes) {
+    for (const [width, height] of sampledModeViewports) {
       await captureLogin(width, height, theme, font, contrast);
     }
   }
@@ -424,8 +447,8 @@ try {
     }
   }
 
-  for (const [theme, font, contrast] of [["dark", "base", "default"], ["light", "a-plus-plus", "default"], ["light", "a", "black"]]) {
-    for (const [width, height] of [[694, 869], [1024, 768], [1920, 1080]]) {
+  for (const [theme, font, contrast] of accessibilityModes) {
+    for (const [width, height] of sampledModeViewports) {
       await command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
       for (const [name, path] of routes) {
         const errorStart = browserErrors.length;
@@ -472,6 +495,7 @@ try {
   for (const [name, path] of printRoutes) {
     const errorStart = browserErrors.length;
     await navigate(`${baseUrl}${path}`);
+    await evaluate(`document.documentElement.dataset.theme='light'; document.documentElement.dataset.font='base'; document.documentElement.dataset.contrast='default'`);
     await settleAnimations();
     const metrics = await evaluate(`(() => {
       const sheet = document.querySelector('.paper, .print-sheet');
@@ -483,7 +507,11 @@ try {
         forbidden: false,
         documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
         navOverflow: false,
-        appliedMode: { theme: 'light', font: 'base', contrast: 'default' },
+        appliedMode: {
+          theme: document.documentElement.dataset.theme || null,
+          font: document.documentElement.dataset.font || null,
+          contrast: document.documentElement.dataset.contrast || null
+        },
         activeAnimations: document.getAnimations().filter((animation) => animation.playState === 'running').length,
         tablePalette: [],
         width: document.documentElement.clientWidth,
@@ -515,10 +543,13 @@ try {
   const checkedResults = results.map((item) => ({
     ...item,
     expectedForbidden: expectedForbidden.has(item.name),
+    expectedStatus: expectedStatuses.get(item.name) ||
+      (expectedForbidden.has(item.name) ? 403 : 200),
     modeMismatch: item.appliedMode.theme !== item.theme ||
       item.appliedMode.font !== item.font ||
       item.appliedMode.contrast !== (item.contrast || "default"),
-    journalLayoutMismatch: item.name === "journal" && (!item.journalLayout ||
+    journalLayoutMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
+      item.name === "journal" && (!item.journalLayout ||
       !item.journalLayout.groupCoversTable ||
       !item.journalLayout.groupCellsNeutral || !item.journalLayout.groupLabelsBounded ||
       !item.journalLayout.statusRowsNeutral ||
@@ -526,10 +557,12 @@ try {
         ? (!item.journalLayout.cardGrid || !item.journalLayout.headerHidden)
         : (!item.journalLayout.firstPinned || !item.journalLayout.statusPinned ||
           (item.width >= 1366 && item.journalLayout.internalOverflow)))),
-    taskLayoutMismatch: item.name === "tasks" && item.width <= 1100 &&
+    taskLayoutMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
+      item.name === "tasks" && item.width <= 1100 &&
       (!item.taskLayout || !item.taskLayout.compact || !item.taskLayout.headerHidden ||
         !item.taskLayout.cardGrid || !item.taskLayout.actionsVisible),
-    responsiveTableMismatch: responsiveRouteNames.has(item.name) && item.width <= 900 &&
+    responsiveTableMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
+      responsiveRouteNames.has(item.name) && item.width <= 900 &&
       (!item.responsiveTable || !item.responsiveTable.compact ||
         !item.responsiveTable.headerHidden || !item.responsiveTable.cardGrid ||
         item.responsiveTable.horizontallyScrollable || !item.responsiveTable.actionsVisible),
@@ -542,10 +575,11 @@ try {
     baseUrl,
     cases: results.length,
     expectedForbidden: [...expectedForbidden],
+    expectedStatuses: Object.fromEntries(expectedStatuses),
     failures: checkedResults.filter((item) =>
       item.documentOverflow || (item.width >= 1024 && item.navOverflow) ||
       (item.name !== "login" && item.path.includes("login")) ||
-      (item.httpStatus >= 400 && !(item.expectedForbidden && item.httpStatus === 403)) ||
+      item.httpStatus !== item.expectedStatus ||
       item.forbidden !== item.expectedForbidden || item.browserErrors.length || item.modeMismatch ||
       item.journalLayoutMismatch || item.taskLayoutMismatch || item.responsiveTableMismatch ||
       item.printLayoutMismatch || item.activeAnimations

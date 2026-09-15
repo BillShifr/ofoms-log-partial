@@ -16,6 +16,41 @@
 
 ## Журнал выполнения
 
+### 2026-09-15 — live browser QA и устранение UI root causes
+
+- Найден и использован живой локальный PostgreSQL; штатный dev-сервер поднят на
+  `127.0.0.1:8000`, production-style error server — на `127.0.0.1:8080`.
+- Baseline охватил 840 browser-cases и дал 39 failures: неверный GET к POST-only
+  endpoint и повторяющийся responsive mismatch protocol. Ручной просмотр дополнительно
+  выявил wide journal на 768 px, чрезмерный help text/file control в `A++` и overflow
+  error-page actions.
+- Исправлены общие владельцы DataTable/Field/embedded form/error surface и visual QA
+  status/route contracts. After: 813 основных cases, 54 permission cases и 81 error-page
+  case, по 0 failures; три print PDF отрендерены и просмотрены.
+- Upgrade непустой dev-БД выявил pending trigger events в `journal.0008`; миграция
+  переведена в non-atomic contract и после этого успешно применена без очистки данных.
+- Screenshot evidence сохранён в `.artifacts/visual-qa/{baseline,after}/`; локальные
+  артефакты и QA-данные не включаются в git.
+
+### 2026-09-15 — закрытие gaps visual QA и token contract
+
+- Инвентаризация несколькими агентами подтвердила, что raw product tables,
+  inline styles/event handlers и executable inline scripts в шаблонах не вернулись.
+- Найден корневой разрыв в `scripts/visual_qa.mjs`: постоянная browser-матрица
+  проверяла 694 px вместо обязательных 390×844 и 768×1024, а high contrast white
+  не был отдельным режимом. Runner расширен до требуемых viewport и accessibility modes.
+- Print phase теперь явно сбрасывает DOM в `light/base/default` и читает applied mode
+  обратно из страницы перед PDF-gate, чтобы исключить наследование темы после screen-матрицы.
+- В CSS token layer добавлены недостающие semantic tokens `--muted`, `--secondary`,
+  `--accent-soft` и `--accent-bg` для light/dark/contrast modes; fallback literal-цвета
+  в компонентных правилах validation/nav-badge убраны.
+- Общие JS-контракты усилены: conditional-fields больше не строит CSS attribute selector
+  из произвольного id контроллера, а admin populate-скрипт безопасно no-op вне
+  `django.jQuery`.
+- CI дополнен синтаксической проверкой `scripts/visual_qa.mjs` и всех `static/js/*.js`;
+  template hygiene ratchets закрепляют обязательную QA-матрицу и отсутствие literal
+  fallback-цветов в компонентном CSS.
+
 ### 2026-09-14 — владелец настроек таблицы и overflow-tooltip
 
 - На `/journal/` настройка колонок перенесена из действий фильтра в toolbar таблицы, чтобы единственным владельцем табличных настроек оставался контекст соответствующей таблицы.

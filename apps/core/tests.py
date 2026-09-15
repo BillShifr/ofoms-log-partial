@@ -1854,3 +1854,83 @@ class TemplateHygieneTests(TestCase):
             if inline_style.search(script.read_text(encoding="utf-8-sig")):
                 violations.append(str(script.relative_to(scripts_root)))
         self.assertEqual(violations, [])
+
+    def test_javascript_sources_parse(self):
+        scripts = [Path(settings.BASE_DIR) / "scripts" / "visual_qa.mjs"]
+        scripts.extend((Path(settings.BASE_DIR) / "static" / "js").glob("*.js"))
+        failures = []
+        for script in scripts:
+            result = subprocess.run(
+                ["node", "--check", str(script)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode:
+                failures.append(f"{script.relative_to(settings.BASE_DIR)}: {result.stderr}")
+        self.assertEqual(failures, [])
+
+    def test_conditional_fields_do_not_build_id_attribute_selector(self):
+        script = (
+            Path(settings.BASE_DIR) / "static" / "js" / "conditional-fields.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn('querySelectorAll("[data-conditional-controller]")', script)
+        self.assertIn("container.dataset.conditionalController !== controller.id", script)
+        self.assertNotIn('data-conditional-controller="\' + controller.id', script)
+
+    def test_visual_qa_matrix_contains_required_viewports_and_modes(self):
+        visual_qa = (
+            Path(settings.BASE_DIR) / "scripts" / "visual_qa.mjs"
+        ).read_text(encoding="utf-8")
+        for viewport in (
+            "[390, 844]",
+            "[768, 1024]",
+            "[1024, 768]",
+            "[1280, 800]",
+            "[1366, 768]",
+            "[1440, 900]",
+            "[1920, 1080]",
+        ):
+            self.assertIn(viewport, visual_qa)
+        for mode in (
+            '["dark", "base", "default"]',
+            '["light", "a", "default"]',
+            '["light", "a-plus-plus", "default"]',
+            '["light", "base", "black"]',
+            '["light", "base", "white"]',
+        ):
+            self.assertIn(mode, visual_qa)
+
+    def test_visual_qa_route_filter_applies_to_screen_and_print_routes(self):
+        visual_qa = (
+            Path(settings.BASE_DIR) / "scripts" / "visual_qa.mjs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("const knownRoutes = new Set([...routes, ...printRoutes]", visual_qa)
+        self.assertIn("printRoutes.length - 1", visual_qa)
+        self.assertIn(
+            "responsiveTableMismatch: !expectedForbidden.has(item.name)", visual_qa
+        )
+        self.assertIn("QA_EXPECT_STATUSES", visual_qa)
+        self.assertIn("item.httpStatus !== item.expectedStatus", visual_qa)
+
+    def test_component_css_color_fallbacks_stay_in_token_layer(self):
+        css = (Path(settings.BASE_DIR) / "static/css/portal.css").read_text(
+            encoding="utf-8"
+        )
+        component_css = css.split("/* ---------- Минимальный сброс ---------- */", 1)[1]
+        fallback_color = re.compile(
+            r"var\(\s*--[a-z0-9-]+\s*,\s*(?:#[0-9a-fA-F]{3,8}|rgba?\()"
+        )
+        self.assertIsNone(fallback_color.search(component_css))
+
+    def test_error_pages_have_a_mobile_reflow_contract(self):
+        css = (Path(settings.BASE_DIR) / "static/css/portal.css").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(".error-page { min-width: 0", css)
+        self.assertIn(
+            ".error-page__card { width: min(100%, 680px); max-width: 100%", css
+        )
+        self.assertIn(".error-page__actions { display: grid", css)

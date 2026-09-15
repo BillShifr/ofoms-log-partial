@@ -1,4 +1,5 @@
 window.addEventListener("load", function () {
+  if (!window.django || !django.jQuery) return;
   (function ($) {
     "use strict";
     $(document).on("ready", function () {

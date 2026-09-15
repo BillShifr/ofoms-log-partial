@@ -39,6 +39,7 @@ class DataTableNode(template.Node):
         variant = str(options.get("variant", "")).strip()
         wrap_variant = str(options.get("wrap_variant", "")).strip()
         label = str(options.get("label", "")).strip()
+        table_key = str(options.get("table_key", "")).strip()
         responsive = bool(options.get("responsive", False))
         sortable = bool(options.get("sortable", False))
         fixed_first = bool(options.get("fixed_first", False))
@@ -65,6 +66,8 @@ class DataTableNode(template.Node):
             table_classes.append("th-sticky")
 
         table_attrs = format_html(' class="{}"', " ".join(table_classes))
+        if table_key:
+            table_attrs = format_html('{} data-table-key="{}"', table_attrs, table_key)
         if sortable:
             table_attrs = format_html("{} data-client-sort", table_attrs)
         content = self.nodelist.render(context)
@@ -106,6 +109,7 @@ def do_data_table(parser, token):
         "variant",
         "wrap_variant",
         "label",
+        "table_key",
         "responsive",
         "sortable",
         "fixed_first",

@@ -13,12 +13,12 @@
   {% endif %}
 </header>
 
-<div class="card">
+<div class="card task-form-card">
   <form method="post" data-validate>
     {% csrf_token %}
     <details class="collapsible" open data-key="task-form">
-      <summary class="collapsible__toggle">Основные параметры</summary>
-      <div class="form-grid">
+      <summary class="collapsible__toggle">Содержание задачи</summary>
+      <div class="form-grid task-form-grid">
         <div class="field"><label for="{{ form.name.id_for_label }}">Наименование</label>{{ form.name }}{% for error in form.name.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field"><label for="{{ form.command.id_for_label }}">Команда</label>{{ form.command }}
           {% if task and command_tips %}<span class="text-muted">{{ command_tips|get_item:task.command|default:"" }}</span>{% endif %}
@@ -28,8 +28,8 @@
     </details>
 
     <details class="collapsible" data-key="task-form-sched"{% if form.errors %} open{% endif %}>
-      <summary class="collapsible__toggle">Исполнение и приоритет</summary>
-      <div class="form-grid">
+      <summary class="collapsible__toggle">Ответственность и состояние</summary>
+      <div class="form-grid task-form-grid">
         <div class="field"><label for="{{ form.status.id_for_label }}">Статус</label>{{ form.status }}
           <span class="text-muted">{{ form.status.help_text }}</span></div>
         <div class="field" id="assignee-wrap">
@@ -44,6 +44,12 @@
         </div>
         <div class="field"><label for="{{ form.priority.id_for_label }}">Приоритет</label>{{ form.priority }}
           {% if form.priority.help_text %}<span class="text-muted">{{ form.priority.help_text }}</span>{% endif %}</div>
+      </div>
+    </details>
+
+    <details class="collapsible" data-key="task-form-run"{% if form.errors %} open{% endif %}>
+      <summary class="collapsible__toggle">Запуск и расписание</summary>
+      <div class="form-grid task-form-grid">
         <div class="field"><label for="{{ form.run_mode.id_for_label }}">Режим запуска</label>{{ form.run_mode }}</div>
         <div class="field"><label for="{{ form.interval_minutes.id_for_label }}">Интервал (минут)</label>{{ form.interval_minutes }}
           <span class="text-muted">{{ form.interval_minutes.help_text }}</span>

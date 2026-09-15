@@ -18,14 +18,24 @@
   <form method="get" id="journal-filter-form">
     <details class="collapsible" id="journal-filters" data-key="journal-filters">
       <summary class="collapsible__toggle">Фильтры и поиск</summary>
-      <div class="filters">
-        <div class="field"><label for="id_id">ID</label>{{ form.id }}{{ form.id.errors }}</div>
-        <div class="field"><label for="id_n_irp">Номер</label>{{ form.n_irp }}{{ form.n_irp.errors }}</div>
-        <div class="field"><label for="id_z_f">Фамилия заявителя</label>{{ form.z_f }}{{ form.z_f.errors }}</div>
-        <div class="field"><label for="id_z_enp">ЕНП</label>{{ form.z_enp }}{{ form.z_enp.errors }}</div>
-        <div class="field"><label for="id_irp_type">Вид обращения</label>{{ form.irp_type }}{{ form.irp_type.errors }}</div>
-        <div class="field"><label for="id_how">Способ</label>{{ form.how }}{{ form.how.errors }}</div>
-        <div class="field"><label for="id_status">Статус</label>{{ form.status }}{{ form.status.errors }}</div>
+      <div class="filters filters--journal">
+        <fieldset class="field-group">
+          <legend>Обращение</legend>
+          <div class="field"><label for="id_id">ID</label>{{ form.id }}{{ form.id.errors }}</div>
+          <div class="field"><label for="id_n_irp">Номер</label>{{ form.n_irp }}{{ form.n_irp.errors }}</div>
+        </fieldset>
+        <fieldset class="field-group">
+          <legend>Заявитель</legend>
+          <div class="field"><label for="id_z_f">Фамилия заявителя</label>{{ form.z_f }}{{ form.z_f.errors }}</div>
+          <div class="field"><label for="id_z_enp">ЕНП</label>{{ form.z_enp }}{{ form.z_enp.errors }}</div>
+        </fieldset>
+        <fieldset class="field-group field-group--classification">
+          <legend>Классификация</legend>
+          <div class="field"><label for="id_irp_type">Вид обращения</label>{{ form.irp_type }}{{ form.irp_type.errors }}</div>
+          <div class="field"><label for="id_theme">Тема</label>{{ form.theme }}{{ form.theme.errors }}</div>
+          <div class="field"><label for="id_how">Способ</label>{{ form.how }}{{ form.how.errors }}</div>
+          <div class="field"><label for="id_status">Статус</label>{{ form.status }}{{ form.status.errors }}</div>
+        </fieldset>
         <fieldset class="field-group field-group--period">
           <legend>Период</legend>
           <div class="field field--date"><label for="id_date_from">С даты</label>{{ form.date_from }}{{ form.date_from.errors }}</div>
@@ -53,11 +63,11 @@
       <p class="table-toolbar__title">Реестр обращений</p>
       <p class="table-toolbar__meta">Настройки применяются только к этой таблице.</p>
     </div>
-    <a class="btn btn--ghost btn--icon" href="{% url 'system:prefs' %}" aria-label="Настроить колонки таблицы обращений" title="Настроить колонки">
+    <a class="btn btn--ghost btn--icon" href="{% url 'system:table_prefs' table_key %}" aria-label="Настроить колонки таблицы обращений" title="Настроить колонки">
       <span aria-hidden="true">⚙</span>
     </a>
   </div>
-  {% data_table variant="wide journal" wrap_variant="journal" fixed_first=fixed_first label="Таблица обращений; на узком экране показана карточками" %}
+  {% data_table variant="wide journal" wrap_variant="journal" fixed_first=fixed_first table_key=table_key label="Таблица обращений; на узком экране показана карточками" %}
       <colgroup>
         {% for col in cols %}<col class="col-{{ col.key }}">{% endfor %}
       </colgroup>
@@ -84,17 +94,17 @@
         <tr class="clickable {% if not irp.is_closed and irp.is_overdue %}row--overdue{% elif not irp.is_closed and not irp.result %}row--open{% endif %}"
             data-href="{% url 'journal:detail' irp.pk %}">
           {% for col in cols %}
-            <td class="col-{{ col.key }}{% if col.key == 'n_irp' %} cell-id{% endif %}{% if col.key == 'date_close' and not irp.date_close %} cell--empty{% elif col.key == 'z_enp' and not irp.z_enp %} cell--empty{% elif col.key == 'employee_one' and not irp.employee_one %} cell--empty{% endif %}" data-label="{{ col.label }}">
+            <td class="col-{{ col.key }}{% if col.key == 'n_irp' %} cell-id{% endif %}{% if col.key == 'theme' or col.key == 'z_f' or col.key == 'z_enp' or col.key == 'employee_one' %} cell-long{% endif %}{% if col.key == 'date_close' and not irp.date_close %} cell--empty{% elif col.key == 'z_enp' and not irp.z_enp %} cell--empty{% elif col.key == 'employee_one' and not irp.employee_one %} cell--empty{% endif %}" data-label="{{ col.label }}">
               {% if col.key == 'id' %}<a class="table-row-link" href="{% url 'journal:detail' irp.pk %}" aria-label="Открыть обращение № {{ irp.n_irp }}">{{ irp.id }}</a>
               {% elif col.key == 'n_irp' %}<span class="mono compact-id" title="{{ irp.n_irp }}" aria-label="Полный номер обращения: {{ irp.n_irp }}">…{{ irp.n_irp|slice:"-12:" }}</span>
               {% elif col.key == 'date_create' %}<span data-value="{{ irp.date_create|date:'Y-m-d' }}">{{ irp.date_create|date:"d.m.Y" }}</span><br><span class="text-muted">{{ irp.time_create|time:"H:i"|default:"" }}</span>
               {% elif col.key == 'data_plan' %}<span data-value="{{ irp.data_plan|date:'Y-m-d' }}">{{ irp.data_plan|date:"d.m.Y" }}</span>
               {% elif col.key == 'date_close' %}{% if irp.date_close %}<span data-value="{{ irp.date_close|date:'Y-m-d' }}">{{ irp.date_close|date:"d.m.Y" }}</span>{% endif %}
               {% elif col.key == 'irp_type' %}{{ irp.get_irp_type_display }}
-              {% elif col.key == 'theme' %}{{ irp.theme.code_name }} — {{ irp.theme.title }}
-              {% elif col.key == 'z_f' %}{{ irp.z_f }} {{ irp.z_i|default:"" }}
-              {% elif col.key == 'z_enp' %}{{ irp.z_enp|default:"" }}
-              {% elif col.key == 'employee_one' %}{{ irp.employee_one.full_name }}
+              {% elif col.key == 'theme' %}<span class="cell-clip">{{ irp.theme.code_name }} — {{ irp.theme.title }}</span>
+              {% elif col.key == 'z_f' %}<span class="cell-clip">{{ irp.z_f }} {{ irp.z_i|default:"" }}</span>
+              {% elif col.key == 'z_enp' %}<span class="cell-clip">{{ irp.z_enp|default:"" }}</span>
+              {% elif col.key == 'employee_one' %}<span class="cell-clip">{{ irp.employee_one.full_name }}</span>
               {% elif col.key == 'status' %}
                 {% if irp.is_closed %}<span class="badge badge--closed">{{ irp.get_status_display }}</span>
                 {% elif irp.is_overdue %}<span class="badge badge--overdue">Просрочено</span>

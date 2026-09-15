@@ -17,6 +17,10 @@
     </div>
     <h3 class="report-card__title"><a href="{% url 'reports:detail' report.slug %}">{{ report.title }}</a></h3>
     <p class="text-muted report-card__desc">{{ report.description }}</p>
+    <p class="text-muted report-card__meta">Шаблон отчёта: откройте форму, задайте период и параметры, затем сформируйте новый результат.</p>
+    <div class="report-card__actions">
+      <a class="btn btn--sm btn--primary" href="{% url 'reports:detail' report.slug %}">Сформировать отчёт</a>
+    </div>
   </article>
   {% endfor %}
 </div>

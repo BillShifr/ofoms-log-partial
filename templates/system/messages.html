@@ -28,9 +28,15 @@
               <label for="participant-search">Участники</label>
               <input id="participant-search" type="text"
                      data-suggest-url="{% url 'system:users_suggest' %}"
-                     placeholder="Введите ФИО (от 3 символов) — совпадения отмечаются автоматически"
-                     autocomplete="off">
-              <div class="participant-pick">{{ form.participants }}</div>
+                     placeholder="Введите ФИО (от 3 символов)"
+                     autocomplete="off"
+                     role="combobox"
+                     aria-autocomplete="list"
+                     aria-expanded="false"
+                     aria-controls="participant-options">
+              <div class="participant-tokens" aria-live="polite"></div>
+              <div id="participant-options" class="autocomplete autocomplete--anchored participant-options" role="listbox" hidden></div>
+              <div class="participant-pick" hidden>{{ form.participants }}</div>
               {% for error in form.participants.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
             </div>
           </div>

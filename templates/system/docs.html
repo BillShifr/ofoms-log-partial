@@ -44,39 +44,30 @@
 </div>
 {% endif %}
 
-{% if request.GET.q %}
-<div class="card mb-2">
-  <h3 class="mt-1 mb-1">Результаты поиска по «{{ request.GET.q }}»</h3>
-  {% include "system/_docs_grid.html" %}
-</div>
-{% else %}
-<div class="grid-2">
-  {% for cat in categories %}
-  <a class="card report-card" data-href="{% url 'system:doc_category' cat.slug %}">
-    <div class="cat-icon" aria-hidden="true">{{ cat.icon|default:"DOC" }}</div>
-    <h3 class="mt-1 mb-1">{{ cat.name }}</h3>
-    {% if cat.description %}<p class="text-muted">{{ cat.description }}</p>{% endif %}
-    <span class="badge badge--role">Документов: {{ cat.docs_total }}</span>
-  </a>
-  {% empty %}
-  <div class="empty-state span-2">Разделы документации пока не созданы</div>
-  {% endfor %}
-</div>
+<div class="docs-layout">
+  {% if not request.GET.q %}
+  <nav class="card docs-nav" aria-label="Разделы документации">
+    <a class="docs-nav__item {% if not category %}is-active{% endif %}" href="{% url 'system:docs' %}">
+      <span>Все документы</span><span class="badge badge--role">{{ docs|length }}</span>
+    </a>
+    {% for cat in categories %}
+    <a class="docs-nav__item {% if category and category.pk == cat.pk %}is-active{% endif %}" href="{% url 'system:doc_category' cat.slug %}">
+      <span>{{ cat.name }}</span><span class="badge badge--role">{{ cat.docs_total }}</span>
+    </a>
+    {% empty %}
+    <div class="empty-state">Разделы пока не созданы</div>
+    {% endfor %}
+  </nav>
+  {% endif %}
 
-{% if category or docs %}
-<div class="card mt-2">
-  <div class="section-bar">
-    <h2 class="section-bar__title mt-1 mb-1">
-      {% if category %}{{ category.name }}{% else %}Без категории{% endif %}
-    </h2>
-    {% if category %}<a class="btn btn--ghost btn--sm" href="{% url 'system:docs' %}">← Все разделы</a>{% endif %}
-  </div>
-  {% include "system/_docs_grid.html" %}
+  <section class="card docs-list-card">
+    <div class="section-bar">
+      <h2 class="section-bar__title mt-1 mb-1">
+        {% if request.GET.q %}Результаты поиска по «{{ request.GET.q }}»{% elif category %}{{ category.name }}{% else %}Документы{% endif %}
+      </h2>
+      {% if category %}<a class="btn btn--ghost btn--sm" href="{% url 'system:docs' %}">Все разделы</a>{% endif %}
+    </div>
+    {% include "system/_docs_grid.html" %}
+  </section>
 </div>
-{% else %}
-<div class="card mt-2">
-  <div class="empty-state">Документация ещё не загружена</div>
-</div>
-{% endif %}
-{% endif %}
 {% endblock %}

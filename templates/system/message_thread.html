@@ -52,8 +52,9 @@
             {% with uids=r.reactions|get_item:emoji %}
             <button type="submit" name="emoji" value="{{ emoji }}" form="react-form-{{ r.pk }}"
                     class="reaction {% if user.id in uids %}reaction--active{% endif %}"
-                    title="Добавить/убрать реакцию">
-              {{ emoji }} {{ uids|length }}
+                    title="Добавить/убрать реакцию"
+                    aria-pressed="{% if user.id in uids %}true{% else %}false{% endif %}">
+              <span class="reaction__emoji">{{ emoji }}</span> <span class="reaction__count">{{ uids|length }}</span>
             </button>
             {% endwith %}
             {% endfor %}

@@ -1,22 +1,18 @@
 {% load system_filters %}
 {% if docs %}
-<div class="grid-2">
+<div class="docs-list">
   {% for d in docs %}
-  <div class="card report-card">
-    <div class="flex flex--start gap-10">
-      <div class="doc-type">{{ d.file_type|upper|default:"DOC" }}</div>
-      <div class="flex-grow">
-        <h3 class="mt-1 mb-1">{{ d.title }}</h3>
+  <div class="docs-row">
+    <a class="docs-row__main" href="{% if d.is_video %}{% url 'system:doc_view' d.pk %}{% else %}{% url 'system:doc_download' d.pk %}{% endif %}"{% if d.is_video %} target="_blank" rel="noopener"{% endif %}>
+      <span class="doc-type">{{ d.file_type|upper|default:"DOC" }}</span>
+      <span class="docs-row__body">
+        <strong>{{ d.title }}</strong>
         {% if d.description %}<p class="text-muted">{{ d.description }}</p>{% endif %}
-        <div class="text-muted">
-          <span>Версия {{ d.version|default:"1.0" }}</span>
-          <span> · {{ d.size_display }}</span>
-          <span> · {{ d.uploaded_by.full_name|default:"—" }} · {{ d.created_at|date:"d.m.Y" }}</span>
-          <span> · Скачиваний: {{ d.downloads_count }}</span>
-        </div>
-      </div>
-    </div>
-    <div class="flex gap-8 mt-1 mb-1">
+        <span class="docs-row__meta">Версия {{ d.version|default:"1.0" }} · {{ d.size_display }} · {{ d.uploaded_by.full_name|default:"—" }} · {{ d.created_at|date:"d.m.Y" }} · Скачиваний: {{ d.downloads_count }}</span>
+      </span>
+      <span class="badge badge--role">{% if d.is_video %}Смотреть{% else %}Открыть{% endif %}</span>
+    </a>
+    <div class="docs-row__actions">
       {% if d.is_video %}
       <a class="btn btn--sm btn--primary" href="{% url 'system:doc_view' d.pk %}"
          target="_blank" rel="noopener" title="Открыть видео в защищённом просмотре">Смотреть</a>

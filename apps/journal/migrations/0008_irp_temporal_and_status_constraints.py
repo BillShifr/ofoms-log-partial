@@ -21,6 +21,10 @@ def normalize_legacy_irp(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    # PostgreSQL cannot add constraints while the preceding data updates have
+    # pending trigger events in the same transaction on a populated database.
+    atomic = False
+
     dependencies = [("journal", "0007_alter_irpfile_file")]
 
     operations = [

@@ -3,8 +3,9 @@
 
   function updateDependentFields(controller) {
     document
-      .querySelectorAll('[data-conditional-controller="' + controller.id + '"]')
+      .querySelectorAll("[data-conditional-controller]")
       .forEach(function (container) {
+        if (container.dataset.conditionalController !== controller.id) return;
         var expected = (container.dataset.conditionalValues || "")
           .split(",")
           .map(function (value) { return value.trim(); });

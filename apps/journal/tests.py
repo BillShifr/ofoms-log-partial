@@ -5,6 +5,7 @@
 """
 
 import datetime
+import importlib
 import tempfile
 from io import BytesIO
 from pathlib import Path
@@ -37,6 +38,15 @@ from apps.journal.models import (
 )
 
 ROUTING_MEDIA_ROOT = tempfile.mkdtemp(prefix="ejournal_test_media_")
+
+
+class IrpTemporalConstraintMigrationContractTests(TestCase):
+    def test_data_normalization_and_constraints_are_not_in_one_transaction(self):
+        migration = importlib.import_module(
+            "apps.journal.migrations.0008_irp_temporal_and_status_constraints"
+        )
+
+        self.assertFalse(migration.Migration.atomic)
 
 
 class IrpThemeTests(TestCase):
@@ -630,6 +640,7 @@ class JournalScreenTests(TestCase):
         self.assertIn("min-width: 1130px !important", css)
         self.assertIn("table-layout: fixed", css)
         visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text(encoding="utf-8")
+        self.assertIn("const mobile = innerWidth <= 900", visual_qa)
         self.assertIn(
             "(item.width >= 1366 && item.journalLayout.internalOverflow)", visual_qa
         )

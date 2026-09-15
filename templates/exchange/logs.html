@@ -8,7 +8,7 @@
 </header>
 
 <div class="card table-card">
-  {% data_table variant="exchange" responsive=True sortable=True label="Таблица загрузок; на узком экране показана карточками" %}
+  {% data_table variant="exchange" responsive=True sortable=True table_key="exchange-logs" label="Таблица загрузок; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th>Файл</th><th>Организация</th><th>Тип</th><th>Статус</th>
@@ -19,7 +19,7 @@
         {% for log in logs %}
         <tr class="responsive-row" data-href="{% url 'exchange:protocol' log.pk %}"
             {% if log.status == 'ok' %}title="Загрузка обработана без ошибок — протокол FLCP"{% else %}title="Загрузка обработана с ошибками — смотрите протокол FLCP, код 41"{% endif %}>
-          <td class="mono cell-long responsive-cell--wide" data-label="Файл">{{ log.filename }}</td>
+          <td class="mono cell-long responsive-cell--wide" data-label="Файл"><span class="cell-clip">{{ log.filename }}</span></td>
           <td data-label="Организация">{{ log.get_org_display }}</td>
           <td data-label="Тип">{{ log.get_kind_display }}</td>
           <td data-label="Статус">{% if log.status == 'ok' %}<span class="badge badge--closed">OK</span>

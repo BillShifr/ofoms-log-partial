@@ -38,7 +38,7 @@
 </div>
 
 <div class="card table-card">
-  {% data_table variant="events" responsive=True sortable=True label="Таблица событий; на узком экране показана карточками" %}
+  {% data_table variant="events" responsive=True sortable=True table_key="system-events" label="Таблица событий; на узком экране показана карточками" %}
       <thead>
         <tr>
           <th data-type="num">ID</th>
@@ -66,8 +66,8 @@
             {% elif e.result == 'failed' %}<span class="badge badge--overdue">{{ e.get_result_display }}</span>
             {% else %}<span class="badge badge--open">{{ e.get_result_display }}</span>{% endif %}
           </td>
-          <td data-label="Инициатор">{{ e.user.full_name|default:"—" }}</td>
-          <td class="mono cell-long responsive-cell--wide" data-label="Объект">{{ e.target }}</td>
+          <td class="cell-long" data-label="Инициатор"><span class="cell-clip">{{ e.user.full_name|default:"—" }}</span></td>
+          <td class="mono cell-long responsive-cell--wide" data-label="Объект"><span class="cell-clip">{{ e.target }}</span></td>
           <td class="mono" data-label="IP">{{ e.ip|default:"—" }}</td>
           <td data-label="Длительность, мс" data-type="num">{{ e.duration_ms|default:"—" }}</td>
         </tr>

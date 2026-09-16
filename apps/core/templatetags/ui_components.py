@@ -90,7 +90,7 @@ class DataTableNode(template.Node):
             )
             server_settings = ""
             if settings_url:
-                server_settings = format_html(
+                server_settings = mark_safe(
                     '<div class="table-settings__server" data-table-settings-content>'
                     '<p class="text-muted">Загрузка настроек колонок...</p></div>'
                 )

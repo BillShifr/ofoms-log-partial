@@ -147,7 +147,11 @@ class LiveFlowsTests(LiveServerTestCase):
         )
         self.recipient.groups.add(Group.objects.get(name="СП1"))
         self.admin = Employee.objects.create_user(
-            username="e2e_admin", password=PASSWORD, org=81000, is_staff=True
+            username="e2e_admin",
+            password=PASSWORD,
+            org=81000,
+            is_staff=True,
+            is_superuser=True,
         )
         self.admin.groups.add(Group.objects.get(name="Администратор"))
         self.theme = IrpTheme.objects.create(

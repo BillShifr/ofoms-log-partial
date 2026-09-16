@@ -1833,7 +1833,7 @@ class TemplateHygieneTests(TestCase):
         rendered = Template(
             "{% load ui_components %}"
             "{% data_table responsive=True sortable=True "
-            "fixed_first=fixed table_key='users-list' title='Пользователи' label=label %}"
+            "fixed_first=fixed table_key='system-users' title='Пользователи' label=label %}"
             "<thead><tr><th>ФИО</th></tr></thead>"
             "<tbody><tr><td>Иванов</td></tr></tbody>"
             "{% end_data_table %}"
@@ -1843,7 +1843,7 @@ class TemplateHygieneTests(TestCase):
         self.assertIn('tabindex="0"', rendered)
         self.assertIn('aria-label="Сотрудники &quot;ТФОМС&quot;"', rendered)
         self.assertIn('class="data data--responsive th-sticky"', rendered)
-        self.assertIn('data-table-key="users-list"', rendered)
+        self.assertIn('data-table-key="system-users"', rendered)
         self.assertIn('class="table-toolbar"', rendered)
         self.assertIn("Пользователи", rendered)
         self.assertIn("data-table-settings-trigger", rendered)

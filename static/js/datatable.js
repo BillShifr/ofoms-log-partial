@@ -77,11 +77,13 @@
         th.tabIndex = 0;
         th.setAttribute('aria-sort', 'none');
         th.setAttribute('aria-label', th.textContent.trim() + ': сортировать');
-        th.addEventListener('click', function () { sortTable(table, i); });
+        th.addEventListener('click', function () {
+          sortTable(table, Array.prototype.indexOf.call(th.parentNode.cells, th));
+        });
         th.addEventListener('keydown', function (event) {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            sortTable(table, i);
+            sortTable(table, Array.prototype.indexOf.call(th.parentNode.cells, th));
           }
         });
       });
@@ -305,12 +307,87 @@
     });
   }
 
+  function applyTablePreferences(table, payload) {
+    if (!payload || !payload.columns || table.dataset.tableServerManaged === 'true') return;
+    var keys = payload.columns.map(function (column) { return column.key; });
+    var selected = payload.current && payload.current.length ? payload.current : keys;
+    var selectedSet = new Set(selected);
+    var orderedKeys = selected.concat(keys.filter(function (key) {
+      return selected.indexOf(key) === -1;
+    }));
+
+    Array.prototype.forEach.call(table.rows, function (row) {
+      if (row.cells.length !== keys.length || row.querySelector('[colspan]')) return;
+      var byKey = {};
+      Array.prototype.forEach.call(row.cells, function (cell, index) {
+        byKey[keys[index]] = cell;
+      });
+      orderedKeys.forEach(function (key) {
+        var cell = byKey[key];
+        if (!cell) return;
+        cell.hidden = !selectedSet.has(key);
+        row.appendChild(cell);
+      });
+    });
+    table.querySelectorAll('tr [colspan]').forEach(function (cell) {
+      cell.colSpan = selected.length;
+    });
+    table.classList.toggle('th-sticky', Boolean(payload.fixed_first));
+
+    var sorting = payload.sorting || {};
+    if (sorting.field && table.hasAttribute('data-client-sort')) {
+      var index = selected.indexOf(sorting.field);
+      if (index !== -1) {
+        sortTable(table, index);
+        if (sorting.dir === '-') sortTable(table, index);
+      }
+    }
+  }
+
+  function initTablePreferences() {
+    var requests = Array.prototype.map.call(
+      document.querySelectorAll('table.data[data-table-settings-url]'),
+      function (table) {
+        if (table.dataset.tableServerManaged === 'true') return Promise.resolve();
+        var url = table.dataset.tableSettingsUrl;
+        url += (url.indexOf('?') === -1 ? '?' : '&') + 'format=json';
+        return fetch(url, { credentials: 'same-origin' })
+          .then(function (response) {
+            if (!response.ok) throw new Error('preferences unavailable');
+            return response.json();
+          })
+          .then(function (payload) { applyTablePreferences(table, payload); })
+          .catch(function () { return null; });
+      }
+    );
+    return Promise.all(requests);
+  }
+
+  function initDialogs() {
+    document.addEventListener('click', function (event) {
+      var close = event.target.closest('[data-modal-close]');
+      if (close) {
+        var currentDialog = close.closest('dialog');
+        if (currentDialog && typeof currentDialog.close === 'function') currentDialog.close();
+        return;
+      }
+      var trigger = event.target.closest('[data-modal-open]');
+      if (!trigger) return;
+      var dialog = document.getElementById(trigger.getAttribute('data-modal-open'));
+      if (!dialog) return;
+      event.preventDefault();
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      else dialog.setAttribute('open', 'open');
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     initRowClick();
     initSort();
     initTooltips();
     initCellTruncate();
-    initResize();
+    initTablePreferences().then(initResize);
     initTableSettings();
+    initDialogs();
   });
 })();

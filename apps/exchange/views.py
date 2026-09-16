@@ -110,7 +110,11 @@ def exchange_logs(request):
     qs = ImportLog.objects.all()
     if request.user.org != TFOMS and not request.user.is_superuser:
         qs = qs.filter(org=request.user.org)
-    logs = qs[:100]
+    logs = list(qs[:100])
+    for log in logs:
+        protocol_rows = _parse_flcp(log.flcp) or []
+        log.error_rows = [row for row in protocol_rows if row.get("OSHIB") != "0"]
+        log.error_count = len(log.error_rows)
     return render(
         request,
         "exchange/logs.html",

@@ -23,7 +23,9 @@
       <div class="field"><label>Источник</label>{{ form.way }}{{ form.way.errors }}</div>
       <div class="field"><label>Организация-источник</label>{{ form.way_n }}{{ form.way_n.errors }}</div>
       <div class="field"><label>Способ</label>{{ form.how }}{{ form.how.errors }}</div>
-      <div class="field"><label>Тема</label>{{ form.theme }}{{ form.theme.errors }}</div>
+      <div class="field"><label>Тема</label>{{ form.theme }}{{ form.theme.errors }}
+        {% if user.is_superuser %}<a class="field-help-link" href="{% url 'admin:journal_irptheme_add' %}" target="_blank" rel="noopener">+ Создать тему в справочнике</a>{% endif %}
+      </div>
       <div class="field"><label>Комментарий к теме</label>{{ form.theme_comment }}{{ form.theme_comment.errors }}</div>
       <div class="field" data-conditional-controller="id_irp_type" data-conditional-values="2"><label>Сведения о жалобе</label>{{ form.zh_d }}{{ form.zh_d.errors }}</div>
       <div class="field span-2"><label>Содержание обращения</label>{{ form.text }}{{ form.text.errors }}</div>

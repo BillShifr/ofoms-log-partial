@@ -296,7 +296,7 @@ class ReportScreenTests(BaseReportTestCase):
         self.assertContains(resp, "Качество услуг")
         self.assertContains(
             resp,
-            'class="data data--responsive" data-client-sort data-table-key="reports-detail"',
+            'class="data data--responsive" data-client-sort data-table-key="report-r4_complaints"',
         )
         self.assertContains(resp, 'class="responsive-row')
         self.assertContains(resp, 'data-label="Причина"')
@@ -325,6 +325,20 @@ class ReportScreenTests(BaseReportTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "application/pdf")
         self.assertTrue(resp.content.startswith(b"%PDF"))
+
+    def test_empty_report_disables_exports_and_rejects_direct_download(self):
+        self.client.force_login(self.tfoms_user)
+        params = {"date_from": datetime.date.today().isoformat()}
+
+        detail = self.client.get(
+            reverse("reports:detail", args=["r4_complaints"]), params
+        )
+        export = self.client.get(
+            reverse("reports:export", args=["r4_complaints", "xlsx"]), params
+        )
+
+        self.assertContains(detail, 'disabled title="Нет данных для выгрузки"', count=2)
+        self.assertEqual(export.status_code, 422)
 
     def test_smo_personal_export_cannot_cross_owner_scope_after_redirect(self):
         own = self._make(owner=self.smo_user)

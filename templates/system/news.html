@@ -92,7 +92,7 @@
 </div>
 {% endif %}
 
-<div class="grid-2">
+<div class="grid-2 news-grid">
   {% for n in page.object_list %}
   <article class="card report-card news-card {% if n.is_pinned %}news-card--pinned{% endif %}"
      data-href="{% url 'system:news_detail' n.pk %}" tabindex="0">

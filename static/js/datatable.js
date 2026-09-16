@@ -136,6 +136,10 @@
     return 'datatable-widths:' + (table.getAttribute('data-table-key') || location.pathname);
   }
 
+  function storageKeyByName(tableKey) {
+    return 'datatable-widths:' + (tableKey || location.pathname);
+  }
+
   function readWidths(table) {
     try { return JSON.parse(localStorage.getItem(storageKey(table)) || '{}'); }
     catch (e) { return {}; }
@@ -244,11 +248,69 @@
     });
   }
 
+  function initTableSettings() {
+    document.addEventListener('click', function (event) {
+      var trigger = event.target.closest('[data-table-settings-trigger]');
+      if (!trigger) return;
+      var dialog = document.getElementById(trigger.getAttribute('data-modal-target'));
+      if (!dialog) return;
+      event.preventDefault();
+      var content = dialog.querySelector('[data-table-settings-content]');
+      var settingsUrl = trigger.getAttribute('data-settings-url');
+      if (content && settingsUrl && !content.dataset.loaded) {
+        var url = settingsUrl + (settingsUrl.indexOf('?') === -1 ? '?' : '&') + 'modal=1';
+        fetch(url, { credentials: 'same-origin' })
+          .then(function (response) { return response.text(); })
+          .then(function (html) {
+            content.innerHTML = html;
+            content.dataset.loaded = 'true';
+          })
+          .catch(function () {
+            content.innerHTML = '<p class="alert alert--error">Не удалось загрузить настройки колонок.</p>';
+          });
+      }
+      if (typeof dialog.showModal === 'function') {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute('open', 'open');
+      }
+    });
+
+    document.addEventListener('submit', function (event) {
+      var form = event.target.closest('[data-table-prefs-form]');
+      if (!form) return;
+      event.preventDefault();
+      fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error('save failed');
+          window.location.reload();
+        })
+        .catch(function () {
+          var error = form.querySelector('[data-table-prefs-error]');
+          if (error) error.hidden = false;
+        });
+    });
+
+    document.addEventListener('click', function (event) {
+      var reset = event.target.closest('[data-table-reset-widths]');
+      if (!reset) return;
+      try { localStorage.removeItem(storageKeyByName(reset.getAttribute('data-table-key'))); }
+      catch (e) {}
+      window.location.reload();
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     initRowClick();
     initSort();
     initTooltips();
     initCellTruncate();
     initResize();
+    initTableSettings();
   });
 })();

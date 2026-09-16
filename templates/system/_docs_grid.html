@@ -10,15 +10,17 @@
         {% if d.description %}<p class="text-muted">{{ d.description }}</p>{% endif %}
         <span class="docs-row__meta">Версия {{ d.version|default:"1.0" }} · {{ d.size_display }} · {{ d.uploaded_by.full_name|default:"—" }} · {{ d.created_at|date:"d.m.Y" }} · Скачиваний: {{ d.downloads_count }}</span>
       </span>
-      <span class="badge badge--role">{% if d.is_video %}Смотреть{% else %}Открыть{% endif %}</span>
+      <span class="badge badge--role">{% if d.is_video %}Смотреть{% else %}Скачать{% endif %}</span>
     </a>
     <div class="docs-row__actions">
       {% if d.is_video %}
       <a class="btn btn--sm btn--primary" href="{% url 'system:doc_view' d.pk %}"
          target="_blank" rel="noopener" title="Открыть видео в защищённом просмотре">Смотреть</a>
       {% endif %}
+      {% if d.is_video %}
       <a class="btn btn--sm btn--primary" href="{% url 'system:doc_download' d.pk %}"
          title="Скачать файл (учёт загрузок)">Скачать</a>
+      {% endif %}
       {% if can_manage %}
       <form method="post" action="{% url 'system:doc_delete' d.pk %}" class="inline-form" data-confirm="Удалить документ «{{ d.title }}»?">
         {% csrf_token %}

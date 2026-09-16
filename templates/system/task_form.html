@@ -20,8 +20,8 @@
       <summary class="collapsible__toggle">Содержание задачи</summary>
       <div class="form-grid task-form-grid">
         <div class="field"><label for="{{ form.name.id_for_label }}">Наименование</label>{{ form.name }}{% for error in form.name.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
-        <div class="field"><label for="{{ form.command.id_for_label }}">Команда</label>{{ form.command }}
-          {% if task and command_tips %}<span class="text-muted">{{ command_tips|get_item:task.command|default:"" }}</span>{% endif %}
+        <div class="field"><label for="{{ form.command.id_for_label }}">Действие</label>{{ form.command }}
+          <span class="text-muted">Выберите системное действие для запуска. Проверка доступности ничего не меняет и нужна для контроля расписания.</span>
           {% for error in form.command.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field field--wide"><label for="{{ form.description.id_for_label }}">Описание</label>{{ form.description }}</div>
       </div>
@@ -39,7 +39,7 @@
                  value="{% if form.instance.assigned_to %}{{ form.instance.assigned_to.full_name }}{% endif %}"
                  placeholder="Введите ФИО (от 3 символов)" autocomplete="off">
           <div id="assignee-select">{{ form.assigned_to }}</div>
-          <span class="text-muted">Начните вводить фамилию — система предложит сотрудников</span>
+          <span class="text-muted">Выберите исполнителя из списка или начните вводить фамилию — система подставит найденного сотрудника.</span>
           {% for error in form.assigned_to.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
         </div>
         <div class="field"><label for="{{ form.priority.id_for_label }}">Приоритет</label>{{ form.priority }}
@@ -50,8 +50,9 @@
     <details class="collapsible" data-key="task-form-run"{% if form.errors %} open{% endif %}>
       <summary class="collapsible__toggle">Запуск и расписание</summary>
       <div class="form-grid task-form-grid">
-        <div class="field"><label for="{{ form.run_mode.id_for_label }}">Режим запуска</label>{{ form.run_mode }}</div>
-        <div class="field"><label for="{{ form.interval_minutes.id_for_label }}">Интервал (минут)</label>{{ form.interval_minutes }}
+        <div class="field"><label for="{{ form.run_mode.id_for_label }}">Режим запуска</label>{{ form.run_mode }}
+          <span class="text-muted">Только вручную — запуск кнопкой. По расписанию — автоматический повтор через заданный интервал.</span></div>
+        <div class="field" data-conditional-controller="{{ form.run_mode.id_for_label }}" data-conditional-values="scheduled"><label for="{{ form.interval_minutes.id_for_label }}">Интервал автозапуска (минут)</label>{{ form.interval_minutes }}
           <span class="text-muted">{{ form.interval_minutes.help_text }}</span>
           {% for error in form.interval_minutes.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field field--narrow"><label class="checkbox">{{ form.enabled }}{{ form.enabled.label }}</label></div>
@@ -77,7 +78,7 @@
 
   <div class="tab-panel is-active" data-panel="runs">
     {% if runs %}
-    {% data_table responsive=True table_key="system-task-runs" label="История запусков; на узком экране показана карточками" %}
+    {% data_table responsive=True table_key="system-task-runs" title="История запусков" label="История запусков; на узком экране показана карточками" %}
         <thead>
           <tr><th>Начало</th><th>Завершение</th><th>Инициатор</th><th>Результат</th><th>Лог</th></tr>
         </thead>

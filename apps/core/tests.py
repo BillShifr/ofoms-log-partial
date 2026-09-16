@@ -1833,7 +1833,7 @@ class TemplateHygieneTests(TestCase):
         rendered = Template(
             "{% load ui_components %}"
             "{% data_table responsive=True sortable=True "
-            "fixed_first=fixed table_key='users-list' label=label %}"
+            "fixed_first=fixed table_key='users-list' title='Пользователи' label=label %}"
             "<thead><tr><th>ФИО</th></tr></thead>"
             "<tbody><tr><td>Иванов</td></tr></tbody>"
             "{% end_data_table %}"
@@ -1844,6 +1844,10 @@ class TemplateHygieneTests(TestCase):
         self.assertIn('aria-label="Сотрудники &quot;ТФОМС&quot;"', rendered)
         self.assertIn('class="data data--responsive th-sticky"', rendered)
         self.assertIn('data-table-key="users-list"', rendered)
+        self.assertIn('class="table-toolbar"', rendered)
+        self.assertIn("Пользователи", rendered)
+        self.assertIn("data-table-settings-trigger", rendered)
+        self.assertIn("data-table-reset-widths", rendered)
         self.assertIn("data-client-sort", rendered)
         self.assertEqual(rendered.count("<table"), 1)
         self.assertEqual(rendered.count("</table>"), 1)
@@ -1860,6 +1864,9 @@ class TemplateHygieneTests(TestCase):
             "localStorage.setItem(storageKey(table)",
             "datatable-widths:",
             "ResizeObserver",
+            "data-table-settings-trigger",
+            "data-table-prefs-form",
+            "data-table-reset-widths",
         ]
         missing = [needle for needle in required if needle not in script]
         self.assertEqual(missing, [])
@@ -2034,7 +2041,9 @@ class TemplateHygieneTests(TestCase):
         )
         self.assertIn("width: 100%;\n  min-width: 0;", css)
         self.assertIn(".collapsible + .collapsible { margin-top: 14px; }", css)
+        self.assertIn(".collapsible > form > .form-actions", css)
         self.assertIn("overflow: hidden;", css)
+        self.assertIn("html { scroll-behavior: smooth; font-size: var(--fs); }", css)
         self.assertIn("formContainmentMismatch", visual_qa)
         self.assertIn("clipsRoundedHeader", visual_qa)
         self.assertIn("adjacentCollapsiblesSpaced", visual_qa)

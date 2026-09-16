@@ -4,55 +4,6 @@
 {% block content %}
 <header class="module-heading"><a class="module-heading__back" href="{% url 'system:prefs' %}">← Настройки интерфейса</a><p class="page-heading__eyebrow">Рабочая таблица</p><h1>{{ meta.title }}</h1><p>Выберите видимые колонки, их порядок и начальную сортировку.</p></header>
 <div class="card">
-  <form method="post" data-validate>
-    {% csrf_token %}
-    <h2 class="form-section">Колонки и порядок</h2>
-    {% data_table responsive=True table_key="system-table-prefs" label="Настройка колонок; на узком экране показана карточками" %}
-        <thead>
-          <tr><th></th><th>#</th><th>Колонка</th><th>Группа</th></tr>
-        </thead>
-        <tbody>
-          {% for col in columns %}
-            <tr class="responsive-row">
-              <td data-label="Показывать"><label class="checkbox"><input type="checkbox" name="columns" value="{{ col.key }}" {% if col.key in current %}checked{% endif %}></label></td>
-              <td data-label="Порядок">
-                <input class="input-order" type="number" name="order_{{ col.key }}" value="{{ forloop.counter }}" min="1" max="99">
-              </td>
-              <td data-label="Колонка">{{ col.label }}</td>
-              <td class="text-muted" data-label="Группа">{{ col.group|default:"—" }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-    {% end_data_table %}
-
-    <div class="filters mt-1">
-      <div class="field">
-        <label for="sort_field">Сортировка по умолчанию</label>
-        <select name="sort_field" id="sort_field">
-          <option value="">— по умолчанию —</option>
-          {% for col in columns %}
-            {% if col.sortable %}
-            <option value="{{ col.key }}" {% if sort_field == col.key %}selected{% endif %}>{{ col.label }}</option>
-            {% endif %}
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field">
-        <label for="sort_dir">Направление</label>
-        <select name="sort_dir" id="sort_dir">
-          <option value="-" {% if sort_dir == '-' %}selected{% endif %}>По убыванию</option>
-          <option value="" {% if sort_dir == '' %}selected{% endif %}>По возрастанию</option>
-        </select>
-      </div>
-      <div class="field">
-        <label class="checkbox"><input type="checkbox" name="fixed_first" {% if pref.fixed_first %}checked{% endif %}> Фиксировать первую колонку</label>
-      </div>
-    </div>
-
-    <div class="form-actions">
-      <button class="btn btn--primary" type="submit">Сохранить</button>
-      <a class="btn btn--ghost" href="{% url 'system:prefs' %}">Отмена</a>
-    </div>
-  </form>
+  {% include "system/_table_prefs_form.html" %}
 </div>
 {% endblock %}

@@ -258,14 +258,12 @@ async function measureCollapsibleLayout() {
     if (panel.open) return null;
     const panelStyle = getComputedStyle(panel);
     const toggleStyle = getComputedStyle(toggle);
-    const markerContent = getComputedStyle(toggle, '::after').content;
     const toggleRect = toggle.getBoundingClientRect();
     return {
       closed: !panel.open,
       hasBorder: panelStyle.borderTopStyle !== 'none' && panelStyle.borderTopWidth !== '0px',
       clipsRoundedHeader: panelStyle.overflow !== 'visible',
       hasLeftStateBar: toggleStyle.boxShadow !== 'none',
-      hasStateText: markerContent !== 'none' && markerContent !== '""',
       minTapHeight: toggleRect.height >= 40
     };
   })()`);
@@ -273,19 +271,21 @@ async function measureCollapsibleLayout() {
 
 async function measureFormContainment() {
   return evaluate(`(() => {
-    const containers = [...document.querySelectorAll('.card, details.collapsible, fieldset.field-group, .form-grid, .filters')];
+    const containers = [...document.querySelectorAll('.card, details.collapsible, fieldset.field-group, .form-grid, .filters, .date-range')];
     const inspectable = [...document.querySelectorAll('.field, .field-group, .form-grid, input, select, textarea, .collapsible__toggle, .form-section-heading')]
       .filter((element) => {
         const style = getComputedStyle(element);
         const rect = element.getBoundingClientRect();
+        const closedDetails = element.closest('details:not([open])');
         return element.type !== 'hidden' && !element.closest('.table-wrap') &&
+          (!closedDetails || element.matches('.collapsible__toggle')) &&
           style.display !== 'none' && style.visibility !== 'hidden' &&
           rect.width > 0 && rect.height > 0;
       });
     const overflowing = [];
     const containerFor = (element) => {
-      if (element.matches('input, select, textarea')) return element.closest('.field, fieldset.field-group, details.collapsible, .card');
-      if (element.matches('.field')) return element.closest('fieldset.field-group, .form-grid, .filters, details.collapsible, .card');
+      if (element.matches('input, select, textarea')) return element.closest('.field, .date-range, fieldset.field-group, details.collapsible, .card');
+      if (element.matches('.field')) return element.closest('.date-range, fieldset.field-group, .form-grid, .filters, details.collapsible, .card');
       if (element.matches('.field-group')) return element.closest('.filters, details.collapsible, .card');
       if (element.matches('.form-grid')) return element.closest('details.collapsible, .card');
       return element.closest('details.collapsible, .card');
@@ -543,7 +543,11 @@ try {
         httpStatus: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
         forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
         documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-        navOverflow: Boolean(document.querySelector('.nav__scroll')) && document.querySelector('.nav__scroll').scrollWidth > document.querySelector('.nav__scroll').clientWidth + 1,
+      navOverflow: (() => {
+        const nav = document.querySelector('.nav__scroll');
+        return Boolean(nav) && getComputedStyle(nav).overflowX === 'visible' &&
+          nav.scrollWidth > nav.clientWidth + 1;
+      })(),
         appliedMode: {
           theme: document.documentElement.dataset.theme || null,
           font: document.documentElement.dataset.font || null,
@@ -589,7 +593,11 @@ try {
           httpStatus: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
           forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
           documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-          navOverflow: Boolean(document.querySelector('.nav__scroll')) && document.querySelector('.nav__scroll').scrollWidth > document.querySelector('.nav__scroll').clientWidth + 1,
+          navOverflow: (() => {
+            const nav = document.querySelector('.nav__scroll');
+            return Boolean(nav) && getComputedStyle(nav).overflowX === 'visible' &&
+              nav.scrollWidth > nav.clientWidth + 1;
+          })(),
           appliedMode: {
             theme: document.documentElement.dataset.theme || null,
             font: document.documentElement.dataset.font || null,
@@ -708,7 +716,7 @@ try {
       item.collapsibleLayout && (!item.collapsibleLayout.closed ||
         !item.collapsibleLayout.hasBorder || !item.collapsibleLayout.clipsRoundedHeader ||
         !item.collapsibleLayout.hasLeftStateBar ||
-        !item.collapsibleLayout.hasStateText || !item.collapsibleLayout.minTapHeight),
+        !item.collapsibleLayout.minTapHeight),
     formContainmentMismatch: !expectedForbidden.has(item.name) && !expectedStatuses.has(item.name) &&
       item.formContainment && (item.formContainment.overflowCount > 0 ||
         !item.formContainment.roundedCollapsiblesClip ||

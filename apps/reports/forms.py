@@ -19,7 +19,7 @@ class ReportFilterForm(forms.Form):
     )
     date_to = forms.DateField(
         required=False,
-        label="по",
+        label="Регистрация по",
         widget=forms.DateInput(attrs={"type": "date"}),
     )
     how = forms.TypedChoiceField(

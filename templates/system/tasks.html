@@ -19,6 +19,7 @@
           <th>Приоритет</th>
           <th>Режим</th>
           <th>Последний запуск</th>
+          <th>Результат</th>
           <th class="cell-actions" data-no-sort></th>
         </tr>
       </thead>
@@ -42,6 +43,12 @@
           </td>
           <td data-label="Режим">{{ t.get_run_mode_display }}</td>
           <td data-label="Последний запуск" data-value="{{ t.last_finished_at|date:'Y-m-d\TH:i:s' }}">{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
+          <td data-label="Результат">
+            {% if t.last_result == 'failed' %}
+              <button class="status-detail-button badge badge--overdue" type="button" data-modal-open="task-result-{{ t.pk }}">Ошибка запуска</button>
+            {% elif t.last_result == 'ok' %}<span class="badge badge--closed">Успешно</span>
+            {% else %}<span class="text-muted">Не запускалось</span>{% endif %}
+          </td>
           <td class="text-nowrap cell-actions responsive-cell--actions task-cell--actions" data-label="Действия"><div class="table-actions">
             <a class="btn btn--sm btn--ghost" href="{% url 'system:task_update' t.pk %}">Карточка</a>
             <form method="post" action="{% url 'system:task_run' t.pk %}" class="inline-form">{% csrf_token %}
@@ -54,13 +61,25 @@
         </tr>
         {% if t.last_log %}
         <tr class="task-log-row" data-href="{% url 'system:task_update' t.pk %}" data-sort-group="task-{{ t.pk }}">
-          <td colspan="8" class="text-muted mono">{{ t.last_log|slice:":500" }}</td>
+          <td colspan="9" class="text-muted mono">{{ t.last_log|slice:":500" }}</td>
         </tr>
         {% endif %}
         {% empty %}
-        <tr class="responsive-empty"><td colspan="8" class="text-muted table-empty">Заданий не создано.</td></tr>
+        <tr class="responsive-empty"><td colspan="9" class="text-muted table-empty">Заданий не создано.</td></tr>
         {% endfor %}
       </tbody>
   {% end_data_table %}
+  {% for t in tasks %}{% if t.last_result == 'failed' %}
+  <dialog class="modal" id="task-result-{{ t.pk }}">
+    <div class="modal__dialog">
+      <div class="modal__head"><h2>Ошибка запуска: {{ t.name }}</h2><form method="dialog"><button class="btn btn--ghost btn--icon" type="submit" aria-label="Закрыть">×</button></form></div>
+      <div class="modal__body">
+        <dl class="detail-list"><dt>Действие</dt><dd>{{ command_tips|get_item:t.command|default:t.command }}</dd><dt>Последний запуск</dt><dd>{{ t.last_finished_at|date:"d.m.Y H:i:s"|default:"—" }}</dd></dl>
+        <div><strong>Что произошло</strong><pre class="error-detail">{{ t.last_log|default:"Система не сохранила техническое описание ошибки. Откройте карточку задания и повторите запуск после проверки параметров." }}</pre></div>
+        <div class="modal__actions"><a class="btn btn--primary" href="{% url 'system:task_update' t.pk %}">Открыть карточку</a><form method="dialog"><button class="btn btn--ghost" type="submit">Закрыть</button></form></div>
+      </div>
+    </div>
+  </dialog>
+  {% endif %}{% endfor %}
 </div>
 {% endblock %}

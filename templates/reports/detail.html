@@ -47,9 +47,12 @@
     </details>
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Сформировать отчёт</button>
-      {% if rows %}
+      {% if has_data %}
       <a class="btn btn--ghost" href="{% url 'reports:export' report.slug 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a>
       <a class="btn btn--ghost" href="{% url 'reports:export' report.slug 'pdf' %}?{{ request.GET.urlencode }}">PDF</a>
+      {% elif rows is not None %}
+      <button class="btn btn--ghost" type="button" disabled title="Нет данных для выгрузки">Excel</button>
+      <button class="btn btn--ghost" type="button" disabled title="Нет данных для выгрузки">PDF</button>
       {% endif %}
     </div>
   </form>
@@ -57,7 +60,7 @@
 
 {% if rows is not None %}
 <div class="card table-card">
-  {% data_table responsive=True sortable=True table_key="reports-detail" title="Результат отчёта" label="Таблица отчёта; на узком экране показана карточками" %}
+  {% data_table responsive=True sortable=True table_key=report_table_key title="Результат отчёта" label="Таблица отчёта; на узком экране показана карточками" %}
       <thead>
         <tr>
           {% for label in report.labels %}<th>{{ label }}</th>{% endfor %}

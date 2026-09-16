@@ -24,7 +24,7 @@
               {% for error in form.title.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
               <span class="text-muted">Необязательно — для личного диалога подставятся имена участников</span>
             </div>
-            <div class="field field--wide">
+            <div class="field field--wide participant-field">
               <label for="participant-search">Участники</label>
               <input id="participant-search" type="text"
                      data-suggest-url="{% url 'system:users_suggest' %}"

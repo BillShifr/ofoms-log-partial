@@ -75,10 +75,14 @@ class BaseSystemTestCase(TestCase):
         ensure_role_groups()
 
     def setUp(self):
-        self.admin = Employee.objects.create_user(
+        self.portal_admin = Employee.objects.create_user(
             username="admin_sys", password=PASSWORD, org=81000, is_staff=True
         )
         admin_group = Group.objects.get(name="Администратор")
+        self.portal_admin.groups.add(admin_group)
+        self.admin = Employee.objects.create_superuser(
+            username="root_sys", password=PASSWORD, org=81000
+        )
         self.admin.groups.add(admin_group)
         self.operator = Employee.objects.create_user(
             username="op_sys", password=PASSWORD, org=81000
@@ -105,11 +109,14 @@ class AccessTests(BaseSystemTestCase):
             self.assertContains(resp, "Недостаточно прав", status_code=403)
 
     def test_admin_can_open_admin_screens(self):
-        self.admin.groups.add(Group.objects.get(name="ОП1"))
-        self.client.force_login(self.admin)
-        for name in ("users", "user_create", "events", "tasks", "task_create"):
+        self.portal_admin.groups.add(Group.objects.get(name="ОП1"))
+        self.client.force_login(self.portal_admin)
+        for name in ("tasks", "task_create"):
             resp = self.client.get(reverse(f"system:{name}"))
             self.assertEqual(resp.status_code, 200, name)
+        for name in ("users", "user_create", "events"):
+            resp = self.client.get(reverse(f"system:{name}"))
+            self.assertEqual(resp.status_code, 403, name)
 
     def test_smo_account_with_forged_admin_group_is_denied_admin_surfaces(self):
         forged_admin = Employee.objects.create_user(
@@ -167,8 +174,8 @@ class AccessTests(BaseSystemTestCase):
         self.client.force_login(self.admin)
         response = self.client.get(reverse("system:users"))
 
-        self.assertContains(response, '<details class="nav__menu">')
-        self.assertContains(response, ">Управление</summary>")
+        self.assertContains(response, '<details class="nav__menu nav__menu--admin">')
+        self.assertContains(response, ">Администрирование</summary>")
         self.assertContains(response, reverse("system:users"))
         self.assertContains(response, reverse("system:events"))
         self.assertContains(response, "/admin/")
@@ -179,9 +186,12 @@ class AccessTests(BaseSystemTestCase):
 
     def test_user_screens_for_regular_user(self):
         self.client.force_login(self.operator)
-        for name in ("messages", "docs", "news", "prefs"):
+        for name in ("messages", "docs", "news"):
             resp = self.client.get(reverse(f"system:{name}"))
             self.assertEqual(resp.status_code, 200, name)
+        self.assertRedirects(
+            self.client.get(reverse("system:prefs")), reverse("journal:list")
+        )
 
 
 class PaginationTests(TestCase):
@@ -213,12 +223,12 @@ class UserManagementTests(BaseSystemTestCase):
             org=81000,
             first_name="Исходное",
         )
-        self.client.force_login(self.admin)
+        self.client.force_login(self.portal_admin)
 
         listing = self.client.get(reverse("system:users"))
         update_url = reverse("system:user_update", args=[root.pk])
-        self.assertNotContains(listing, root.username)
-        self.assertEqual(self.client.get(update_url).status_code, 404)
+        self.assertEqual(listing.status_code, 403)
+        self.assertEqual(self.client.get(update_url).status_code, 403)
         self.assertEqual(
             self.client.post(
                 update_url,
@@ -228,11 +238,11 @@ class UserManagementTests(BaseSystemTestCase):
                     "is_active": "on",
                 },
             ).status_code,
-            404,
+            403,
         )
         for route in ("user_block", "user_unblock"):
             response = self.client.post(reverse(f"system:{route}", args=[root.pk]))
-            self.assertEqual(response.status_code, 404, route)
+            self.assertEqual(response.status_code, 403, route)
 
         root.refresh_from_db()
         self.assertEqual(root.first_name, "Исходное")
@@ -482,23 +492,22 @@ class UserManagementTests(BaseSystemTestCase):
         self.assertTrue(self.admin.is_active)
 
     def test_cannot_remove_own_administrator_role_through_update_form(self):
-        self.client.force_login(self.admin)
+        self.client.force_login(self.portal_admin)
         operator_group = Group.objects.get(name="ОП1")
         response = self.client.post(
-            reverse("system:user_update", args=[self.admin.pk]),
+            reverse("system:user_update", args=[self.portal_admin.pk]),
             {
-                "last_name": self.admin.last_name,
-                "org": str(self.admin.org),
+                "last_name": self.portal_admin.last_name,
+                "org": str(self.portal_admin.org),
                 "roles": [operator_group.pk],
                 "is_active": "on",
                 "is_staff": "on",
             },
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Нельзя снять собственную роль администратора")
-        self.admin.refresh_from_db()
-        self.assertTrue(self.admin.groups.filter(name="Администратор").exists())
+        self.assertEqual(response.status_code, 403)
+        self.portal_admin.refresh_from_db()
+        self.assertTrue(self.portal_admin.groups.filter(name="Администратор").exists())
 
     def test_filter_by_org(self):
         self.client.force_login(self.admin)
@@ -2041,6 +2050,9 @@ class TaskTests(BaseSystemTestCase):
 
         self.assertContains(response, "Проверка доступности задания")
         self.assertContains(response, "Действие")
+        self.assertContains(response, "Новые действия добавляются разработчиком")
+        self.assertContains(response, 'class="readonly-field"')
+        self.assertNotContains(response, '<select name="status"')
         self.assertContains(response, "data-assignee-search")
         self.assertContains(response, 'id="assignee-select"')
         self.assertContains(response, "data-conditional-values=\"scheduled\"")
@@ -2847,16 +2859,38 @@ class PrefTests(BaseSystemTestCase):
 
     def test_ui_preferences_expose_required_accessibility_modes(self):
         self.client.force_login(self.operator)
-        response = self.client.get(reverse("system:prefs"))
+        response = self.client.get(reverse("system:messages"))
 
-        self.assertContains(response, 'data-ui-font="base"')
-        self.assertContains(response, 'data-ui-font="a"')
-        self.assertContains(response, 'data-ui-font="a-plus"')
-        self.assertContains(response, 'data-ui-font="a-plus-plus"')
         self.assertContains(response, 'data-ui-contrast="white"')
         self.assertContains(response, 'data-ui-contrast="black"')
-        self.assertContains(response, 'aria-labelledby="font-scale-label"')
-        self.assertContains(response, 'aria-labelledby="contrast-label"')
+        self.assertNotContains(response, "data-ui-font")
+        self.assertNotContains(response, ">Настройки</a>")
+        self.assertRedirects(
+            self.client.get(reverse("system:prefs")), reverse("journal:list")
+        )
+
+    def test_task_table_preferences_have_full_modal_configuration(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse("system:table_prefs", args=["system-tasks"]),
+            {"modal": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Наименование")
+        self.assertContains(response, "Результат")
+        self.assertContains(response, "Сортировка по умолчанию")
+        self.assertContains(response, ">Отмена</button>")
+
+    def test_table_preferences_json_supports_client_rendered_tables(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse("system:table_prefs", args=["exchange-logs"]),
+            {"format": "json"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["columns"][0]["key"], "filename")
 
     def test_save_table_prefs(self):
         self.client.force_login(self.operator)

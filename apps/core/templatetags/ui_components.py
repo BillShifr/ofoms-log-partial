@@ -2,6 +2,7 @@
 
 from django import template
 from django.template.base import token_kwargs
+from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
@@ -23,12 +24,18 @@ class DataTableNode(template.Node):
         table_key = str(options.get("table_key", "")).strip()
         title = str(options.get("title", "")).strip()
         settings_url = str(options.get("settings_url", "")).strip()
+        server_managed = bool(options.get("server_managed", False))
         responsive = bool(options.get("responsive", False))
         sortable = bool(options.get("sortable", False))
         fixed_first = bool(options.get("fixed_first", False))
         scrollable = bool(options.get("scrollable", True))
         settings_enabled = bool(options.get("settings", True))
-        has_settings = bool(table_key and title and settings_enabled)
+        if table_key and not settings_url:
+            from apps.system.table_config import get_table_meta
+
+            if get_table_meta(table_key) is not None:
+                settings_url = reverse("system:table_prefs", args=[table_key])
+        has_settings = bool(table_key and title and settings_enabled and settings_url)
 
         table_classes = ["data"]
         if responsive:
@@ -41,6 +48,13 @@ class DataTableNode(template.Node):
             table_attrs = format_html("{} data-client-sort", table_attrs)
         if table_key:
             table_attrs = format_html('{} data-table-key="{}"', table_attrs, table_key)
+        if settings_url:
+            table_attrs = format_html(
+                '{} data-table-settings-url="{}"{}',
+                table_attrs,
+                settings_url,
+                mark_safe(' data-table-server-managed="true"') if server_managed else "",
+            )
         content = self.nodelist.render(context)
         table_markup = format_html("<table{}>{}</table>", table_attrs, mark_safe(content))
         if not scrollable:
@@ -76,7 +90,7 @@ class DataTableNode(template.Node):
             )
             server_settings = ""
             if settings_url:
-                server_settings = format_html(
+                server_settings = mark_safe(
                     '<div class="table-settings__server" data-table-settings-content>'
                     '<p class="text-muted">Загрузка настроек колонок...</p></div>'
                 )
@@ -91,7 +105,8 @@ class DataTableNode(template.Node):
                 '<p class="text-muted">Ширины колонок сохраняются в этом браузере для текущей таблицы.</p>'
                 '<button class="btn btn--ghost" type="button" data-table-reset-widths '
                 'data-table-key="{}">Сбросить ширины колонок</button>'
-                '</div>{}</div></div></dialog>',
+                '</div>{}'
+                '</div></div></dialog>',
                 modal_id,
                 table_key,
                 server_settings,
@@ -134,6 +149,7 @@ def do_data_table(parser, token):
         "title",
         "settings_url",
         "settings",
+        "server_managed",
     }
     unknown = set(options) - allowed
     if unknown:

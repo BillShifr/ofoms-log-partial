@@ -13,7 +13,7 @@
       <label for="search-docs">Поиск по документам</label>
       <input id="search-docs" type="text" name="q" value="{{ request.GET.q }}" data-autocomplete="doc" data-autocomplete-url="{% url 'system:doc_suggest' %}" placeholder="Введите название (от 3 символов)">
     </div>
-    <div class="field field--narrow">
+    <div class="field field--narrow field--submit">
       <button class="btn btn--primary" type="submit">Найти</button>
       {% if request.GET.q %}<a class="btn btn--ghost" href="{% url 'system:docs' %}">Сбросить</a>{% endif %}
     </div>

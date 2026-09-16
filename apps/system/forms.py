@@ -297,7 +297,7 @@ class TaskForm(forms.ModelForm):
         model = TaskJob
         fields = (
             "name", "command", "description",
-            "status", "assigned_to", "priority",
+            "assigned_to", "priority",
             "run_mode", "interval_minutes", "enabled",
         )
         widgets = {
@@ -311,11 +311,6 @@ class TaskForm(forms.ModelForm):
         self.fields["interval_minutes"].required = False
         self.fields["priority"].help_text = "0 — низкий, 1 — средний, 2 — высокий"
         self.fields["priority"].required = False
-        self.fields["status"].required = False
-        self.fields["status"].disabled = True
-        self.fields["status"].help_text = (
-            "Статус изменяется системой при запуске и завершении задания."
-        )
         available_assignees = Q(is_active=True)
         if self.instance.assigned_to_id:
             available_assignees |= Q(pk=self.instance.assigned_to_id)
@@ -335,7 +330,7 @@ class TaskForm(forms.ModelForm):
             and self.instance.status == TaskJob.Status.CANCELLED
             and cleaned.get("enabled")
         ):
-            cleaned["status"] = TaskJob.Status.CREATED
+            self.instance.status = TaskJob.Status.CREATED
         if (
             cleaned.get("run_mode") == TaskJob.RunMode.SCHEDULED
             and not cleaned.get("interval_minutes")

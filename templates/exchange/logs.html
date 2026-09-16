@@ -22,8 +22,8 @@
           <td class="mono cell-long responsive-cell--wide" data-label="Файл"><span class="cell-clip">{{ log.filename }}</span></td>
           <td data-label="Организация">{{ log.get_org_display }}</td>
           <td data-label="Тип">{{ log.get_kind_display }}</td>
-          <td data-label="Статус">{% if log.status == 'ok' %}<span class="badge badge--closed">OK</span>
-              {% else %}<span class="badge badge--overdue">Ошибки</span>{% endif %}</td>
+          <td data-label="Статус">{% if log.status == 'ok' %}<span class="badge badge--closed">Без ошибок</span>
+              {% else %}<button class="status-detail-button badge badge--overdue" type="button" data-modal-open="exchange-result-{{ log.pk }}">Ошибки{% if log.error_count %}: {{ log.error_count }}{% endif %}</button>{% endif %}</td>
           <td data-label="Записей" data-type="num">{{ log.rows }}</td>
           <td data-label="Когда">{{ log.created_at|date:"d.m.Y H:i" }}</td>
           <td class="text-nowrap responsive-cell--wide responsive-cell--actions" data-label="Действия"><a class="btn btn--sm btn--ghost" href="{% url 'exchange:protocol' log.pk %}">Протокол</a></td>
@@ -33,5 +33,17 @@
         {% endfor %}
       </tbody>
   {% end_data_table %}
+  {% for log in logs %}{% if log.status != 'ok' %}
+  <dialog class="modal" id="exchange-result-{{ log.pk }}">
+    <div class="modal__dialog">
+      <div class="modal__head"><h2>Ошибки обработки файла</h2><form method="dialog"><button class="btn btn--ghost btn--icon" type="submit" aria-label="Закрыть">×</button></form></div>
+      <div class="modal__body">
+        <dl class="detail-list"><dt>Файл</dt><dd class="mono">{{ log.filename }}</dd><dt>Результат</dt><dd>{% if log.error_count %}Найдено ошибок: {{ log.error_count }}{% else %}Файл отклонён, подробный протокол отсутствует{% endif %}</dd></dl>
+        <p class="text-muted">Код 41 означает нарушение структуры XML или недопустимое значение поля. В протоколе указаны поле, номер обращения и комментарий проверки.</p>
+        <div class="modal__actions"><a class="btn btn--primary" href="{% url 'exchange:protocol' log.pk %}">Открыть протокол</a><form method="dialog"><button class="btn btn--ghost" type="submit">Закрыть</button></form></div>
+      </div>
+    </div>
+  </dialog>
+  {% endif %}{% endfor %}
 </div>
 {% endblock %}

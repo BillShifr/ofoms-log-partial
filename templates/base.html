@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}{{ SYSTEM_META.SYSTEM_SHORT_TITLE }}{% endblock %} — {{ SYSTEM_META.SYSTEM_ORG }}</title>
-  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260915-8">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=20260916-1">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -14,7 +14,7 @@
   <header class="header">
     <div class="container header__inner">
       <a class="header__brand" href="{% url 'journal:list' %}" aria-label="На главную страницу журнала">
-        <span class="header__logo" aria-hidden="true">{{ SYSTEM_META.SYSTEM_SHORT_TITLE|slice:":1" }}</span>
+        <img class="header__logo" src="{% static 'img/tfoms-yugra-logo.png' %}" alt="" width="50" height="44">
         <div class="header__title-wrap">
           <div class="header__title">{{ SYSTEM_META.SYSTEM_SHORT_TITLE }}</div>
           <div class="header__org">{{ SYSTEM_META.SYSTEM_ORG }}</div>
@@ -25,12 +25,17 @@
           <div class="header__user">
             <span class="header__user-copy">
               <span class="header__user-name">{{ user.full_name|default:user.username }}</span>
-              {% if SYSTEM_ROLE_LABEL %}<span class="header__user-role">{{ SYSTEM_ROLE_LABEL }}</span>{% endif %}
+              {% if SYSTEM_ROLE_LABEL %}<span class="header__user-role">Права: {{ SYSTEM_ROLE_LABEL }}</span>{% endif %}
             </span>
           </div>
           <div class="theme-switch" role="group" aria-label="Цветовая тема">
             <button class="theme-switch__btn" type="button" data-ui-theme="light" aria-label="Светлая тема" aria-pressed="false" title="Светлая тема">☀</button>
             <button class="theme-switch__btn" type="button" data-ui-theme="dark" aria-label="Тёмная тема" aria-pressed="false" title="Тёмная тема">☾</button>
+          </div>
+          <div class="contrast-switch" role="group" aria-label="Контраст">
+            <button class="theme-switch__btn" type="button" data-ui-contrast="default" aria-label="Обычный контраст" aria-pressed="false" title="Обычный контраст">◐</button>
+            <button class="theme-switch__btn" type="button" data-ui-contrast="white" aria-label="Высокий контраст: белый фон" aria-pressed="false" title="Белый высококонтрастный режим">W</button>
+            <button class="theme-switch__btn" type="button" data-ui-contrast="black" aria-label="Высокий контраст: чёрный фон" aria-pressed="false" title="Чёрный высококонтрастный режим">B</button>
           </div>
           <form method="post" action="{% url 'logout' %}" class="header__logout">
             {% csrf_token %}
@@ -44,8 +49,8 @@
   </header>
 
   {% if user.is_authenticated %}<nav class="nav" aria-label="Основное меню">
-    <div class="container nav__scroll">
-    <div class="nav__inner">
+    <div class="container nav__shell">
+    <div class="nav__scroll"><div class="nav__inner">
       <a class="nav__link {% if active_nav == 'journal' %}nav__link--active{% endif %}"
          href="{% url 'journal:list' %}">Журнал</a>
       {% if can_manage_system %}
@@ -62,21 +67,17 @@
          href="{% url 'system:news' %}">Новости</a>
       <a class="nav__link {% if active_nav == 'docs' %}nav__link--active{% endif %}"
          href="{% url 'system:docs' %}">Документация</a>
-      <a class="nav__link {% if active_nav == 'prefs' %}nav__link--active{% endif %}"
-         href="{% url 'system:prefs' %}">Настройки</a>
-      {% if can_manage_system or user.is_staff %}
-        <details class="nav__menu">
-          <summary class="nav__link {% if active_nav == 'users' or active_nav == 'events' %}nav__link--active{% endif %}">Управление</summary>
+    </div></div>
+      {% if user.is_superuser %}
+        <details class="nav__menu nav__menu--admin">
+          <summary class="nav__link {% if active_nav == 'users' or active_nav == 'events' %}nav__link--active{% endif %}">Администрирование</summary>
           <div class="nav__menu-panel">
-            {% if can_manage_system %}
-              <a class="nav__menu-link {% if active_nav == 'users' %}nav__menu-link--active{% endif %}" href="{% url 'system:users' %}">Пользователи</a>
-              <a class="nav__menu-link {% if active_nav == 'events' %}nav__menu-link--active{% endif %}" href="{% url 'system:events' %}">События</a>
-            {% endif %}
-            {% if user.is_staff %}<a class="nav__menu-link" href="/admin/">Администрирование</a>{% endif %}
+            <a class="nav__menu-link {% if active_nav == 'users' %}nav__menu-link--active{% endif %}" href="{% url 'system:users' %}">Пользователи</a>
+            <a class="nav__menu-link {% if active_nav == 'events' %}nav__menu-link--active{% endif %}" href="{% url 'system:events' %}">События</a>
+            <a class="nav__menu-link" href="/admin/">Системная панель</a>
           </div>
         </details>
       {% endif %}
-    </div>
     </div>
   </nav>{% endif %}
 
@@ -100,13 +101,13 @@
 
   <div class="toast-container" aria-live="polite"></div>
   <script src="{% static 'js/toast.js' %}" defer></script>
-  <script src="{% static 'js/datatable.js' %}?v=20260915-6" defer></script>
+  <script src="{% static 'js/datatable.js' %}?v=20260916-1" defer></script>
   <script src="{% static 'js/collapsible.js' %}" defer></script>
   <script src="{% static 'js/autocomplete.js' %}" defer></script>
   <script src="{% static 'js/form-validate.js' %}?v=20260911-2" defer></script>
   <script src="{% static 'js/form-actions.js' %}?v=20260911" defer></script>
   <script src="{% static 'js/page-forms.js' %}?v=20260915-2" defer></script>
-  <script src="{% static 'js/ui-prefs.js' %}?v=20260911-2"></script>
+  <script src="{% static 'js/ui-prefs.js' %}?v=20260916-1"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

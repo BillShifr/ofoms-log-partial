@@ -59,7 +59,7 @@
 
 <div class="card table-card">
   {% url 'system:table_prefs' table_key as table_settings_url %}
-  {% data_table responsive=True fixed_first=fixed_first sortable=True table_key=table_key title="Реестр обращений" settings_url=table_settings_url label="Таблица обращений; на узком экране показана карточками" %}
+  {% data_table responsive=True fixed_first=fixed_first sortable=True server_managed=True table_key=table_key title="Реестр обращений" settings_url=table_settings_url label="Таблица обращений; на узком экране показана карточками" %}
       <colgroup>
         {% for col in cols %}<col class="col-{{ col.key }}">{% endfor %}
       </colgroup>

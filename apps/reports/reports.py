@@ -146,6 +146,11 @@ def _base(user_org: int, filters: ReportFilters):
     return filters.scoped(filters.apply(Irp.objects.all()), user_org)
 
 
+def has_report_data(user_org: int, filters: ReportFilters) -> bool:
+    """Whether the selected scope contains source records for an export."""
+    return _base(user_org, filters).exists()
+
+
 # ---------------------------------------------------------------------------
 # Прил. №1 — Количество поступивших обращений
 # ---------------------------------------------------------------------------

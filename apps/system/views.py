@@ -2,8 +2,8 @@
 
 Доступы:
 - всем аутентифицированным: Сообщения, Новости, Документация, Настройки таблиц;
-- роли «Администратор»/суперпользователю: Пользователи, Журнал событий, Задачи,
-  управление Новостями/Документацией (ТЗ разд. 3, п. «доступ при наличии прав»).
+- роли «Администратор»/суперпользователю: Задачи и управление контентом;
+- только суперпользователю: Пользователи и Журнал событий.
 """
 
 import mimetypes
@@ -65,6 +65,7 @@ from apps.system.models import (
     TaskRunSuperseded,
     UserTableViewPref,
 )
+from apps.system.table_config import allowed_sorts, get_table_meta
 from apps.system.validators import VIDEO_EXTENSIONS
 
 PAGE_SIZE = 25
@@ -79,6 +80,17 @@ def admin_required(view):
     @login_required
     def wrapper(request, *args, **kwargs):
         if not _is_admin(request.user):
+            raise PermissionDenied
+        return view(request, *args, **kwargs)
+
+    return wrapper
+
+
+def superuser_required(view):
+    @wraps(view)
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_active or not request.user.is_superuser:
             raise PermissionDenied
         return view(request, *args, **kwargs)
 
@@ -107,7 +119,7 @@ def _manageable_users_for_actor(actor, *, for_update=False):
     return queryset
 
 
-@admin_required
+@superuser_required
 @require_safe
 def user_list(request):
     form = EmployeeFilterForm(request.GET or None)
@@ -148,7 +160,7 @@ def models_q_lookup(qs, q):
     return qs
 
 
-@admin_required
+@superuser_required
 @require_http_methods(["GET", "POST"])
 def user_create(request):
     if request.method == "POST":
@@ -174,7 +186,7 @@ def user_create(request):
     )
 
 
-@admin_required
+@superuser_required
 @require_http_methods(["GET", "POST"])
 def user_update(request, pk):
     if request.method == "POST":
@@ -222,7 +234,7 @@ def _user_form_context(form, title, *, target_user=None):
     }
 
 
-@admin_required
+@superuser_required
 @require_http_methods(["POST"])
 def user_block(request, pk):
     with transaction.atomic():
@@ -245,7 +257,7 @@ def user_block(request, pk):
     return redirect("system:users")
 
 
-@admin_required
+@superuser_required
 @require_http_methods(["POST"])
 def user_unblock(request, pk):
     with transaction.atomic():
@@ -294,7 +306,7 @@ def _events_qs(form):
     return qs
 
 
-@admin_required
+@superuser_required
 @require_http_methods(["GET"])
 def event_initiator_suggest(request):
     """Автозаполнение инициатора события (PRD v3 §2.10, §2.0.6)."""
@@ -324,7 +336,7 @@ def event_initiator_suggest(request):
     return JsonResponse({"suggestions": matches})
 
 
-@admin_required
+@superuser_required
 @require_safe
 def event_list(request):
     from django.urls import reverse
@@ -351,7 +363,7 @@ def event_list(request):
     )
 
 
-@admin_required
+@superuser_required
 @require_http_methods(["GET"])
 def event_export(request):
     """Выгрузка журнала событий в Excel (ТЗ разд. 3.4/2.10)."""
@@ -1513,34 +1525,32 @@ def news_delete(request, pk):
 # ---------------------------------------------------------------------------
 
 
-def _tables_meta() -> dict:
-    return {
-        JOURNAL_TABLE_KEY: {
+def _table_meta(table_key: str) -> dict | None:
+    if table_key == JOURNAL_TABLE_KEY:
+        return {
             "title": "Журнал обращений",
             "columns": JOURNAL_COLUMNS,
             "allowed_sorts": SORTABLE_FIELDS,
         }
-    }
+    meta = get_table_meta(table_key)
+    if meta is None:
+        return None
+    return {**meta, "allowed_sorts": allowed_sorts(meta)}
 
 
 @login_required
 @require_safe
 def prefs_list(request):
-    prefs = UserTableViewPref.objects.filter(user=request.user)
-    tables = _tables_meta()
-    return render(
-        request,
-        "system/prefs.html",
-        {"prefs": prefs, "tables": tables, "active_nav": "prefs"},
-    )
+    return redirect("journal:list")
 
 
 @login_required
 @require_http_methods(["GET", "POST"])
 def table_prefs(request, table_key):
-    meta = _tables_meta().get(table_key)
+    meta = _table_meta(table_key)
     if meta is None:
         raise Http404
+    is_json = request.GET.get("format") == "json"
     is_modal = request.GET.get("modal") == "1" or request.headers.get(
         "x-requested-with"
     ) == "XMLHttpRequest"
@@ -1599,6 +1609,15 @@ def table_prefs(request, table_key):
         meta["columns"],
         key=lambda column: order_by_key.get(column["key"], len(order_by_key) + 1),
     )
+    if is_json:
+        return JsonResponse(
+            {
+                "columns": meta["columns"],
+                "current": [column["key"] for column in columns if column["key"] in current],
+                "sorting": sorting,
+                "fixed_first": pref.fixed_first,
+            }
+        )
     template_name = "system/table_prefs_modal.html" if is_modal else "system/table_prefs.html"
     return render(
         request,

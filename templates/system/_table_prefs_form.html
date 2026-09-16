@@ -50,7 +50,11 @@
   </div>
 
   <div class="form-actions">
-    <button class="btn btn--primary" type="submit">Сохранить</button>
-    {% if not is_modal %}<a class="btn btn--ghost" href="{% url 'system:prefs' %}">Отмена</a>{% endif %}
+    <button class="btn btn--primary" type="submit" data-submitting-label="Сохранение…">Сохранить</button>
+    {% if is_modal %}
+      <button class="btn btn--ghost" type="button" data-modal-close>Отмена</button>
+    {% else %}
+      <a class="btn btn--ghost" href="{% url 'journal:list' %}">Отмена</a>
+    {% endif %}
   </div>
 </form>

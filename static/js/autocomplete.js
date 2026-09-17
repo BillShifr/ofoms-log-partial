@@ -36,8 +36,10 @@
     host.appendChild(panel);
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  function initInputs() {
     document.querySelectorAll('input[data-autocomplete]').forEach(function (input) {
+      if (input.dataset.autocompleteReady === 'true') return;
+      input.dataset.autocompleteReady = 'true';
       input.setAttribute('autocomplete', 'off');
       input.addEventListener('input', function () {
         var q = input.value.trim();
@@ -53,6 +55,10 @@
         }, DEBOUNCE);
       });
     });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    initInputs();
     document.addEventListener('click', function (e) {
       if (panel && !panel.contains(e.target) && !(e.target.closest && e.target.closest('[data-autocomplete]'))) {
         removePanel();
@@ -61,5 +67,9 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') removePanel();
     });
+  });
+  document.addEventListener('portal:render', function () {
+    removePanel();
+    initInputs();
   });
 })();

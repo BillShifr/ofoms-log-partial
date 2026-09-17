@@ -1,6 +1,12 @@
 // Progressive infinite scroll for the journal. Server pagination remains the fallback.
 (function () {
+  var activeObserver = null;
+
   function initInfiniteScroll() {
+    if (activeObserver) {
+      activeObserver.disconnect();
+      activeObserver = null;
+    }
     var controller = document.querySelector('[data-infinite-scroll]');
     var body = document.querySelector('[data-infinite-body]');
     var sentinel = controller && controller.querySelector('[data-infinite-sentinel]');
@@ -65,9 +71,11 @@
     observer = new IntersectionObserver(function (entries) {
       if (entries.some(function (entry) { return entry.isIntersecting; })) loadNextPage();
     }, { rootMargin: '320px 0px' });
+    activeObserver = observer;
     observer.observe(sentinel);
     finishIfComplete();
   }
 
   document.addEventListener('DOMContentLoaded', initInfiniteScroll);
+  document.addEventListener('portal:render', initInfiniteScroll);
 })();

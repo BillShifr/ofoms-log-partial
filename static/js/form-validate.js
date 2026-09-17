@@ -120,13 +120,15 @@
     return false;
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  function init() {
     document.querySelectorAll('.field').forEach(enhanceField);
     document.querySelectorAll('form').forEach(function (form) {
+      if (form.dataset.validationReady === 'true') return;
       if ((form.getAttribute('method') || '').toLowerCase() === 'dialog') return;
       if (!form.querySelector('button[type="submit"], input[type="submit"]')) return;
       var controls = editableElements(form);
       if (!controls.length) return;
+      form.dataset.validationReady = 'true';
       form.setAttribute('novalidate', 'novalidate');
       form.addEventListener('submit', function (e) {
         clearTips(form);
@@ -167,5 +169,8 @@
         }
       });
     }
-  });
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('portal:render', init);
 })();

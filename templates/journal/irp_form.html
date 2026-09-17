@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load static %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
 <header class="page-heading form-page-heading">
@@ -24,7 +23,7 @@
       <div class="field"><label>Организация-источник</label>{{ form.way_n }}{{ form.way_n.errors }}</div>
       <div class="field"><label>Способ</label>{{ form.how }}{{ form.how.errors }}</div>
       <div class="field"><label>Тема</label>{{ form.theme }}{{ form.theme.errors }}
-        {% if user.is_superuser %}<a class="field-help-link" href="{% url 'admin:journal_irptheme_add' %}" target="_blank" rel="noopener">+ Создать тему в справочнике</a>{% endif %}
+        <button class="field-help-link field-help-button" type="button" data-modal-open="theme-create-modal">+ Создать новую тему</button>
       </div>
       <div class="field"><label>Комментарий к теме</label>{{ form.theme_comment }}{{ form.theme_comment.errors }}</div>
       <div class="field" data-conditional-controller="id_irp_type" data-conditional-values="2"><label>Сведения о жалобе</label>{{ form.zh_d }}{{ form.zh_d.errors }}</div>
@@ -96,5 +95,5 @@
     </div>
   </form>
 </div>
+{% include "journal/_theme_create_modal.html" %}
 {% endblock %}
-{% block scripts %}<script src="{% static 'js/conditional-fields.js' %}?v=20260911" defer></script>{% endblock %}

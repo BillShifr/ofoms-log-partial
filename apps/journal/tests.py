@@ -461,6 +461,38 @@ class JournalScreenTests(TestCase):
 
         return str(uuid.uuid4())
 
+    def test_regular_employees_can_create_current_theme_from_journal(self):
+        for index, user in enumerate((self.tfoms_user, self.smo_user), start=1):
+            with self.subTest(user=user.username):
+                self.client.force_login(user)
+                response = self.client.post(
+                    reverse("journal:theme_create"),
+                    {"code_name": f"new.{index}", "title": f"Новая тема {index}"},
+                    HTTP_ACCEPT="application/json",
+                )
+                self.assertEqual(response.status_code, 201)
+                payload = response.json()
+                theme = IrpTheme.objects.get(pk=payload["id"])
+                self.assertEqual(theme.version, 3)
+                self.assertEqual(theme.code_name, f"NEW.{index}")
+                self.assertEqual(payload["label"], str(theme))
+                self.assertTrue(
+                    EventLog.objects.filter(
+                        user=user,
+                        target=f"irp-theme:{theme.pk}:create",
+                    ).exists()
+                )
+
+    def test_theme_create_rejects_duplicate_current_code(self):
+        self.client.force_login(self.tfoms_user)
+        response = self.client.post(
+            reverse("journal:theme_create"),
+            {"code_name": self.theme.code_name, "title": "Дубликат"},
+            HTTP_ACCEPT="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("code_name", response.json()["errors"])
+
     def test_admin_related_records_are_scoped_to_staff_organization(self):
         own = self._make_irp(owner=self.smo_user)
         foreign = self._make_irp(owner=self.tfoms_user)

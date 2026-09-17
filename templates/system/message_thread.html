@@ -43,7 +43,7 @@
           {% if r.attachments.all %}
             <div class="flex flex--wrap gap-6">
               {% for a in r.attachments.all %}
-                <a class="attachment-chip" href="{% url 'system:message_attachment_download' a.pk %}">Загрузить: {{ a.file.name|cut:"messages/" }}</a>
+                <a class="attachment-chip" data-no-ajax href="{% url 'system:message_attachment_download' a.pk %}">Загрузить: {{ a.file.name|cut:"messages/" }}</a>
               {% endfor %}
             </div>
           {% endif %}

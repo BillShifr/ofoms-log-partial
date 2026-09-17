@@ -6,6 +6,46 @@
   <div class="page-heading__metric"><strong>{{ page.paginator.count }}</strong><span>публикаций</span></div>
 </header>
 
+{% if can_manage %}
+<div class="card mb-2">
+  <details class="collapsible" data-key="news-create">
+    <summary class="collapsible__toggle">Опубликовать новость</summary>
+    <form method="post" action="{% url 'system:news_create' %}" enctype="multipart/form-data" data-validate>
+      {% csrf_token %}
+      <div class="form-grid">
+        <div class="field field--wide">
+          <label for="{{ form.title.id_for_label }}">Заголовок</label>{{ form.title }}
+          {% for error in form.title.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="field">
+          <label for="{{ form.category.id_for_label }}">Категория</label>{{ form.category }}
+        </div>
+        <div class="field field--wide">
+          <label for="{{ form.summary.id_for_label }}">Краткое описание</label>{{ form.summary }}
+          {% for error in form.summary.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="field field--wide">
+          <label for="{{ form.text.id_for_label }}">Содержание</label>{{ form.text }}
+          <span class="text-muted">Поддерживаются простые HTML-теги: &lt;b&gt;, &lt;i&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;a href&gt; и др.</span>
+          {% for error in form.text.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="field">
+          <label for="{{ form.cover_image.id_for_label }}">Обложка</label>{{ form.cover_image }}
+          {% for error in form.cover_image.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="field field--narrow field--checks">
+          <label class="checkbox">{{ form.is_active }}{{ form.is_active.label }}</label>
+          <label class="checkbox">{{ form.is_pinned }}{{ form.is_pinned.label }}</label>
+        </div>
+      </div>
+      <div class="form-actions form-actions--start">
+        <button class="btn btn--primary" type="submit">Опубликовать</button>
+      </div>
+    </form>
+  </details>
+</div>
+{% endif %}
+
 <div class="card mb-2">
   <details class="collapsible" data-key="news-filters">
     <summary class="collapsible__toggle">Поиск и фильтры</summary>
@@ -51,46 +91,6 @@
     </form>
   </details>
 </div>
-
-{% if can_manage %}
-<div class="card mb-2">
-  <details class="collapsible" data-key="news-create">
-    <summary class="collapsible__toggle">Опубликовать новость</summary>
-    <form method="post" action="{% url 'system:news_create' %}" enctype="multipart/form-data" data-validate>
-      {% csrf_token %}
-      <div class="form-grid">
-        <div class="field field--wide">
-          <label for="{{ form.title.id_for_label }}">Заголовок</label>{{ form.title }}
-          {% for error in form.title.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
-        </div>
-        <div class="field">
-          <label for="{{ form.category.id_for_label }}">Категория</label>{{ form.category }}
-        </div>
-        <div class="field field--wide">
-          <label for="{{ form.summary.id_for_label }}">Краткое описание</label>{{ form.summary }}
-          {% for error in form.summary.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
-        </div>
-        <div class="field field--wide">
-          <label for="{{ form.text.id_for_label }}">Содержание</label>{{ form.text }}
-          <span class="text-muted">Поддерживаются простые HTML-теги: &lt;b&gt;, &lt;i&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;a href&gt; и др.</span>
-          {% for error in form.text.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
-        </div>
-        <div class="field">
-          <label for="{{ form.cover_image.id_for_label }}">Обложка</label>{{ form.cover_image }}
-          {% for error in form.cover_image.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
-        </div>
-        <div class="field field--narrow field--checks">
-          <label class="checkbox">{{ form.is_active }}{{ form.is_active.label }}</label>
-          <label class="checkbox">{{ form.is_pinned }}{{ form.is_pinned.label }}</label>
-        </div>
-      </div>
-      <div class="form-actions form-actions--start">
-        <button class="btn btn--primary" type="submit">Опубликовать</button>
-      </div>
-    </form>
-  </details>
-</div>
-{% endif %}
 
 <div class="grid-2 news-grid">
   {% for n in page.object_list %}

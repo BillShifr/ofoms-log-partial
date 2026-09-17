@@ -42,5 +42,7 @@
     if (holder) holder.remove();
   }
 
+  window.showToast = toast;
   document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('portal:render', init);
 })();

@@ -32,7 +32,7 @@
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Применить</button>
       <a class="btn btn--ghost" href="{% url 'system:events' %}">Сбросить</a>
-      <a class="btn btn--ghost" href="{% url 'system:events_export' %}?{{ request.GET.urlencode }}">Скачать Excel</a>
+      <a class="btn btn--ghost" data-no-ajax href="{% url 'system:events_export' %}?{{ request.GET.urlencode }}">Скачать Excel</a>
     </div>
   </form>
 </div>

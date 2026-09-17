@@ -1909,6 +1909,18 @@ class TaskTests(BaseSystemTestCase):
         self.assertContains(response, 'data-label="Лог"')
         self.assertContains(response, "Проверка завершена")
 
+    def test_task_notes_render_structured_layout_and_username_fallback(self):
+        task = self._make_task()
+        TaskNote.objects.create(task=task, author=self.admin, text="Текст заметки")
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("system:task_update", args=[task.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="task-note"')
+        self.assertContains(response, self.admin.username)
+        self.assertContains(response, "Текст заметки")
+
     def test_task_create_rolls_back_when_audit_fails(self):
         self.client.force_login(self.admin)
 
@@ -2340,6 +2352,9 @@ class TaskTests(BaseSystemTestCase):
             target=f"task:{task.pk}:{task.command}",
         )
         self.assertIn("Ошибка выполнения задания", task.last_log)
+        self.assertIn("TASK-RUN-001", task.last_log)
+        self.assertIn(f"Действие: {task.command}", task.last_log)
+        self.assertIn("Категория: RuntimeError", task.last_log)
         self.assertEqual(run.log, task.last_log)
         self.assertEqual(event.detail, task.last_log)
         self.assertNotIn(secret, task.last_log)

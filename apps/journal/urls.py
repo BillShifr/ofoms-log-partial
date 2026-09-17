@@ -22,6 +22,7 @@ urlpatterns = [
     path("print/", views.irp_list_print, name="list_print"),
     path("suggest/", views.irp_suggest, name="suggest"),
     path("new/", views.irp_create, name="create"),
+    path("themes/new/", views.irp_theme_create, name="theme_create"),
     path("<int:pk>/", views.irp_detail, name="detail"),
     path("<int:pk>/edit/", views.irp_edit, name="edit"),
     path("<int:pk>/print/", views.irp_print, name="print"),

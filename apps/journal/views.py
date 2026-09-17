@@ -15,7 +15,7 @@ import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -36,7 +36,13 @@ from apps.core.storage import (
     open_field_file_or_404,
 )
 from apps.employee.models import TFOMS
-from apps.journal.forms import IrpAnswerForm, IrpFilterForm, IrpForm, IrpRedirectForm
+from apps.journal.forms import (
+    IrpAnswerForm,
+    IrpFilterForm,
+    IrpForm,
+    IrpRedirectForm,
+    IrpThemeForm,
+)
 from apps.journal.models import RESULTS, Irp, IrpAnswer, IrpFile, IrpHistory
 from apps.journal.table import (
     ALLOWED_SORTS,
@@ -174,7 +180,48 @@ def irp_list(request):
             "active_nav": "journal",
             "status_map": dict(RESULTS),
             "print_url": print_url,
+            "theme_form": IrpThemeForm(),
         },
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def irp_theme_create(request):
+    """Создать тему версии 3 без перехода в административный раздел."""
+    _require_capability(request, JOURNAL_READ)
+    form = IrpThemeForm(request.POST)
+    if form.is_valid():
+        try:
+            with transaction.atomic():
+                theme = form.save(commit=False)
+                theme.version = 3
+                theme.save()
+                log_event(
+                    module="journal",
+                    event_type=EventLog.EventType.CREATE,
+                    user=request.user,
+                    target=f"irp-theme:{theme.pk}:create",
+                    ip=request.META.get("REMOTE_ADDR"),
+                    detail=f"Создана тема обращения {theme.code_name}: {theme.title}",
+                )
+        except IntegrityError:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "errors": {
+                        "code_name": [
+                            {"message": "Тема с таким кодом уже существует.", "code": "unique"}
+                        ]
+                    },
+                },
+                status=400,
+            )
+        return JsonResponse(
+            {"ok": True, "id": theme.pk, "label": str(theme)}, status=201
+        )
+    return JsonResponse(
+        {"ok": False, "errors": form.errors.get_json_data()}, status=400
     )
 
 
@@ -268,7 +315,12 @@ def irp_create(request):
     return render(
         request,
         "journal/irp_form.html",
-        {"form": form, "title": "Регистрация обращения", "active_nav": "journal"},
+        {
+            "form": form,
+            "theme_form": IrpThemeForm(),
+            "title": "Регистрация обращения",
+            "active_nav": "journal",
+        },
     )
 
 
@@ -317,8 +369,13 @@ def irp_edit(request, pk):
     return render(
         request,
         "journal/irp_form.html",
-        {"form": form, "irp": irp, "title": "Редактирование обращения",
-         "active_nav": "journal"},
+        {
+            "form": form,
+            "theme_form": IrpThemeForm(),
+            "irp": irp,
+            "title": "Редактирование обращения",
+            "active_nav": "journal",
+        },
     )
 
 

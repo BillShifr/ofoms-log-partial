@@ -1871,6 +1871,36 @@ class TemplateHygieneTests(TestCase):
         missing = [needle for needle in required if needle not in script]
         self.assertEqual(missing, [])
 
+    def test_shared_form_validation_covers_empty_action_forms(self):
+        script = (
+            Path(settings.BASE_DIR) / "static" / "js" / "form-validate.js"
+        ).read_text(encoding="utf-8-sig")
+        required = [
+            "document.querySelectorAll('form')",
+            "data-require-input",
+            "dataset.requireSelector",
+            "Заполните хотя бы одно поле",
+            "e.stopImmediatePropagation()",
+        ]
+        self.assertEqual([needle for needle in required if needle not in script], [])
+
+        templates_root = Path(settings.BASE_DIR) / "templates"
+        for relative in (
+            "journal/irp_list.html",
+            "reports/detail.html",
+            "system/_conversation_side.html",
+            "system/docs.html",
+            "system/events.html",
+            "system/messages.html",
+            "system/news.html",
+            "system/users.html",
+        ):
+            with self.subTest(template=relative):
+                markup = (templates_root / relative).read_text(encoding="utf-8-sig")
+                self.assertTrue(
+                    "data-require-input" in markup or "data-require-selector" in markup
+                )
+
     def test_badge_css_keeps_text_inside_badge_box(self):
         css = (Path(settings.BASE_DIR) / "static" / "css" / "portal.css").read_text(
             encoding="utf-8-sig"

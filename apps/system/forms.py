@@ -320,8 +320,11 @@ class TaskForm(forms.ModelForm):
             "last_name", "first_name"
         )
         self.fields["assigned_to"].label_from_instance = (
-            lambda u: f"{u.last_name} {u.first_name}".strip() or u.username
+            lambda u: (
+                f"{u.full_name() or u.username} ({u.get_org_display()})"
+            )
         )
+        self.fields["assigned_to"].widget.attrs["hidden"] = True
 
     def clean(self):
         cleaned = super().clean()

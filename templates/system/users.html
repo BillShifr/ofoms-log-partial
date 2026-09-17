@@ -8,7 +8,7 @@
 </header>
 
 <div class="card mb-2">
-  <form method="get">
+  <form method="get" data-require-input data-require-message="Укажите хотя бы один критерий фильтра">
     <div class="filters">
       <div class="field"><label for="id_q">Поиск</label>{{ form.q }}{{ form.q.errors }}</div>
       <div class="field"><label for="id_org">Организация</label>{{ form.org }}{{ form.org.errors }}</div>

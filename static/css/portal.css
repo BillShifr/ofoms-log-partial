@@ -356,7 +356,6 @@ a:hover { text-decoration: underline; }
   box-shadow: var(--shadow);
   padding: 22px 26px;
 }
-.card + .card { margin-top: 18px; }
 .page-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin: 0 0 22px; }
 .page-heading > div { min-width: 0; }
 .page-heading h1 { margin: 0; overflow-wrap: anywhere; }

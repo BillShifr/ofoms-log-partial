@@ -10,6 +10,7 @@ def normalize_enabled_cancelled_tasks(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
 
     dependencies = [
         ('system', '0010_require_message_attachment_reply'),

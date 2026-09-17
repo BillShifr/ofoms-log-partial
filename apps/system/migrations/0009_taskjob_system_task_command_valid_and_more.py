@@ -49,6 +49,8 @@ def normalize_legacy_tasks(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
     dependencies = [
         ("system", "0008_alter_messageattachment_file_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

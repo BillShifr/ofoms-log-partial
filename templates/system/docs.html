@@ -8,7 +8,7 @@
 </header>
 
 <div class="card mb-2">
-  <form method="get" class="filters filters--center">
+  <form method="get" class="filters filters--center" data-require-input data-require-message="Введите название документа">
     <div class="field field--grow">
       <label for="search-docs">Поиск по документам</label>
       <input id="search-docs" type="text" name="q" value="{{ request.GET.q }}" data-autocomplete="doc" data-autocomplete-url="{% url 'system:doc_suggest' %}" placeholder="Введите название (от 3 символов)">

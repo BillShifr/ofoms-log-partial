@@ -1,7 +1,6 @@
 // Лёгкая клиентская валидация форм (v3, 2.0.4).
-// Формы с атрибутом data-validate: перехват submit, проверка нативных
-// ограничений (required/pattern/min/max/тип), показ подсказки у первого
-// невалидного поля и фокус на него. Серверная валидация остаётся основной.
+// Все формы с пользовательскими полями: перехват submit, проверка нативных
+// ограничений и декларативных групповых правил. Серверная валидация остаётся основной.
 (function () {
   var generatedId = 0;
 
@@ -73,16 +72,68 @@
     }
   }
 
+  function isEditable(element) {
+    if (!element || element.disabled || element.matches('[data-validation-ignore]')) return false;
+    if (!element.matches('input, select, textarea')) return false;
+    return !['hidden', 'submit', 'button', 'reset', 'image'].includes(element.type);
+  }
+
+  function isVisible(element) {
+    return element.type !== 'hidden' && !element.hidden && !element.closest('[hidden]');
+  }
+
+  function hasValue(element) {
+    if (element.type === 'checkbox' || element.type === 'radio') return element.checked;
+    if (element.type === 'file') return Boolean(element.files && element.files.length);
+    return String(element.value || '').trim() !== '';
+  }
+
+  function editableElements(form) {
+    return Array.prototype.filter.call(form.elements, isEditable);
+  }
+
+  function validationTarget(form, controls) {
+    var selector = form.dataset.validationTarget;
+    if (selector) {
+      try {
+        var explicit = form.querySelector(selector);
+        if (explicit) return explicit;
+      } catch (error) {}
+    }
+    return controls.find(isVisible) || controls[0] || null;
+  }
+
+  function validateGroupRules(form, controls) {
+    var candidates = controls;
+    var selector = form.dataset.requireSelector;
+    if (selector) {
+      try { candidates = Array.prototype.slice.call(form.querySelectorAll(selector)); }
+      catch (error) { candidates = []; }
+    } else if (!form.hasAttribute('data-require-input')) {
+      return true;
+    }
+    if (candidates.some(hasValue)) return true;
+    var target = validationTarget(form, controls);
+    if (target) {
+      showTip(target, form.dataset.requireMessage || 'Заполните хотя бы одно поле');
+    }
+    return false;
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.field').forEach(enhanceField);
-    document.querySelectorAll('form[data-validate]').forEach(function (form) {
+    document.querySelectorAll('form').forEach(function (form) {
+      if ((form.getAttribute('method') || '').toLowerCase() === 'dialog') return;
+      if (!form.querySelector('button[type="submit"], input[type="submit"]')) return;
+      var controls = editableElements(form);
+      if (!controls.length) return;
       form.setAttribute('novalidate', 'novalidate');
       form.addEventListener('submit', function (e) {
         clearTips(form);
         var first = null;
-        for (var i = 0; i < form.elements.length; i++) {
-          var el = form.elements[i];
-          if (el.disabled || el.tagName === 'FIELDSET') continue;
+        for (var i = 0; i < controls.length; i++) {
+          var el = controls[i];
+          if (!isVisible(el)) continue;
           var validity = el.validity;
           if (validity && !validity.valid) {
             if (!first) first = el;
@@ -96,7 +147,7 @@
             break;
           }
         }
-        if (first) {
+        if (first || !validateGroupRules(form, controls)) {
           e.preventDefault();
           e.stopImmediatePropagation();
         }

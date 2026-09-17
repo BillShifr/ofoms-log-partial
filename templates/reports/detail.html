@@ -10,7 +10,7 @@
 </header>
 
 <div class="card">
-  <form method="get" class="filter-form" id="report-filter-form">
+  <form method="get" class="filter-form" id="report-filter-form" data-require-input data-require-message="Укажите хотя бы один параметр отчёта">
     <details class="collapsible" id="report-filters" data-key="report-filters"{% if form.errors %} open{% endif %}>
       <summary class="collapsible__toggle">Параметры отчёта</summary>
       <div class="filters">

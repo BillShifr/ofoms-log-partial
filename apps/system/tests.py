@@ -2055,7 +2055,50 @@ class TaskTests(BaseSystemTestCase):
         self.assertNotContains(response, '<select name="status"')
         self.assertContains(response, "data-assignee-search")
         self.assertContains(response, 'id="assignee-select"')
+        self.assertContains(response, 'id="assignee-options"')
+        self.assertContains(response, '<select name="assigned_to" hidden')
+        self.assertContains(response, 'role="combobox"')
         self.assertContains(response, "data-conditional-values=\"scheduled\"")
+
+    def test_task_reassignment_is_recorded_in_compact_audit(self):
+        previous = Employee.objects.create_user(
+            username="task_previous",
+            first_name="Иван",
+            last_name="Петров",
+            password=PASSWORD,
+            org=81000,
+        )
+        replacement = Employee.objects.create_user(
+            username="task_replacement",
+            first_name="Анна",
+            last_name="Сидорова",
+            password=PASSWORD,
+            org=81000,
+        )
+        task = self._make_task(assigned_to=previous)
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:task_update", args=[task.pk]),
+            {
+                "name": task.name,
+                "command": task.command,
+                "assigned_to": replacement.pk,
+                "priority": TaskJob.Priority.LOW,
+                "run_mode": TaskJob.RunMode.MANUAL,
+                "enabled": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        event = EventLog.objects.get(target=f"task:{task.pk}:settings")
+        self.assertEqual(event.user, self.admin)
+        self.assertIn("Исполнитель: Петров Иван", event.detail)
+        self.assertIn("Сидорова Анна", event.detail)
+        card = self.client.get(reverse("system:task_update", args=[task.pk]))
+        self.assertContains(card, "Журнал")
+        self.assertContains(card, event.detail)
+        self.assertContains(card, self.admin.full_name() or self.admin.username)
 
     def test_manual_mode_clears_stale_interval(self):
         task = self._make_task(
@@ -2523,6 +2566,10 @@ class TaskTests(BaseSystemTestCase):
 
     def test_assignee_suggest(self):
         self.client.force_login(self.admin)
+        initial = self.client.get(reverse("system:task_assignee_suggest"))
+        self.assertEqual(initial.status_code, 200)
+        self.assertTrue(initial.json()["suggestions"])
+        self.assertIn("(", initial.json()["suggestions"][0]["label"])
         resp = self.client.get(reverse("system:task_assignee_suggest"), {"q": "petr"})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["suggestions"], [])

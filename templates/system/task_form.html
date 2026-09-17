@@ -33,14 +33,18 @@
         <div class="field"><span class="field-label">Статус</span>
           <output class="readonly-field">{% if task %}{{ task.get_status_display }}{% else %}Будет создана{% endif %}</output>
           <span class="text-muted">Статус изменяется системой при запуске и завершении задания.</span></div>
-        <div class="field" id="assignee-wrap">
+        <div class="field">
           <label for="assignee_search">Исполнитель</label>
-          <input id="assignee_search" type="text" data-assignee-search
-                 data-suggest-url="{% url 'system:task_assignee_suggest' %}"
-                 value="{% if form.instance.assigned_to %}{{ form.instance.assigned_to.full_name }}{% endif %}"
-                 placeholder="Введите ФИО (от 3 символов)" autocomplete="off">
-          <div id="assignee-select">{{ form.assigned_to }}</div>
-          <span class="text-muted">Выберите исполнителя из списка или начните вводить фамилию — система подставит найденного сотрудника.</span>
+          <div class="autocomplete-field" id="assignee-wrap">
+            <input id="assignee_search" type="text" data-assignee-search
+                   data-suggest-url="{% url 'system:task_assignee_suggest' %}"
+                   placeholder="Выберите сотрудника или начните вводить ФИО"
+                   autocomplete="off" role="combobox" aria-autocomplete="list"
+                   aria-expanded="false" aria-controls="assignee-options">
+            <div id="assignee-options" class="autocomplete autocomplete--anchored" role="listbox" hidden></div>
+          </div>
+          <div id="assignee-select" hidden>{{ form.assigned_to }}</div>
+          <span class="text-muted">Нажмите на поле для списка сотрудников или введите не менее трёх символов.</span>
           {% for error in form.assigned_to.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
         </div>
         <div class="field"><label for="{{ form.priority.id_for_label }}">Приоритет</label>{{ form.priority }}
@@ -72,6 +76,7 @@
 <div class="card">
   <div class="tabs" role="tablist">
     <button class="tab is-active" type="button" data-tab="runs">Запуски <span class="nav__badge">{{ runs|length }}</span></button>
+    <button class="tab" type="button" data-tab="audit">Журнал <span class="nav__badge">{{ task_event_count }}</span></button>
     <button class="tab" type="button" data-tab="notes">Заметки <span class="nav__badge">{{ notes|length }}</span></button>
     <button class="tab" type="button" data-tab="files">Файлы <span class="nav__badge">{{ files|length }}</span></button>
     <button class="tab" type="button" data-tab="reports">Отчёты <span class="nav__badge">{{ reports|length }}</span></button>
@@ -97,6 +102,35 @@
     {% end_data_table %}
     {% else %}
     <p class="text-muted">Запусков ещё не было.</p>
+    {% endif %}
+  </div>
+
+  <div class="tab-panel" data-panel="audit">
+    {% if task_events %}
+    <div class="task-audit" aria-label="Журнал изменений задания">
+      {% for event in task_events %}
+      <article class="task-audit__item">
+        <span class="task-audit__marker" aria-hidden="true"></span>
+        <div class="task-audit__content">
+          <div class="task-audit__meta">
+            <time datetime="{{ event.started_at|date:'c' }}">{{ event.started_at|date:"d.m.Y H:i:s" }}</time>
+            <span>{% if event.user %}{{ event.user.full_name|default:event.user.username }}{% else %}Система{% endif %}</span>
+            {% if event.result == 'failed' %}<span class="badge badge--overdue">Ошибка</span>{% endif %}
+          </div>
+          <p>{{ event.audit_summary }}</p>
+          {% if event.audit_detail %}
+          <details class="task-audit__details">
+            <summary>Технические детали</summary>
+            <pre class="error-detail">{{ event.audit_detail }}</pre>
+          </details>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% if task_event_count > 50 %}<p class="text-muted">Показаны последние 50 событий. Полная история доступна в системном журнале.</p>{% endif %}
+    {% else %}
+    <p class="text-muted">Изменений пока нет.</p>
     {% endif %}
   </div>
 

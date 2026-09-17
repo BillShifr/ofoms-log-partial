@@ -9,7 +9,7 @@
 <div class="card mb-2">
   <details class="collapsible" data-key="news-filters">
     <summary class="collapsible__toggle">Поиск и фильтры</summary>
-    <form method="get" class="filters">
+    <form method="get" class="filters" data-require-input data-require-message="Укажите хотя бы один критерий фильтра">
       {% if filter_error %}<div class="field field--wide"><div class="alert alert--error" role="alert">{{ filter_error }}</div></div>{% endif %}
       <div class="field">
         <label for="news-q">Поиск</label>

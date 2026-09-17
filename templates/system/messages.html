@@ -16,7 +16,7 @@
     <div class="card messenger__create">
       <details class="collapsible" data-key="new-conversation">
         <summary class="collapsible__toggle">Новый диалог</summary>
-        <form method="post" action="{% url 'system:conversation_create' %}" data-validate>
+        <form method="post" action="{% url 'system:conversation_create' %}" data-validate data-require-selector=".participant-pick input:checked" data-validation-target="#participant-search" data-require-message="Выберите хотя бы одного участника">
           {% csrf_token %}
           <div class="form-grid">
             <div class="field field--wide">

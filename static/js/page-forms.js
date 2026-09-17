@@ -1,28 +1,6 @@
 (function () {
   "use strict";
 
-  function initReportFilter() {
-    var form = document.getElementById("report-filter-form");
-    if (!form) return;
-    form.addEventListener("submit", function (event) {
-      var from = form.querySelector('[name="date_from"]');
-      var to = form.querySelector('[name="date_to"]');
-      if (!from || !to || from.value || to.value) return;
-      event.preventDefault();
-      from.setCustomValidity("Укажите хотя бы дату начала или окончания периода");
-      from.reportValidity();
-      [from, to].forEach(function (element) {
-        element.classList.add("is-invalid");
-        element.addEventListener("input", function clearDateError() {
-          from.setCustomValidity("");
-          from.classList.remove("is-invalid");
-          to.classList.remove("is-invalid");
-          element.removeEventListener("input", clearDateError);
-        });
-      });
-    });
-  }
-
   function initExchangeUpload() {
     var form = document.getElementById("upload-form");
     if (!form) return;
@@ -199,61 +177,115 @@
   function initAssigneeSearch() {
     var search = document.querySelector("[data-assignee-search]");
     var selectBox = document.getElementById("assignee-select");
-    if (!search || !selectBox || !search.dataset.suggestUrl) return;
+    var panel = document.getElementById("assignee-options");
+    if (!search || !selectBox || !panel || !search.dataset.suggestUrl) return;
     var select = selectBox.querySelector("select");
-    var panel = null;
-    if (select) {
-      select.addEventListener("change", function () {
-        var option = select.options[select.selectedIndex];
-        search.value = option && option.value ? option.textContent.trim() : "";
+    if (!select) return;
+    var activeIndex = -1;
+    var requestNumber = 0;
+    var selectedLabel = "";
+    var disclosure = search.closest(".collapsible");
+
+    function syncFromSelect() {
+      var option = select.options[select.selectedIndex];
+      selectedLabel = option && option.value ? option.textContent.trim() : "";
+      search.value = selectedLabel;
+      search.setCustomValidity("");
+    }
+
+    function closePanel() {
+      panel.innerHTML = "";
+      panel.hidden = true;
+      if (disclosure) disclosure.classList.remove("has-open-popover");
+      search.setAttribute("aria-expanded", "false");
+      search.removeAttribute("aria-activedescendant");
+      activeIndex = -1;
+    }
+
+    function setActive(items, index) {
+      activeIndex = index;
+      items.forEach(function (item, itemIndex) {
+        var active = itemIndex === index;
+        item.classList.toggle("is-active", active);
+        item.setAttribute("aria-selected", String(active));
       });
+      if (items[index]) search.setAttribute("aria-activedescendant", items[index].id);
     }
 
-    function removePanel() {
-      if (panel) panel.remove();
-      panel = null;
+    function choose(item) {
+      select.value = String(item.id);
+      selectedLabel = item.label;
+      search.value = item.label;
+      search.setCustomValidity("");
+      closePanel();
+      search.focus();
     }
 
-    search.addEventListener("input", function () {
-      var query = search.value.trim();
-      if (query.length < 3) {
-        removePanel();
-        return;
-      }
+    function show(items) {
+      closePanel();
+      items = items.filter(function (item) { return item && item.id; });
+      if (!items.length) return;
+      panel.hidden = false;
+      if (disclosure) disclosure.classList.add("has-open-popover");
+      search.setAttribute("aria-expanded", "true");
+      items.forEach(function (item) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.id = "assignee-option-" + item.id;
+        button.className = "autocomplete__item";
+        button.setAttribute("role", "option");
+        button.textContent = item.label;
+        button.addEventListener("click", function () { choose(item); });
+        panel.appendChild(button);
+      });
+      setActive(Array.prototype.slice.call(panel.children), 0);
+    }
+
+    function load(query) {
+      var currentRequest = ++requestNumber;
       fetch(search.dataset.suggestUrl + "?q=" + encodeURIComponent(query))
         .then(function (response) { return response.json(); })
         .then(function (data) {
-          removePanel();
-          var items = (data.suggestions || []).filter(function (item) {
-            return item && item.id;
-          });
-          if (!items.length) return;
-          panel = document.createElement("div");
-          panel.className = "autocomplete autocomplete--anchored";
-          items.forEach(function (item) {
-            var button = document.createElement("button");
-            button.type = "button";
-            button.className = "autocomplete__item";
-            button.textContent = item.label;
-            button.addEventListener("click", function () {
-              select.value = item.id;
-              search.value = item.label;
-              removePanel();
-            });
-            panel.appendChild(button);
-          });
-          search.parentNode.appendChild(panel);
+          if (currentRequest === requestNumber) show(data.suggestions || []);
         })
-        .catch(removePanel);
+        .catch(function () {
+          if (currentRequest === requestNumber) closePanel();
+        });
+    }
+
+    search.addEventListener("focus", function () {
+      load(search.value === selectedLabel ? "" : search.value.trim());
     });
-    document.addEventListener("click", function (event) {
-      if (panel && !panel.contains(event.target) && !event.target.closest("#assignee-wrap")) {
-        removePanel();
+    search.addEventListener("input", function () {
+      var query = search.value.trim();
+      if (search.value !== selectedLabel) select.value = "";
+      search.setCustomValidity(query && !select.value ? "Выберите сотрудника из списка" : "");
+      if (!query) load("");
+      else if (query.length >= 3) load(query);
+      else closePanel();
+    });
+    search.addEventListener("keydown", function (event) {
+      if (panel.hidden) return;
+      var items = Array.prototype.slice.call(panel.children);
+      if (event.key === "Escape") closePanel();
+      else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setActive(items, Math.min(items.length - 1, activeIndex + 1));
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setActive(items, Math.max(0, activeIndex - 1));
+      } else if (event.key === "Enter" && items[activeIndex]) {
+        event.preventDefault();
+        items[activeIndex].click();
       }
     });
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") removePanel();
+    document.addEventListener("click", function (event) {
+      if (!panel.contains(event.target) && !event.target.closest("#assignee-wrap")) {
+        closePanel();
+      }
     });
+    select.addEventListener("change", syncFromSelect);
+    syncFromSelect();
   }
 
   function initConditionalFields() {
@@ -319,7 +351,6 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    initReportFilter();
     initExchangeUpload();
     initDocumentTitle();
     initParticipants();

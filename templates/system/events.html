@@ -8,7 +8,7 @@
 </header>
 
 <div class="card mb-2">
-  <form method="get" id="events-filter-form">
+  <form method="get" id="events-filter-form" data-require-selector="select[name=module], select[name=event_type], select[name=result], input[name=user], input[name=target], input[name=date_from], input[name=date_to]" data-validation-target=".js-event-user" data-require-message="Укажите хотя бы один критерий фильтра">
     <details class="collapsible" id="events-filters" data-key="events-filters">
       <summary class="collapsible__toggle">Фильтры</summary>
       <div class="filters">

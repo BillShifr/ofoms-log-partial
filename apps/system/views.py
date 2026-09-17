@@ -859,6 +859,72 @@ def users_suggest(request):
 # ---------------------------------------------------------------------------
 
 
+TASK_AUDIT_FIELDS = {
+    "name": "Наименование",
+    "command": "Действие",
+    "description": "Описание",
+    "assigned_to": "Исполнитель",
+    "priority": "Приоритет",
+    "run_mode": "Режим запуска",
+    "interval_minutes": "Интервал",
+    "enabled": "Активность",
+    "status": "Статус",
+}
+
+
+def _task_snapshot(task, command_labels):
+    assignee = task.assigned_to
+    return {
+        "name": task.name,
+        "command": command_labels.get(task.command, task.command),
+        "description": task.description,
+        "assigned_to": (
+            f"{assignee.full_name() or assignee.username} ({assignee.get_org_display()})"
+            if assignee else "не назначен"
+        ),
+        "priority": task.get_priority_display(),
+        "run_mode": task.get_run_mode_display(),
+        "interval_minutes": (
+            f"{task.interval_minutes} мин." if task.interval_minutes else "не задан"
+        ),
+        "enabled": "включено" if task.enabled else "отключено",
+        "status": task.get_status_display(),
+    }
+
+
+def _task_change_detail(before, after, changed_fields):
+    changes = []
+    for field, label in TASK_AUDIT_FIELDS.items():
+        if field not in changed_fields and before[field] == after[field]:
+            continue
+        if before[field] == after[field]:
+            continue
+        if field == "description":
+            changes.append("Описание очищено" if not after[field] else "Описание обновлено")
+        else:
+            changes.append(f"{label}: {before[field]} → {after[field]}")
+    return "; ".join(changes) or "Параметры задания сохранены без изменений"
+
+
+def _task_audit(task):
+    queryset = EventLog.objects.filter(
+        module="system", target__startswith=f"task:{task.pk}:"
+    ).select_related("user")
+    total = queryset.count()
+    events = list(queryset[:50])
+    for event in events:
+        if event.event_type == EventLog.EventType.TASK:
+            event.audit_summary = (
+                f"Запуск завершён: {event.get_result_display()}"
+                if event.finished_at else "Запуск начат"
+            )
+            event.audit_detail = event.detail
+        else:
+            event.audit_summary = event.detail or event.get_event_type_display()
+            event.audit_detail = ""
+    return events, total
+
+
 @admin_required
 @require_safe
 def task_list(request):
@@ -879,7 +945,7 @@ def task_assignee_suggest(request):
     from django.http import JsonResponse
 
     q = (request.GET.get("q") or "").strip()
-    if len(q) < 3:
+    if q and len(q) < 3:
         return JsonResponse({"suggestions": []})
     qs = Employee.objects.filter(is_active=True).annotate(
         search_name=Concat(
@@ -889,11 +955,12 @@ def task_assignee_suggest(request):
             output_field=CharField(),
         )
     )
-    qs = filter_contains_any(
-        qs, ("search_name", "username"), q, prefix="assignee_search_"
-    )
+    if q:
+        qs = filter_contains_any(
+            qs, ("search_name", "username"), q, prefix="assignee_search_"
+        )
     rows = qs.order_by("last_name", "first_name", "pk").values(
-        "id", "last_name", "first_name", "username"
+        "id", "last_name", "first_name", "username", "org"
     )[:10]
     matches = []
     for employee in rows:
@@ -901,13 +968,19 @@ def task_assignee_suggest(request):
             f"{employee['last_name']} {employee['first_name']}".strip()
             or employee["username"]
         )
-        matches.append({"id": employee["id"], "label": label})
+        org_label = dict(Employee._meta.get_field("org").choices).get(employee["org"], "")
+        matches.append({
+            "id": employee["id"],
+            "label": f"{label} ({org_label})" if org_label else label,
+        })
     return JsonResponse({"suggestions": matches})
 
 
 @admin_required
 @require_http_methods(["GET", "POST"])
 def task_create(request):
+    from apps.system.tasks import TASK_COMMAND_LABELS
+
     if request.method == "POST":
         form = TaskForm(request.POST)
         if form.is_valid():
@@ -921,6 +994,11 @@ def task_create(request):
                     user=request.user,
                     target=f"task:{task.pk}:{task.command}",
                     ip=request.META.get("REMOTE_ADDR"),
+                    detail=(
+                        "Задание создано. "
+                        f"Исполнитель: {_task_snapshot(task, TASK_COMMAND_LABELS)['assigned_to']}; "
+                        f"режим: {task.get_run_mode_display()}"
+                    ),
                 )
             messages.success(request, "Задание создано.")
             return redirect("system:tasks")
@@ -955,7 +1033,7 @@ def _task_update(request, pk, *, for_update=False):
             note.save()
             log_event(module="system", event_type=EventLog.EventType.UPDATE,
                       user=request.user, target=f"task:{task.pk}:note:{note.pk}",
-                      ip=request.META.get("REMOTE_ADDR"))
+                      ip=request.META.get("REMOTE_ADDR"), detail="Добавлена заметка")
             messages.success(request, "Заметка добавлена.")
         return redirect("system:task_update", pk=task.pk)
     if action == "note_edit":
@@ -970,7 +1048,7 @@ def _task_update(request, pk, *, for_update=False):
                 note.save()
                 log_event(module="system", event_type=EventLog.EventType.UPDATE,
                           user=request.user, target=f"task:{task.pk}:note:{note.pk}",
-                          ip=request.META.get("REMOTE_ADDR"))
+                          ip=request.META.get("REMOTE_ADDR"), detail="Изменена заметка")
                 messages.success(request, "Заметка обновлена.")
             else:
                 messages.error(request, "Текст заметки пуст.")
@@ -985,7 +1063,7 @@ def _task_update(request, pk, *, for_update=False):
             note.delete()
             log_event(module="system", event_type=EventLog.EventType.DELETE,
                       user=request.user, target=f"task:{task.pk}:note:{note_id}",
-                      ip=request.META.get("REMOTE_ADDR"))
+                      ip=request.META.get("REMOTE_ADDR"), detail="Удалена заметка")
             messages.success(request, "Заметка удалена.")
         return redirect("system:task_update", pk=task.pk)
     if action == "file":
@@ -999,7 +1077,8 @@ def _task_update(request, pk, *, for_update=False):
                 tf.save()
                 log_event(module="system", event_type=EventLog.EventType.UPDATE,
                           user=request.user, target=f"task:{task.pk}:file",
-                          ip=request.META.get("REMOTE_ADDR"))
+                          ip=request.META.get("REMOTE_ADDR"),
+                          detail=f"Прикреплён файл: {PurePosixPath(tf.file.name).name}")
             messages.success(request, "Файл прикреплён.")
         else:
             messages.error(
@@ -1015,25 +1094,33 @@ def _task_update(request, pk, *, for_update=False):
             rep.save()
             log_event(module="system", event_type=EventLog.EventType.UPDATE,
                       user=request.user, target=f"task:{task.pk}:report",
-                      ip=request.META.get("REMOTE_ADDR"))
+                      ip=request.META.get("REMOTE_ADDR"),
+                      detail=f"Сохранён отчёт: {rep.title}")
             messages.success(request, "Отчёт сохранён.")
         return redirect("system:task_update", pk=task.pk)
 
     if request.method == "POST":
+        before = _task_snapshot(task, TASK_COMMAND_LABELS)
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
-            form.save()
+            task = form.save()
+            after = _task_snapshot(task, TASK_COMMAND_LABELS)
             log_event(
                 module="system",
                 event_type=EventLog.EventType.UPDATE,
                 user=request.user,
-                target=f"task:{task.pk}:{task.command}",
+                target=f"task:{task.pk}:settings",
                 ip=request.META.get("REMOTE_ADDR"),
+                detail=_task_change_detail(
+                    before, after, set(form.changed_data) | {"status"}
+                ),
             )
             messages.success(request, "Задание обновлено.")
             return redirect("system:task_update", pk=task.pk)
     else:
         form = TaskForm(instance=task)
+
+    task_events, task_event_count = _task_audit(task)
 
     return render(
         request,
@@ -1050,6 +1137,8 @@ def _task_update(request, pk, *, for_update=False):
             "file_form": TaskFileForm(),
             "report_form": TaskReportForm(),
             "command_tips": TASK_COMMAND_LABELS,
+            "task_events": task_events,
+            "task_event_count": task_event_count,
             "active_nav": "tasks",
         },
     )
@@ -1098,6 +1187,7 @@ def task_toggle(request, pk):
             user=request.user,
             target=f"task:{task.pk}:{state_code}",
             ip=request.META.get("REMOTE_ADDR"),
+            detail=f"Задание {'включено' if task.enabled else 'отключено'}",
         )
     state = "включено" if task.enabled else "выключено"
     messages.success(request, f"Задание «{task.name}» {state}.")

@@ -1014,6 +1014,34 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
         self.assertContains(response, 'class="responsive-row"')
         self.assertContains(response, 'data-label="Комментарий"')
         self.assertContains(response, "Обязательное поле не заполнено")
+        self.assertContains(response, 'data-control-group="1"')
+        self.assertContains(response, 'data-control-group-toggle="1"')
+        self.assertContains(response, "Ошибка 41")
+        self.assertContains(response, 'id="protocol-error-1"')
+
+    def test_protocol_groups_rows_by_error_code(self):
+        log = ImportLog.objects.create(
+            org=81000,
+            kind="irp",
+            filename="grouped.xml",
+            status="error",
+            rows=3,
+            flcp=(
+                "<?xml version='1.0' encoding='windows-1251'?><FLCP>"
+                "<PR OSHIB='41' IM_POL='z_f' N_ZAP='1' COMMENT='Первое'/>"
+                "<PR OSHIB='52' IM_POL='z_enp' N_ZAP='2' COMMENT='Второе'/>"
+                "<PR OSHIB='41' IM_POL='z_i' N_ZAP='3' COMMENT='Третье'/>"
+                "</FLCP>"
+            ),
+        )
+        self.client.force_login(self.tfoms)
+
+        response = self.client.get(reverse("exchange:protocol", args=[log.pk]))
+
+        groups = response.context["protocol_groups"]
+        self.assertEqual([group["code"] for group in groups], ["41", "52"])
+        self.assertEqual([len(group["rows"]) for group in groups], [2, 1])
+        self.assertContains(response, "Ошибка 52")
 
     def test_malformed_protocol_fails_closed(self):
         log = ImportLog.objects.create(

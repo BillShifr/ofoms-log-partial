@@ -164,6 +164,23 @@ class IrpFilterForm(forms.Form):
     )
 
 
+class IrpThemeForm(forms.ModelForm):
+    """Новая тема актуального справочника, создаваемая сотрудником из журнала."""
+
+    class Meta:
+        model = IrpTheme
+        fields = ["code_name", "title"]
+
+    def clean_code_name(self):
+        value = (self.cleaned_data.get("code_name") or "").strip().upper()
+        if IrpTheme.objects.filter(code_name=value, version=3).exists():
+            raise forms.ValidationError("Тема с таким кодом уже существует.")
+        return value
+
+    def clean_title(self):
+        return (self.cleaned_data.get("title") or "").strip()
+
+
 class IrpAnswerForm(forms.ModelForm):
     """Форма добавления ответа на обращение (ТЗ п. 215)."""
 

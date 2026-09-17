@@ -60,7 +60,8 @@ class TaskRunSuperseded(RuntimeError):
 
 
 SAFE_TASK_FAILURE_LOG = (
-    "Ошибка выполнения задания. Подробности записаны в журнале сервера."
+    "Ошибка выполнения задания. Проверьте параметры и повторите запуск; "
+    "технические подробности сохранены в журнале сервера."
 )
 
 
@@ -605,7 +606,10 @@ class TaskJob(models.Model):
             ok = True
         except Exception as exc:  # noqa: BLE001 — любая ошибка задания фиксируется
             logger.exception("task %s failed", self.pk)
-            log = f"{type(exc).__name__}: {SAFE_TASK_FAILURE_LOG}"
+            log = (
+                f"TASK-RUN-001 | Действие: {self.command} | "
+                f"Категория: {type(exc).__name__} | {SAFE_TASK_FAILURE_LOG}"
+            )
             ok = False
 
         finished_at = timezone.now()

@@ -3,7 +3,7 @@
 <div class="docs-list">
   {% for d in docs %}
   <div class="docs-row">
-    <a class="docs-row__main" href="{% if d.is_video %}{% url 'system:doc_view' d.pk %}{% else %}{% url 'system:doc_download' d.pk %}{% endif %}"{% if d.is_video %} target="_blank" rel="noopener"{% endif %}>
+    <a class="docs-row__main" data-no-ajax href="{% if d.is_video %}{% url 'system:doc_view' d.pk %}{% else %}{% url 'system:doc_download' d.pk %}{% endif %}"{% if d.is_video %} target="_blank" rel="noopener"{% endif %}>
       <span class="doc-type">{{ d.file_type|upper|default:"DOC" }}</span>
       <span class="docs-row__body">
         <strong>{{ d.title }}</strong>
@@ -18,7 +18,7 @@
          target="_blank" rel="noopener" title="Открыть видео в защищённом просмотре">Смотреть</a>
       {% endif %}
       {% if d.is_video %}
-      <a class="btn btn--sm btn--primary" href="{% url 'system:doc_download' d.pk %}"
+      <a class="btn btn--sm btn--primary" data-no-ajax href="{% url 'system:doc_download' d.pk %}"
          title="Скачать файл (учёт загрузок)">Скачать</a>
       {% endif %}
       {% if can_manage %}

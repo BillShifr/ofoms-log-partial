@@ -135,12 +135,21 @@ def exchange_protocol(request, pk):
     ):
         raise PermissionDenied
     rows = _parse_flcp(log.flcp)
+    protocol_groups = []
+    grouped = {}
+    for row in rows or []:
+        code = row.get("OSHIB") or "41"
+        if code not in grouped:
+            grouped[code] = {"code": code, "rows": []}
+            protocol_groups.append(grouped[code])
+        grouped[code]["rows"].append(row)
     return render(
         request,
         "exchange/protocol.html",
         {
             "log": log,
             "prs": rows or [],
+            "protocol_groups": protocol_groups,
             "protocol_unavailable": rows is None,
             "active_nav": "exchange",
         },

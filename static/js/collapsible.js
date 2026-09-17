@@ -6,8 +6,10 @@
     return 'collapsible:' + (el.id || el.getAttribute('data-key') || location.pathname + ':' + (el.querySelector('summary') || {}).textContent);
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  function init() {
     document.querySelectorAll('details.collapsible').forEach(function (el) {
+      if (el.dataset.collapsibleReady === 'true') return;
+      el.dataset.collapsibleReady = 'true';
       var key = stateKey(el);
       var saved = null;
       try { saved = localStorage.getItem(key); } catch (e) { /* noop */ }
@@ -18,5 +20,8 @@
         catch (e) { /* noop */ }
       });
     });
-  });
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('portal:render', init);
 })();

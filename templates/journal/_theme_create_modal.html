@@ -1,0 +1,29 @@
+<dialog class="modal" id="theme-create-modal">
+  <div class="modal__dialog">
+    <div class="modal__head">
+      <h2>Новая тема обращения</h2>
+      <button class="btn btn--ghost btn--icon" type="button" data-modal-close aria-label="Закрыть">×</button>
+    </div>
+    <form method="post" action="{% url 'journal:theme_create' %}" data-theme-create-form data-validate>
+      {% csrf_token %}
+      <div class="modal__body">
+        <p class="text-muted">Тема сразу появится в актуальном справочнике и станет доступна при регистрации обращения.</p>
+        <div class="form-grid">
+          <div class="field">
+            <label for="theme-code-name">Код темы</label>
+            <input id="theme-code-name" name="code_name" maxlength="14" required placeholder="Например, 1.2.3">
+          </div>
+          <div class="field field--wide">
+            <label for="theme-title">Название</label>
+            <input id="theme-title" name="title" maxlength="255" required placeholder="Краткое название темы">
+          </div>
+        </div>
+        <div class="alert alert--error" data-theme-form-errors role="alert" hidden></div>
+        <div class="modal__actions">
+          <button class="btn btn--ghost" type="button" data-modal-close>Отмена</button>
+          <button class="btn btn--primary" type="submit">Создать тему</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</dialog>

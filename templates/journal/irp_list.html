@@ -96,6 +96,7 @@
               {% elif col.key == 'status' %}
                 {% if irp.is_closed %}<span class="badge badge--closed">{{ irp.get_status_display }}</span>
                 {% elif irp.is_overdue %}<span class="badge badge--overdue">Просрочено</span>
+                {% elif irp.status == 'preliminary' %}<span class="badge badge--preliminary">{{ irp.get_status_display }}</span>
                 {% else %}<span class="badge badge--open">{{ irp.get_status_display }}</span>{% endif %}
               {% endif %}
             </td>

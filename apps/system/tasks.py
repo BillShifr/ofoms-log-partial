@@ -185,5 +185,16 @@ TASK_COMMAND_CHOICES = task_command_choices()
 
 
 def run_command(command: str, params: dict | None) -> str:
+    if str(command).startswith("custom:"):
+        from apps.system.models import TaskAction
+
+        action_id = str(command).split(":", 1)[1]
+        try:
+            action = TaskAction.objects.get(pk=action_id, is_active=True)
+        except (TaskAction.DoesNotExist, ValueError) as exc:
+            raise ValidationError("Пользовательское действие недоступно.") from exc
+        if action.description:
+            return f"Пользовательское действие выполнено: {action.name}. {action.description}"
+        return f"Пользовательское действие выполнено: {action.name}."
     definition = get_task_command(command)
     return definition.handler(validate_command_params(command, params))

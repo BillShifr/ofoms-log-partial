@@ -47,6 +47,7 @@ from apps.system.models import (
     NewsCategory,
     NewsItem,
     SystemDocument,
+    TaskAction,
     TaskAlreadyRunning,
     TaskDisabled,
     TaskFile,
@@ -868,6 +869,26 @@ class MessageTests(BaseSystemTestCase):
         meta = _conversations_meta(self.operator, "уникальный")
 
         self.assertEqual([item["conv"].pk for item in meta], [conv.pk])
+
+    def test_conversation_search_prefers_participant_over_body_text(self):
+        self.smo.last_name = "Сидорова"
+        self.smo.first_name = "Ирина"
+        self.smo.save(update_fields=["last_name", "first_name"])
+        participant_match = Conversation.objects.create(title="Рабочий вопрос")
+        participant_match.participants.set([self.operator, self.smo])
+        body_only = self._conv()
+        thread = MessageThread.objects.create(
+            conversation=body_only, created_by=self.admin, title="Тема"
+        )
+        MessageReply.objects.create(
+            thread=thread, author=self.admin, body=f"В тексте упомянута {self.smo.last_name}"
+        )
+
+        from apps.system.views import _conversations_meta
+
+        meta = _conversations_meta(self.operator, self.smo.last_name)
+
+        self.assertEqual([item["conv"].pk for item in meta], [participant_match.pk])
 
     def test_conversation_without_participants_rejected(self):
         self.client.force_login(self.operator)
@@ -2005,6 +2026,38 @@ class TaskTests(BaseSystemTestCase):
         self.assertEqual(resp.status_code, 302)
         task = TaskJob.objects.get(name="Импорт")
         self.assertEqual(task.created_by, self.admin)
+
+    def test_regular_specialist_can_create_custom_task_action_and_task_can_run_it(self):
+        self.client.force_login(self.operator)
+        response = self.client.post(
+            reverse("system:task_action_create"),
+            {"name": "Проверка выгрузки", "description": "Сверить протокол обмена"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        action = TaskAction.objects.get(name="Проверка выгрузки")
+        self.assertEqual(action.created_by, self.operator)
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("system:task_create"),
+            {
+                "name": "Пользовательская проверка",
+                "command": action.command_code,
+                "run_mode": TaskJob.RunMode.MANUAL,
+                "enabled": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        task = TaskJob.objects.get(name="Пользовательская проверка")
+        run = task.enqueue(user=self.admin)
+        TaskJob.execute_run(run.pk)
+        task.refresh_from_db()
+
+        self.assertEqual(task.status, TaskJob.Status.COMPLETED)
+        self.assertIn("Пользовательское действие выполнено", task.last_log)
+        self.assertIn("Сверить протокол обмена", task.last_log)
 
     def test_task_run_history_uses_responsive_rows(self):
         task = self._make_task()

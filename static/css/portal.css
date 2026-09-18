@@ -494,7 +494,7 @@ table.data th {
   top: 0;
   z-index: 2;
   overflow: visible;
-  padding-right: 22px;
+  padding-right: 44px;
 }
 table.data td > a,
 table.data td > span:not(.badge),
@@ -512,8 +512,9 @@ table.data td > div:not(.table-actions) {
 .col-resizer {
   position: absolute;
   top: 0;
+  right: 0;
   z-index: 8;
-  width: 10px;
+  width: 12px;
   height: 100%;
   padding: 0;
   border: 0;
@@ -526,7 +527,7 @@ table.data td > div:not(.table-actions) {
   position: absolute;
   top: 25%;
   bottom: 25%;
-  left: 4px;
+  right: 0;
   width: 2px;
   background: transparent;
 }
@@ -618,13 +619,36 @@ table.data td.cell-long {
 .col-z_enp { width: 135px; }
 .col-employee_one { width: 180px; }
 .col-status { width: 150px; }
+table.data .col-status .badge,
+.record-heading__status .badge {
+  max-width: none;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+table.data[data-table-key="system-tasks"] {
+  min-width: 1320px;
+}
+table.data[data-table-key="system-tasks"] .badge {
+  max-width: none;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
 .cell-id { white-space: nowrap; letter-spacing: -.02em; }
 .compact-id { display: block; overflow: hidden; color: color-mix(in srgb, var(--ink) 78%, transparent); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
 .table-actions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; min-width: max-content; }
+.table-actions--icon { gap: 6px; min-width: 0; }
+.table-actions--icon .btn--icon {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  font-size: .9rem;
+}
 .table-actions .btn { min-height: 34px; }
 td.cell-actions .btn--sm { padding-inline: 10px; }
 table.data th.task-cell--actions,
-table.data td.task-cell--actions { width: 400px; max-width: 400px; }
+table.data td.task-cell--actions { width: 168px; max-width: 168px; }
 .table-empty { padding: 40px 20px !important; text-align: center !important; }
 
 /* ---------- Формы ---------- */
@@ -1308,9 +1332,18 @@ table.data tbody tr[data-href] { cursor: pointer; }
 th.data-sort { cursor: pointer; user-select: none; white-space: nowrap; }
 th.data-sort a { color: inherit; text-decoration: none; }
 th.data-sort a:hover { color: var(--primary); text-decoration: none; }
-th.data-sort::after { content: " ⇅"; opacity: .45; font-size: .8em; }
-th.data-sort.sort-asc::after { content: " ▲"; opacity: 1; }
-th.data-sort.sort-desc::after { content: " ▼"; opacity: 1; }
+th.data-sort::after {
+  content: "⇅";
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  transform: translateY(-50%);
+  opacity: .45;
+  font-size: .8em;
+  pointer-events: none;
+}
+th.data-sort.sort-asc::after { content: "▲"; opacity: 1; }
+th.data-sort.sort-desc::after { content: "▼"; opacity: 1; }
 th.data-sort:hover { background: var(--chip-green); }
 td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ---------- Мессенджер (PRD v3 §2.6) ---------- */
@@ -1424,7 +1457,16 @@ table.data .control-group__heading th {
 .news-card__pinned { position: absolute; top: 14px; right: 14px; }
 .news-card__meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: .82rem; }
 .news-card__actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; width: 100%; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--line); }
-.news-card__actions > .btn, .news-card__actions > form, .news-card__actions > form .btn { width: 100%; min-height: 34px; justify-content: center; }
+.news-card__actions > form { display: block; margin: 0; }
+.news-card__actions > .btn,
+.news-card__actions > form,
+.news-card__actions > form .btn {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  justify-content: center;
+}
+.news-card__actions > form .btn { height: 100%; }
 .news-card .news-card__meta { padding-right: 72px; }
 .news-article { max-width: 940px; margin-inline: auto; }
 .news-article > h1 { max-width: 800px; }

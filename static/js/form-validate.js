@@ -47,6 +47,8 @@
   }
 
   function showTip(input, message) {
+    var disclosure = input.closest('details');
+    if (disclosure && !disclosure.open) disclosure.open = true;
     var existing = input.parentNode.querySelector('.validation-tip');
     if (existing) existing.remove();
     var tip = document.createElement('span');
@@ -85,6 +87,7 @@
   function hasValue(element) {
     if (element.type === 'checkbox' || element.type === 'radio') return element.checked;
     if (element.type === 'file') return Boolean(element.files && element.files.length);
+    if (element.tagName === 'SELECT') return String(element.value || '').trim() !== '';
     return String(element.value || '').trim() !== '';
   }
 

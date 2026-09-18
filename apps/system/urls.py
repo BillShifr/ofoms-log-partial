@@ -33,6 +33,7 @@ urlpatterns = [
     # Задачи (3.6)
     path("tasks/", views.task_list, name="tasks"),
     path("tasks/assignees/suggest/", views.task_assignee_suggest, name="task_assignee_suggest"),
+    path("tasks/actions/new/", views.task_action_create, name="task_action_create"),
     path("tasks/new/", views.task_create, name="task_create"),
     path("tasks/<int:pk>/", views.task_update, name="task_update"),
     path("tasks/<int:pk>/run/", views.task_run, name="task_run"),

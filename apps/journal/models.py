@@ -247,6 +247,14 @@ class Irp(models.Model):
         on_delete=models.PROTECT,
         verbose_name="Сотрудник, ответственный за обращение",
     )
+    repeat_of = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="repeat_appeals",
+        verbose_name="Повторное обращение по",
+    )
     line_it = models.SmallIntegerField(
         blank=True, null=True, choices=LINES, verbose_name="Линия рассмотрения"
     )
@@ -380,41 +388,42 @@ class Irp(models.Model):
 
     def clean(self):
         super().clean()
-        if self.irp_type != 2 and self.zh_d:
-            raise ValidationError(
-                {"zh_d": "Сведения о жалобе допустимы только для жалобы."}
-            )
-        if not self.pr_out and (self.date_cross or self.time_cross):
-            raise ValidationError(
-                {
-                    "pr_out": (
-                        "Дата и время направления допустимы только при наличии "
-                        "признака направления."
+        from apps.journal.validation import raise_irp_business_validation
+
+        raise_irp_business_validation(
+            {field.name: getattr(self, field.name) for field in self._meta.fields}
+        )
+        if self.repeat_of_id:
+            if self.pk and self.repeat_of_id == self.pk:
+                raise ValidationError(
+                    {"repeat_of": "Обращение не может ссылаться само на себя."}
+                )
+            ancestor = self.repeat_of
+            visited = {self.pk} if self.pk else set()
+            while ancestor is not None:
+                if ancestor.pk in visited:
+                    raise ValidationError(
+                        {"repeat_of": "Обнаружена циклическая цепочка обращений."}
                     )
-                }
-            )
-        if self.time_cross and not self.date_cross:
-            raise ValidationError(
-                {"date_cross": "Для времени направления укажите дату направления."}
-            )
-        if self.way == 5 and not self.way_n:
-            raise ValidationError({"way_n": "Укажите организацию"})
-        if bool(self.date_close) != bool(self.result):
-            raise ValidationError(
-                "Для закрытия обращения одновременно укажите дату и исход."
-            )
-        if self.data_plan and self.date_create and self.data_plan < self.date_create:
-            raise ValidationError(
-                {"data_plan": "Плановый срок не может быть раньше даты поступления."}
-            )
-        if self.date_close and self.date_create and self.date_close < self.date_create:
-            raise ValidationError(
-                {"date_close": "Дата закрытия не может быть раньше даты поступления."}
-            )
-        if self.status == self.Status.CLOSED and not self.date_close:
-            raise ValidationError(
-                {"date_close": "Для статуса «Закрыто» укажите дату и исход."}
-            )
+                visited.add(ancestor.pk)
+                ancestor = ancestor.repeat_of
+
+    def apply_open_repeat_routing(self) -> None:
+        """Наследует текущий маршрут открытого исходного обращения."""
+        if not self.repeat_of_id:
+            return
+        original = self.repeat_of
+        if original.is_closed or original.date_close:
+            return
+        self.otv_t = original.otv_t
+        self.otv_kon = original.otv_kon
+        self.employee_it = original.employee_it or original.employee_one
+        self.line_it = original.line_it or original.line_one
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and self.repeat_of_id:
+            self.apply_open_repeat_routing()
+        return super().save(*args, **kwargs)
 
     @property
     def is_closed(self) -> bool:

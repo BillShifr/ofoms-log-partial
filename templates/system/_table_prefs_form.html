@@ -2,14 +2,17 @@
 <form method="post" action="{% url 'system:table_prefs' table_key %}{% if is_modal %}?modal=1{% endif %}" data-validate{% if is_modal %} data-table-prefs-form{% endif %}>
   {% csrf_token %}
   {% if is_modal %}
-  <p class="text-muted">Выберите видимые колонки, их порядок и начальную сортировку.</p>
+  <p class="text-muted">Выберите видимые и закреплённые колонки, их порядок, группировку и начальную сортировку.</p>
   <p class="alert alert--error" data-table-prefs-error hidden>Не удалось сохранить настройки. Проверьте форму и попробуйте ещё раз.</p>
   {% else %}
   <h2 class="form-section">Колонки и порядок</h2>
   {% endif %}
+  <div class="form-actions form-actions--start">
+    <button class="btn btn--ghost btn--sm" type="button" data-table-select-all>Выбрать все колонки</button>
+  </div>
   {% data_table responsive=True table_key="system-table-prefs" label="Настройка колонок; на узком экране показана карточками" settings=False %}
       <thead>
-        <tr><th></th><th>#</th><th>Колонка</th><th>Группа</th></tr>
+        <tr><th>Показывать</th><th>#</th><th>Колонка</th><th>Закрепить</th><th>Группа</th></tr>
       </thead>
       <tbody>
         {% for col in columns %}
@@ -19,6 +22,7 @@
               <input class="input-order" type="number" name="order_{{ col.key }}" value="{{ forloop.counter }}" min="1" max="99">
             </td>
             <td data-label="Колонка">{{ col.label }}</td>
+            <td data-label="Закрепить"><label class="checkbox"><input type="checkbox" name="pinned_columns" value="{{ col.key }}" {% if col.key in pinned_columns %}checked{% endif %} aria-label="Закрепить колонку {{ col.label }}"></label></td>
             <td class="text-muted" data-label="Группа">{{ col.group|default:"—" }}</td>
           </tr>
         {% endfor %}
@@ -44,10 +48,19 @@
         <option value="" {% if sort_dir == '' %}selected{% endif %}>По возрастанию</option>
       </select>
     </div>
-    <div class="field">
-      <label class="checkbox"><input type="checkbox" name="fixed_first" {% if pref.fixed_first %}checked{% endif %}> Фиксировать первую колонку</label>
-    </div>
   </div>
+
+  {% if available_groups %}
+  <fieldset class="fieldset table-group-settings">
+    <legend>Групповые заголовки</legend>
+    <p class="text-muted">Отметьте смысловые группы, которые нужно показывать над названиями колонок.</p>
+    <div class="checkbox-grid">
+      {% for group in available_groups %}
+      <label class="checkbox"><input type="checkbox" name="grouped_headers" value="{{ group }}" {% if group in grouped_headers %}checked{% endif %}> {{ group }}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% endif %}
 
   <div class="form-actions">
     <button class="btn btn--primary" type="submit" data-submitting-label="Сохранение…">Сохранить</button>

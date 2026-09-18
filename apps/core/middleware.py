@@ -163,14 +163,32 @@ class AuditMiddleware:
                 result = EventLog.Result.FAILED
             else:
                 result = EventLog.Result.OK
-            log_event(
-                module="http",
-                event_type=event_type or EventLog.EventType.OTHER,
-                result=result,
-                user=actor if actor and actor.is_authenticated else None,
-                target=f"{request.method} {request.path}",
-                ip=request.META.get("REMOTE_ADDR"),
-                duration_ms=duration_ms,
-            )
+            canonical = getattr(request, "_canonical_auth_event", None)
+            if canonical is not None and canonical.event_type != EventLog.EventType.BLOCK:
+                canonical.module = "http"
+                canonical.event_type = event_type or canonical.event_type
+                canonical.user = actor if actor and actor.is_authenticated else None
+                canonical.target = f"{request.method} {request.path}"
+                canonical.ip = request.META.get("REMOTE_ADDR")
+                canonical = log_event(
+                    module="http",
+                    event_type=canonical.event_type,
+                    obj=canonical,
+                    result=result,
+                    duration_ms=duration_ms,
+                )
+                canonical.save(
+                    update_fields=["module", "event_type", "user", "target", "ip"]
+                )
+            else:
+                log_event(
+                    module="http",
+                    event_type=event_type or EventLog.EventType.OTHER,
+                    result=result,
+                    user=actor if actor and actor.is_authenticated else None,
+                    target=f"{request.method} {request.path}",
+                    ip=request.META.get("REMOTE_ADDR"),
+                    duration_ms=duration_ms,
+                )
 
         return response

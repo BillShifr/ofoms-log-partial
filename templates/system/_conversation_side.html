@@ -14,7 +14,7 @@
   <a class="conversation-card {% if m.unread %}conversation-card--unread{% endif %}"
      href="{% url 'system:conversation' m.conv.pk %}">
     <div class="conversation-card__head">
-      <strong>{% if m.unread %}<span class="nav__badge">{{ m.unread }}</span> {% endif %}{{ m.conv.display_title }}</strong>
+      <strong>{% if m.unread %}<span class="nav__badge">{{ m.unread }}</span> {% endif %}{{ m.title }}</strong>
       <span class="text-muted">{{ m.last.created_at|date:"d.m.Y H:i"|default:m.conv.created_at|date:"d.m.Y" }}</span>
     </div>
     {% if m.last %}

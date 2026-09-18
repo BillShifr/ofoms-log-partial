@@ -9,17 +9,8 @@ import datetime
 
 from lxml import etree
 
-from apps.employee.models import ORGS
-from apps.journal.models import (
-    IRP_HOW,
-    IRP_TYPES,
-    IRP_WAYS,
-    LINES,
-    OTV_T,
-    RESULTS,
-    ZH_TYPES,
-    IrpTheme,
-)
+from apps.journal.models import Irp, IrpTheme
+from apps.journal.validation import validate_irp_business_rules
 
 # Код ошибки в протоколе ФЛК
 FLCP_OK = "0"
@@ -89,41 +80,28 @@ def _check_record(
         ):
             if missing(f):
                 err(f, "Обязательное поле не заполнено")
-        if d.get("irp_type") not in [c for c, _ in IRP_TYPES]:
-            err("irp_type", "Вид обращения вне справочника")
-        if d.get("way") not in [c for c, _ in IRP_WAYS]:
-            err("way", "Источник поступления вне справочника")
-        if d.get("how") not in [c for c, _ in IRP_HOW]:
-            err("how", "Способ обращения вне справочника")
-        if d.get("otv_t") not in [c for c, _ in OTV_T]:
-            err("otv_t", "Тип ответственной организации вне справочника")
-        if d.get("otv_kon") not in [c for c, _ in ORGS]:
-            err("otv_kon", "Организация вне реестра (код ОКАТО/реестра ОМС)")
-        if d.get("line_one") not in [None, ""] and d.get("line_one") not in [
-            c for c, _ in LINES
-        ]:
-            err("line_one", "Линия вне справочника")
-        if d.get("line_it") not in [None, ""] and d.get("line_it") not in [
-            c for c, _ in LINES
-        ]:
-            err("line_it", "Линия вне справочника")
-        if d.get("result") not in [None, ""] and d.get("result") not in [
-            c for c, _ in RESULTS
-        ]:
-            err("result", "Исход обработки вне справочника")
-        if d.get("zh_d") not in [None, ""] and d.get("zh_d") not in [
-            c for c, _ in ZH_TYPES
-        ]:
-            err("zh_d", "Сведения о жалобе вне справочника")
-        if d.get("irp_type") != 2 and d.get("zh_d") not in [None, ""]:
-            err("zh_d", "Сведения о жалобе допустимы только для жалобы")
-        if not d.get("pr_out") and (d.get("date_cross") or d.get("time_cross")):
-            err(
-                "pr_out",
-                "Дата и время направления требуют признака направления",
-            )
-        if d.get("time_cross") and not d.get("date_cross"):
-            err("date_cross", "Время направления требует даты направления")
+        for field_name in (
+            "irp_type",
+            "way",
+            "how",
+            "otv_t",
+            "otv_kon",
+            "line_one",
+            "line_it",
+            "result",
+            "zh_d",
+            "pr_out",
+            "z_smo",
+            "z_doctype",
+            "in_smo",
+            "in_doctype",
+        ):
+            value = d.get(field_name)
+            if value in (None, ""):
+                continue
+            allowed = {choice for choice, _ in Irp._meta.get_field(field_name).choices}
+            if value not in allowed:
+                err(field_name, "Значение вне справочника")
         theme_txt = d.get("theme")
         if theme_txt:
             theme_exists = IrpTheme.objects.filter(
@@ -131,8 +109,8 @@ def _check_record(
             ).exists()
             if not theme_exists:
                 err("theme", f"Тема обращения {theme_txt} не из справочника")
-        if d.get("way") == 5 and not d.get("way_n"):
-            err("way_n", "Укажите организацию-источник при способе 5")
+        for issue in validate_irp_business_rules(d):
+            err(issue.field, issue.message)
     return errors
 
 

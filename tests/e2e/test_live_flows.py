@@ -338,7 +338,7 @@ class LiveFlowsTests(LiveServerTestCase):
             "/system/tasks/new/",
             {
                 "name": "Сквозная задача",
-                "command": "noop",
+                "command": "database_health",
                 "description": "Проверка жизненного цикла",
                 "status": TaskJob.Status.CREATED,
                 "assigned_to": self.operator.pk,

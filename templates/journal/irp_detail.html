@@ -17,8 +17,8 @@
     <a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a>
     <a class="btn btn--ghost" href="{% url 'journal:print' irp.pk %}" target="_blank" rel="noopener">Печать</a>
     {% if not irp.is_closed %}
-      <a class="btn btn--ghost" href="{% url 'journal:redirect' irp.pk %}">Переадресовать</a>
-      <a class="btn btn--primary" href="{% url 'journal:edit' irp.pk %}">Редактировать</a>
+      {% if can_journal_redirect %}<a class="btn btn--ghost" href="{% url 'journal:redirect' irp.pk %}">Переадресовать</a>{% endif %}
+      {% if can_journal_change %}<a class="btn btn--primary" href="{% url 'journal:edit' irp.pk %}">Редактировать</a>{% endif %}
     {% endif %}
   </div>
 </header>
@@ -28,6 +28,7 @@
   <div class="section-heading"><div><p class="section-heading__index">01</p><h2>Основные сведения</h2></div><span>Регистрация и содержание</span></div>
   <dl class="detail-list">
     <dt>Вид обращения</dt><dd>{{ irp.get_irp_type_display }}</dd>
+    <dt>Повторное обращение</dt><dd>{% if irp.repeat_of %}<a href="{% url 'journal:detail' irp.repeat_of_id %}">№ {{ irp.repeat_of.n_irp }}</a>{% else %}—{% endif %}</dd>
     <dt>Дата / время поступления</dt><dd>{{ irp.date_create|date:"d.m.Y" }}
       {% if irp.time_create %}{{ irp.time_create|time:"H:i" }}{% endif %}</dd>
     <dt>Источник</dt><dd>{{ irp.get_way_display }}{% if irp.way_n %} — {{ irp.way_n }}{% endif %}</dd>
@@ -106,7 +107,7 @@
   <div class="empty-state">Ответов пока нет</div>
   {% endfor %}
 
-  {% if not irp.is_closed %}
+  {% if not irp.is_closed and can_journal_change %}
   <form method="post" action="{% url 'journal:answer' irp.pk %}" class="answer-form" data-validate>
     {% csrf_token %}
     <div class="field"><label for="{{ answer_form.text.id_for_label }}">Новый ответ</label>{{ answer_form.text }}</div>

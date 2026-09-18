@@ -13,6 +13,8 @@ urlpatterns = [
     path("users/<int:pk>/", views.user_update, name="user_update"),
     path("users/<int:pk>/block/", views.user_block, name="user_block"),
     path("users/<int:pk>/unblock/", views.user_unblock, name="user_unblock"),
+    path("groups/", views.group_list, name="groups"),
+    path("groups/<int:pk>/delete/", views.group_delete, name="group_delete"),
     # Журнал событий (3.4)
     path("events/", views.event_list, name="events"),
     path("events/suggest/", views.event_initiator_suggest, name="event_initiator_suggest"),

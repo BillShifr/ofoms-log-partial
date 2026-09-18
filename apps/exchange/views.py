@@ -5,11 +5,16 @@
 """
 
 import os
+from pathlib import Path
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import EmptyPage, Paginator
 from django.db import transaction
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_http_methods, require_safe
 
 from apps.core.models import EventLog, log_event
@@ -24,6 +29,14 @@ from apps.exchange.importers import (
     write_unique_artifact,
 )
 from apps.exchange.models import ImportLog
+from apps.exchange.outbound import (
+    CONTRACT_FILENAME,
+    CONTRACT_MARKER,
+    build_outbound_package,
+)
+from apps.journal.models import Irp
+
+LOG_PAGE_SIZE = 25
 
 
 def _allowed_orgs(user):
@@ -110,7 +123,12 @@ def exchange_logs(request):
     qs = ImportLog.objects.all()
     if request.user.org != TFOMS and not request.user.is_superuser:
         qs = qs.filter(org=request.user.org)
-    logs = list(qs[:100])
+    paginator = Paginator(qs, LOG_PAGE_SIZE)
+    try:
+        page = paginator.page(int(request.GET.get("page", 1)))
+    except (EmptyPage, ValueError):
+        page = paginator.page(paginator.num_pages)
+    logs = list(page.object_list)
     for log in logs:
         protocol_rows = _parse_flcp(log.flcp) or []
         log.error_rows = [row for row in protocol_rows if row.get("OSHIB") != "0"]
@@ -118,8 +136,68 @@ def exchange_logs(request):
     return render(
         request,
         "exchange/logs.html",
-        {"logs": logs, "active_nav": "exchange"},
+        {"logs": logs, "page": page, "active_nav": "exchange"},
     )
+
+
+@login_required
+@require_safe
+def exchange_export(request):
+    """Выгружает обращения по внутреннему контракту текущего формата G1."""
+    if not user_has_capability(request.user, EXCHANGE_READ):
+        raise PermissionDenied
+    allowed = {code for code, _ in _allowed_orgs(request.user)}
+    try:
+        org = int(request.GET.get("org", request.user.org))
+    except (TypeError, ValueError):
+        return HttpResponseBadRequest("Некорректная организация")
+    if org not in allowed:
+        raise PermissionDenied
+
+    qs = Irp.objects.select_related(
+        "theme", "employee_one", "employee_it"
+    ).filter(employee_one__org=org)
+    for parameter, lookup in (("date_from", "date_create__gte"), ("date_to", "date_create__lte")):
+        raw = request.GET.get(parameter)
+        if not raw:
+            continue
+        value = parse_date(raw)
+        if value is None:
+            return HttpResponseBadRequest(f"Некорректная дата: {parameter}")
+        qs = qs.filter(**{lookup: value})
+    qs = qs.order_by("date_create", "pk")
+    count = qs.count()
+    generated_at = timezone.now()
+    if timezone.is_aware(generated_at):
+        generated_at = timezone.localtime(generated_at)
+    generated_at = generated_at.replace(microsecond=0)
+    payload = build_outbound_package(qs, org=org, generated_at=generated_at)
+    filename = f"G1OUT_{org}_{generated_at:%Y%m%d%H%M%S}.xml"
+    log_event(
+        module="exchange",
+        event_type=EventLog.EventType.EXPORT,
+        user=request.user,
+        target=f"outbound:{CONTRACT_MARKER}:{org}",
+        ip=request.META.get("REMOTE_ADDR"),
+        detail=f"Выгружено обращений: {count}",
+    )
+    response = HttpResponse(payload, content_type="application/xml")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["X-Exchange-Contract"] = CONTRACT_MARKER
+    return response
+
+
+@login_required
+@require_safe
+def exchange_export_contract(request):
+    """Возвращает XSD внутреннего, а не официального обменного контракта."""
+    if not user_has_capability(request.user, EXCHANGE_READ):
+        raise PermissionDenied
+    path = Path(__file__).with_name("contracts") / CONTRACT_FILENAME
+    response = HttpResponse(path.read_bytes(), content_type="application/xml")
+    response["Content-Disposition"] = f'attachment; filename="{CONTRACT_FILENAME}"'
+    response["X-Exchange-Contract"] = CONTRACT_MARKER
+    return response
 
 
 @login_required

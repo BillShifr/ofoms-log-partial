@@ -83,7 +83,7 @@ class TaskJobAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
 
 @admin.register(TaskRun)
 class TaskRunAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
-    list_display = ("task", "triggered_by", "started_at", "result")
+    list_display = ("task", "triggered_by", "queued_at", "started_at", "attempt", "result")
     list_filter = ("triggered_by", "result")
 
 

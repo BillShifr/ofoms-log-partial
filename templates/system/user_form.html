@@ -50,10 +50,16 @@
     <details class="collapsible" data-key="user-section-roles" open>
       <summary class="collapsible__toggle">Роли и доступы</summary>
       <div class="field field--roles">
-        <label>Роли (группы)</label>
+        <label for="{{ form.roles.id_for_label }}">Системные роли</label>
         {% if target_user == request.user %}<span class="text-muted">Собственную активность и роль администратора снять нельзя — это защищает доступ к управлению системой.</span>{% endif %}
         {{ form.roles }}
         {% for error in form.roles.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+      </div>
+      <div class="field field--roles">
+        <label for="{{ form.additional_groups.id_for_label }}">Дополнительные группы</label>
+        <span class="text-muted">Группы объединяют сотрудников, но сами по себе не выдают системные права.</span>
+        {{ form.additional_groups }}
+        {% for error in form.additional_groups.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
       </div>
     </details>
     {% endif %}

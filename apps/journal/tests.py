@@ -40,6 +40,14 @@ from apps.journal.models import (
 ROUTING_MEDIA_ROOT = tempfile.mkdtemp(prefix="ejournal_test_media_")
 
 
+class JournalMigrationTestCase(TransactionTestCase):
+    """Возвращает схему к актуальной journal-миграции после контрактного теста."""
+
+    def tearDown(self):
+        MigrationExecutor(connection).migrate([("journal", "0012_irp_repeat_of")])
+        super().tearDown()
+
+
 class IrpTemporalConstraintMigrationContractTests(TestCase):
     def test_data_normalization_and_constraints_are_not_in_one_transaction(self):
         migration = importlib.import_module(
@@ -148,7 +156,7 @@ class XmlFilesConstraintTests(TestCase):
         self._assert_rejected(real_filename="")
 
 
-class XmlFilesConstraintMigrationTests(TransactionTestCase):
+class XmlFilesConstraintMigrationTests(JournalMigrationTestCase):
     migrate_from = [("journal", "0008_irp_temporal_and_status_constraints")]
     migrate_to = [("journal", "0009_enforce_xml_provenance_constraints")]
 
@@ -186,7 +194,7 @@ class XmlFilesConstraintMigrationTests(TransactionTestCase):
         self.assertTrue(NewXmlFiles.objects.filter(pk=valid.pk).exists())
 
 
-class IrpIdentityConstraintMigrationTests(TransactionTestCase):
+class IrpIdentityConstraintMigrationTests(JournalMigrationTestCase):
     migrate_from = [("journal", "0009_enforce_xml_provenance_constraints")]
     migrate_to = [("journal", "0010_enforce_irp_identity")]
 
@@ -225,7 +233,7 @@ class IrpIdentityConstraintMigrationTests(TransactionTestCase):
         executor.migrate(self.migrate_to)
 
 
-class IrpConditionalDetailsMigrationTests(TransactionTestCase):
+class IrpConditionalDetailsMigrationTests(JournalMigrationTestCase):
     migrate_from = [("journal", "0010_enforce_irp_identity")]
     migrate_to = [("journal", "0011_enforce_conditional_irp_details")]
 
@@ -661,7 +669,7 @@ class JournalScreenTests(TestCase):
         self.assertIn(".col-status", css)
         self.assertIn("position: sticky", css)
         self.assertNotIn(".data--journal", css)
-        self.assertNotIn("group-row", css)
+        self.assertIn(".column-group-row", css)
         self.assertIn("display: inline-flex", css)
         self.assertIn("var(--table-header-bg)", css)
         self.assertIn("table.data.th-sticky td:first-child", css)
@@ -1655,3 +1663,79 @@ class RoutingTests(TestCase):
         self.assertContains(resp, "Ответ на обращение")
         self.assertContains(resp, "attach.txt")
         self.assertContains(resp, "Предварительный ответ")
+
+
+class RepeatAppealTests(TestCase):
+    def setUp(self):
+        self.theme = IrpTheme.objects.create(
+            code_name="REPEAT.01", title="Повторные обращения", version=3
+        )
+        self.creator = Employee.objects.create_user(
+            username="repeat_creator", password="GoodPass!1", org=81000
+        )
+        self.assignee = Employee.objects.create_user(
+            username="repeat_assignee", password="GoodPass!1", org=81007
+        )
+
+    def _irp(self, suffix, **overrides):
+        values = {
+            "n_irp": f"repeat-{suffix}",
+            "irp_type": 1,
+            "date_create": datetime.date(2026, 9, 18),
+            "way": 1,
+            "how": 1,
+            "theme": self.theme,
+            "otv_t": 1,
+            "otv_kon": 81000,
+            "employee_one": self.creator,
+            "data_plan": datetime.date(2026, 10, 18),
+        }
+        values.update(overrides)
+        return Irp.objects.create(**values)
+
+    def test_open_original_routes_repeat_to_current_assignee(self):
+        original = self._irp(
+            "original",
+            employee_it=self.assignee,
+            line_it=4,
+            otv_t=2,
+            otv_kon=81007,
+            status=Irp.Status.IN_PROGRESS,
+        )
+
+        repeat = self._irp("new", repeat_of=original)
+
+        self.assertEqual(repeat.repeat_of, original)
+        self.assertEqual(repeat.employee_it, self.assignee)
+        self.assertEqual(repeat.line_it, 4)
+        self.assertEqual(repeat.otv_t, 2)
+        self.assertEqual(repeat.otv_kon, 81007)
+
+    def test_closed_original_does_not_override_new_route(self):
+        original = self._irp(
+            "closed",
+            employee_it=self.assignee,
+            line_it=4,
+            status=Irp.Status.CLOSED,
+            date_close=datetime.date(2026, 9, 18),
+            result=2,
+        )
+
+        repeat = self._irp(
+            "after-closed",
+            repeat_of=original,
+            employee_it=self.creator,
+            line_it=1,
+        )
+
+        self.assertEqual(repeat.employee_it, self.creator)
+        self.assertEqual(repeat.line_it, 1)
+
+    def test_repeat_cannot_reference_itself(self):
+        irp = self._irp("self")
+        irp.repeat_of = irp
+
+        with self.assertRaises(ValidationError) as error:
+            irp.full_clean()
+
+        self.assertIn("repeat_of", error.exception.message_dict)

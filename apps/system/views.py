@@ -13,6 +13,7 @@ from pathlib import PurePosixPath
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import InvalidPage, Paginator
 from django.db import transaction
@@ -26,6 +27,7 @@ from django.views.decorators.http import require_http_methods, require_safe
 from apps.core.fold import contains_folded, filter_contains_any
 from apps.core.models import EventLog, log_event
 from apps.core.policy import user_is_system_admin
+from apps.core.roles import ROLE_GROUP_MAP
 from apps.core.storage import (
     UploadedFileRollback,
     close_file_on_error,
@@ -47,6 +49,7 @@ from apps.system.forms import (
     TaskNoteForm,
     TaskReportForm,
     ThreadForm,
+    UserGroupForm,
 )
 from apps.system.models import (
     Conversation,
@@ -62,7 +65,7 @@ from apps.system.models import (
     TaskFile,
     TaskJob,
     TaskNote,
-    TaskRunSuperseded,
+    TaskRun,
     UserTableViewPref,
 )
 from apps.system.table_config import allowed_sorts, get_table_meta
@@ -105,6 +108,45 @@ def _paginate(request, qs, per_page=PAGE_SIZE):
         return paginator.page(paginator.num_pages or 1)
 
 
+def _server_table_sort(request, queryset, table_key, field_map, default):
+    """Apply one global sort before pagination and build accessible header links."""
+    requested = request.GET.get("sort")
+    if requested is None:
+        pref = UserTableViewPref.objects.filter(
+            user=request.user, table_key=table_key
+        ).first()
+        saved = (pref.sorting or {}) if pref else {}
+        requested = (
+            f"{saved.get('dir', '')}{saved.get('field', '')}"
+            if saved.get("field") in field_map
+            else default
+        )
+    descending = requested.startswith("-")
+    field = requested.removeprefix("-")
+    if field not in field_map:
+        requested = default
+        descending = requested.startswith("-")
+        field = requested.removeprefix("-")
+    order_fields = field_map[field]
+    if isinstance(order_fields, str):
+        order_fields = (order_fields,)
+    prefix = "-" if descending else ""
+    queryset = queryset.order_by(*(prefix + item for item in order_fields))
+
+    headers = {}
+    for key in field_map:
+        params = request.GET.copy()
+        params.pop("page", None)
+        params["sort"] = key if key != field or descending else f"-{key}"
+        headers[key] = {
+            "url": f"?{params.urlencode()}",
+            "aria": (
+                "descending" if descending else "ascending"
+            ) if key == field else "none",
+        }
+    return queryset, requested, headers
+
+
 # ---------------------------------------------------------------------------
 # Пользователи (ТЗ разд. 3.5)
 # ---------------------------------------------------------------------------
@@ -139,6 +181,19 @@ def user_list(request):
     elif form.is_bound:
         qs = qs.none()
 
+    qs, sort, sort_headers = _server_table_sort(
+        request,
+        qs,
+        "system-users",
+        {
+            "full_name": ("last_name", "first_name", "pk"),
+            "username": "username",
+            "org": ("org", "last_name", "first_name"),
+            "job_title": ("job_title", "last_name", "first_name"),
+            "status": ("is_active", "lock_until", "last_name"),
+        },
+        "full_name",
+    )
     page = _paginate(request, qs)
     return render(
         request,
@@ -146,6 +201,8 @@ def user_list(request):
         {
             "page": page,
             "form": form,
+            "sort": sort,
+            "sort_headers": sort_headers,
             "active_nav": "users",
         },
     )
@@ -278,6 +335,57 @@ def user_unblock(request, pk):
     return redirect("system:users")
 
 
+@superuser_required
+@require_http_methods(["GET", "POST"])
+def group_list(request):
+    form = UserGroupForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            group = form.save()
+            log_event(
+                module="employee",
+                event_type=EventLog.EventType.CREATE,
+                user=request.user,
+                target=f"group:{group.pk}:{group.name}",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
+        messages.success(request, f"Группа «{group.name}» создана.")
+        return redirect("system:groups")
+    groups = Group.objects.annotate(member_count=Count("user")).order_by("name")
+    return render(
+        request,
+        "system/groups.html",
+        {
+            "form": form,
+            "groups": groups,
+            "canonical_names": set(ROLE_GROUP_MAP.values()),
+            "active_nav": "groups",
+        },
+    )
+
+
+@superuser_required
+@require_http_methods(["POST"])
+def group_delete(request, pk):
+    with transaction.atomic():
+        group = get_object_or_404(Group.objects.select_for_update(), pk=pk)
+        if group.name in ROLE_GROUP_MAP.values():
+            messages.error(request, "Системную роль удалить нельзя.")
+            return redirect("system:groups")
+        name = group.name
+        target = f"group:{group.pk}:{name}"
+        group.delete()
+        log_event(
+            module="employee",
+            event_type=EventLog.EventType.DELETE,
+            user=request.user,
+            target=target,
+            ip=request.META.get("REMOTE_ADDR"),
+        )
+    messages.success(request, f"Группа «{name}» удалена.")
+    return redirect("system:groups")
+
+
 # ---------------------------------------------------------------------------
 # Журнал событий (ТЗ разд. 3.4)
 # ---------------------------------------------------------------------------
@@ -349,6 +457,24 @@ def event_list(request):
         u = form.cleaned_data["user"]
         initiator_label = f"{u.last_name} {u.first_name}".strip() or u.username
 
+    qs, sort, sort_headers = _server_table_sort(
+        request,
+        qs,
+        "system-events",
+        {
+            "id": "id",
+            "started_at": "started_at",
+            "finished_at": "finished_at",
+            "event_type": "event_type",
+            "module": "module",
+            "result": "result",
+            "user": ("user__last_name", "user__first_name", "id"),
+            "target": "target",
+            "ip": "ip",
+            "duration": "duration_ms",
+        },
+        "-id",
+    )
     page = _paginate(request, qs)
     return render(
         request,
@@ -359,6 +485,8 @@ def event_list(request):
             "active_nav": "events",
             "initiator_label": initiator_label,
             "suggest_url": reverse("system:event_initiator_suggest"),
+            "sort": sort,
+            "sort_headers": sort_headers,
         },
     )
 
@@ -476,6 +604,17 @@ def _participant_or_404(user, conversation):
     return conversation
 
 
+def _conversation_title(conversation, user):
+    if conversation.title:
+        return conversation.title
+    names = [
+        participant.full_name() or participant.username
+        for participant in conversation.participants.all()
+        if participant.pk != user.pk
+    ]
+    return ", ".join(names[:3]) or "Личный диалог"
+
+
 def _conversations_meta(user, q=""):
     """Список диалогов пользователя с последним сообщением и счётчиком
     непрочитанных; при q — фильтр по теме, участникам и тексту."""
@@ -511,6 +650,7 @@ def _conversations_meta(user, q=""):
         meta.append(
             {
                 "conv": conv,
+                "title": _conversation_title(conv, user),
                 "last": last,
                 "unread": unread_counts.get(conv.pk, 0),
             }
@@ -522,24 +662,63 @@ def _conversations_meta(user, q=""):
     return meta
 
 
+def _message_list_context(request, *, form=None, q=""):
+    meta = _conversations_meta(request.user, q)
+    return {
+        "conversations": meta,
+        "unread_total": sum(item["unread"] for item in meta),
+        "form": form if form is not None else NewConversationForm(user=request.user),
+        "q": q,
+        "active_nav": "messages",
+        "emoji_set": EMOJI_SET,
+    }
+
+
+def _conversation_context(request, conversation, *, thread_form=None):
+    threads = list(
+        MessageThread.objects.filter(conversation=conversation).select_related("created_by")
+    )
+    unread_counts = _thread_unread_counts(request.user, conversation)
+    for thread in threads:
+        thread.unread_count = unread_counts.get(thread.pk, 0)
+    return {
+        "conv": conversation,
+        "conv_title": _conversation_title(conversation, request.user),
+        "threads": threads,
+        "thread_form": thread_form if thread_form is not None else ThreadForm(),
+        "conversations": _conversations_meta(request.user),
+        "unread_total": sum(unread_counts.values()),
+        "active_nav": "messages",
+        "emoji_set": EMOJI_SET,
+    }
+
+
+def _thread_context(request, thread, *, reply_form=None):
+    conversation = thread.conversation
+    replies = list(
+        thread.replies.select_related("author")
+        .prefetch_related("attachments")
+        .order_by("created_at")
+    )
+    return {
+        "conv": conversation,
+        "conv_title": _conversation_title(conversation, request.user),
+        "thread": thread,
+        "replies": replies,
+        "reply_form": reply_form if reply_form is not None else ReplyForm(),
+        "can_manage_thread": request.user == thread.created_by or _is_admin(request.user),
+        "conversations": _conversations_meta(request.user),
+        "emoji_set": EMOJI_SET,
+        "active_nav": "messages",
+    }
+
+
 @login_required
 @require_safe
 def message_list(request):
     """Список диалогов (левая панель) + форма создания диалога."""
     q = (request.GET.get("q") or "").strip().lower()
-    meta = _conversations_meta(request.user, q)
-    return render(
-        request,
-        "system/messages.html",
-        {
-            "conversations": meta,
-            "unread_total": sum(m["unread"] for m in meta),
-            "form": NewConversationForm(),
-            "q": q,
-            "active_nav": "messages",
-            "emoji_set": EMOJI_SET,
-        },
-    )
+    return render(request, "system/messages.html", _message_list_context(request, q=q))
 
 
 @login_required
@@ -548,7 +727,7 @@ def conversation_create(request):
     """Создание диалога (сворачиваемая форма на странице сообщений)."""
     if request.method == "GET":
         return redirect("system:messages")
-    form = NewConversationForm(request.POST)
+    form = NewConversationForm(request.POST, user=request.user)
     if form.is_valid():
         with transaction.atomic():
             conv = form.save(commit=False)
@@ -566,7 +745,11 @@ def conversation_create(request):
         messages.success(request, "Диалог создан.")
         return redirect("system:conversation", conv.pk)
     messages.error(request, "Не удалось создать диалог: проверьте форму.")
-    return redirect("system:messages")
+    return render(
+        request,
+        "system/messages.html",
+        _message_list_context(request, form=form),
+    )
 
 
 @login_required
@@ -577,24 +760,10 @@ def conversation_detail(request, pk):
         Conversation.objects.prefetch_related("participants"), pk=pk
     )
     _participant_or_404(request.user, conv)
-    threads = list(
-        MessageThread.objects.filter(conversation=conv).select_related("created_by")
-    )
-    unread_counts = _thread_unread_counts(request.user, conv)
-    for thread in threads:
-        thread.unread_count = unread_counts.get(thread.pk, 0)
     return render(
         request,
         "system/conversation.html",
-        {
-            "conv": conv,
-            "threads": threads,
-            "thread_form": ThreadForm(),
-            "conversations": _conversations_meta(request.user),
-            "unread_total": sum(unread_counts.values()),
-            "active_nav": "messages",
-            "emoji_set": EMOJI_SET,
-        },
+        _conversation_context(request, conv),
     )
 
 
@@ -619,7 +788,12 @@ def conversation_thread_create(request, pk):
             )
         return redirect("system:thread", thread.pk)
     messages.error(request, "Не удалось создать тему: укажите тему обсуждения.")
-    return redirect("system:conversation", conv.pk)
+    conv = Conversation.objects.prefetch_related("participants").get(pk=conv.pk)
+    return render(
+        request,
+        "system/conversation.html",
+        _conversation_context(request, conv, thread_form=form),
+    )
 
 
 @login_required
@@ -629,27 +803,12 @@ def thread_detail(request, pk):
     thread = get_object_or_404(
         MessageThread.objects.select_related("conversation", "created_by"), pk=pk
     )
-    conv = _participant_or_404(request.user, thread.conversation)
+    _participant_or_404(request.user, thread.conversation)
     _mark_read_for_user(request.user, MessageThread.objects.filter(pk=thread.pk))
-    replies = (
-        thread.replies.select_related("author")
-        .prefetch_related("attachments")
-        .order_by("created_at")
-    )
-    thread_replies = list(replies)
     return render(
         request,
         "system/message_thread.html",
-        {
-            "conv": conv,
-            "thread": thread,
-            "replies": thread_replies,
-            "reply_form": ReplyForm(),
-            "can_manage_thread": request.user == thread.created_by or _is_admin(request.user),
-            "conversations": _conversations_meta(request.user),
-            "emoji_set": EMOJI_SET,
-            "active_nav": "messages",
-        },
+        _thread_context(request, thread),
     )
 
 
@@ -689,7 +848,13 @@ def thread_toggle(request, pk):
 @require_http_methods(["POST"])
 def thread_reply(request, pk):
     """Ответ в теме (с необязательным вложением-файлом)."""
-    form = ReplyForm(request.POST)
+    thread = get_object_or_404(
+        MessageThread.objects.select_related("conversation", "created_by"), pk=pk
+    )
+    _participant_or_404(request.user, thread.conversation)
+    if thread.is_closed:
+        raise PermissionDenied
+    form = ReplyForm(request.POST, request.FILES)
     if form.is_valid():
         with UploadedFileRollback() as file_rollback, transaction.atomic():
             thread = get_object_or_404(
@@ -712,23 +877,13 @@ def thread_reply(request, pk):
                 ).first()
                 reply.parent = parent
             reply.save()
-            uploaded = request.FILES.get("attachment")
+            uploaded = form.cleaned_data.get("attachment")
             if uploaded is not None:
-                from apps.system.validators import validate_attachment_file
-
-                try:
-                    validate_attachment_file(uploaded)
-                except Exception:  # noqa: BLE001 — не прошедший валидацию файл
-                    messages.error(
-                        request,
-                        "Вложение не прикреплено: недопустимый тип или размер файла.",
-                    )
-                else:
-                    attachment = MessageAttachment(
-                        reply=reply, file=uploaded, uploaded_by=request.user
-                    )
-                    file_rollback.track(attachment.file)
-                    attachment.save()
+                attachment = MessageAttachment(
+                    reply=reply, file=uploaded, uploaded_by=request.user
+                )
+                file_rollback.track(attachment.file)
+                attachment.save()
             log_event(
                 module="system",
                 event_type=EventLog.EventType.SEND,
@@ -738,13 +893,12 @@ def thread_reply(request, pk):
             )
             messages.success(request, "Сообщение отправлено.")
     else:
-        thread = get_object_or_404(
-            MessageThread.objects.select_related("conversation"), pk=pk
-        )
-        _participant_or_404(request.user, thread.conversation)
-        if thread.is_closed:
-            raise PermissionDenied
         messages.error(request, "Не удалось отправить сообщение: проверьте форму.")
+        return render(
+            request,
+            "system/message_thread.html",
+            _thread_context(request, thread, reply_form=form),
+        )
     return redirect("system:thread", thread.pk)
 
 
@@ -832,7 +986,7 @@ def users_suggest(request):
     q = (request.GET.get("q") or "").strip()
     if len(q) < 3:
         return JsonResponse({"suggestions": []})
-    qs = Employee.objects.filter(is_active=True).annotate(
+    qs = Employee.objects.filter(is_active=True).exclude(pk=request.user.pk).annotate(
         search_name=Concat(
             Coalesce("first_name", Value("")),
             Value(" "),
@@ -867,6 +1021,9 @@ TASK_AUDIT_FIELDS = {
     "priority": "Приоритет",
     "run_mode": "Режим запуска",
     "interval_minutes": "Интервал",
+    "params": "Параметры действия",
+    "max_retries": "Повторные попытки",
+    "retry_delay_seconds": "Задержка повтора",
     "enabled": "Активность",
     "status": "Статус",
 }
@@ -887,6 +1044,9 @@ def _task_snapshot(task, command_labels):
         "interval_minutes": (
             f"{task.interval_minutes} мин." if task.interval_minutes else "не задан"
         ),
+        "params": task.params or {},
+        "max_retries": task.max_retries,
+        "retry_delay_seconds": f"{task.retry_delay_seconds} сек.",
         "enabled": "включено" if task.enabled else "отключено",
         "status": task.get_status_display(),
     }
@@ -929,12 +1089,14 @@ def _task_audit(task):
 @require_safe
 def task_list(request):
     tasks = TaskJob.objects.select_related("assigned_to", "created_by").prefetch_related("runs")
-    from apps.system.tasks import TASK_COMMAND_LABELS
+    from apps.system.tasks import task_command_labels
+
+    command_labels = task_command_labels()
 
     return render(
         request,
         "system/tasks.html",
-        {"tasks": tasks, "command_tips": TASK_COMMAND_LABELS, "active_nav": "tasks"},
+        {"tasks": tasks, "command_tips": command_labels, "active_nav": "tasks"},
     )
 
 
@@ -979,7 +1141,9 @@ def task_assignee_suggest(request):
 @admin_required
 @require_http_methods(["GET", "POST"])
 def task_create(request):
-    from apps.system.tasks import TASK_COMMAND_LABELS
+    from apps.system.tasks import task_command_labels
+
+    command_labels = task_command_labels()
 
     if request.method == "POST":
         form = TaskForm(request.POST)
@@ -996,7 +1160,7 @@ def task_create(request):
                     ip=request.META.get("REMOTE_ADDR"),
                     detail=(
                         "Задание создано. "
-                        f"Исполнитель: {_task_snapshot(task, TASK_COMMAND_LABELS)['assigned_to']}; "
+                        f"Исполнитель: {_task_snapshot(task, command_labels)['assigned_to']}; "
                         f"режим: {task.get_run_mode_display()}"
                     ),
                 )
@@ -1004,7 +1168,10 @@ def task_create(request):
             return redirect("system:tasks")
     else:
         form = TaskForm()
-    return render(request, "system/task_form.html", {"form": form, "title": "Новое задание", "active_nav": "tasks"})
+    return render(request, "system/task_form.html", {
+        "form": form, "task_parameter_fields": form.task_parameter_fields,
+        "title": "Новое задание", "active_nav": "tasks",
+    })
 
 
 @admin_required
@@ -1021,7 +1188,9 @@ def _task_update(request, pk, *, for_update=False):
     if for_update:
         queryset = queryset.select_for_update(of=("self",))
     task = get_object_or_404(queryset, pk=pk)
-    from apps.system.tasks import TASK_COMMAND_LABELS
+    from apps.system.tasks import task_command_labels
+
+    command_labels = task_command_labels()
 
     action = request.POST.get("action") if request.method == "POST" else None
     if action == "note":
@@ -1100,11 +1269,11 @@ def _task_update(request, pk, *, for_update=False):
         return redirect("system:task_update", pk=task.pk)
 
     if request.method == "POST":
-        before = _task_snapshot(task, TASK_COMMAND_LABELS)
+        before = _task_snapshot(task, command_labels)
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
             task = form.save()
-            after = _task_snapshot(task, TASK_COMMAND_LABELS)
+            after = _task_snapshot(task, command_labels)
             log_event(
                 module="system",
                 event_type=EventLog.EventType.UPDATE,
@@ -1136,7 +1305,8 @@ def _task_update(request, pk, *, for_update=False):
             "note_form": TaskNoteForm(),
             "file_form": TaskFileForm(),
             "report_form": TaskReportForm(),
-            "command_tips": TASK_COMMAND_LABELS,
+            "command_tips": command_labels,
+            "task_parameter_fields": form.task_parameter_fields,
             "task_events": task_events,
             "task_event_count": task_event_count,
             "active_nav": "tasks",
@@ -1149,23 +1319,14 @@ def _task_update(request, pk, *, for_update=False):
 def task_run(request, pk):
     task = get_object_or_404(TaskJob, pk=pk)
     try:
-        run = task.run(user=request.user)
+        task.enqueue(user=request.user)
     except TaskAlreadyRunning:
         messages.warning(request, f"Задание «{task.name}» уже выполняется.")
         return redirect("system:task_update", pk=task.pk)
     except TaskDisabled:
         messages.warning(request, f"Задание «{task.name}» отключено.")
         return redirect("system:task_update", pk=task.pk)
-    except TaskRunSuperseded:
-        messages.warning(
-            request,
-            f"Запуск задания «{task.name}» уже закрыт механизмом восстановления.",
-        )
-        return redirect("system:task_update", pk=task.pk)
-    if run.result == EventLog.Result.OK:
-        messages.success(request, f"Задание «{task.name}» выполнено успешно.")
-    else:
-        messages.error(request, f"Задание «{task.name}» завершилось с ошибкой.")
+    messages.success(request, f"Задание «{task.name}» поставлено в очередь.")
     return redirect("system:task_update", pk=task.pk)
 
 
@@ -1176,6 +1337,26 @@ def task_toggle(request, pk):
         task = get_object_or_404(TaskJob.objects.select_for_update(), pk=pk)
         task.enabled = not task.enabled
         update_fields = ["enabled"]
+        if not task.enabled and task.status == TaskJob.Status.QUEUED:
+            now = timezone.now()
+            message = "Запуск отменён: задание отключено до начала выполнения."
+            queued_runs = list(task.runs.filter(finished_at__isnull=True, started_at__isnull=True))
+            for run in queued_runs:
+                run.finished_at = now
+                run.result = TaskRun.Result.FAILED
+                run.log = message
+                run.save(update_fields=["finished_at", "result", "log"])
+                if run.audit_event_id:
+                    log_event(
+                        module="system", event_type=EventLog.EventType.TASK,
+                        obj=run.audit_event, result=EventLog.Result.FAILED,
+                        detail=message,
+                    )
+            task.status = TaskJob.Status.CANCELLED
+            task.last_finished_at = now
+            task.last_result = TaskJob.Result.FAILED
+            task.last_log = message
+            update_fields.extend(["status", "last_finished_at", "last_result", "last_log"])
         if task.enabled and task.status == TaskJob.Status.CANCELLED:
             task.status = TaskJob.Status.CREATED
             update_fields.append("status")
@@ -1219,33 +1400,31 @@ def task_file_download(request, pk):
 # ---------------------------------------------------------------------------
 
 
+def _docs_context(request, *, category=None, form=None):
+    categories = DocCategory.objects.annotate(docs_total=Count("docs"))
+    q = (request.GET.get("q") or "").strip()
+    docs = SystemDocument.objects.select_related("category")
+    if category is not None:
+        docs = docs.filter(category=category)
+    elif q:
+        docs = filter_contains_any(
+            docs, ("title", "description"), q, prefix="doc_search_"
+        )
+    return {
+        "categories": categories,
+        "category": category,
+        "docs": docs,
+        "can_manage": _is_admin(request.user),
+        "form": form if form is not None else DocForm(),
+        "active_nav": "docs",
+    }
+
+
 @login_required
 @require_safe
 def doc_list(request):
-    """Главная документации (wiki-стиль): карточки категорий + без категории."""
-    categories = DocCategory.objects.annotate(docs_total=Count("docs"))
-    q = (request.GET.get("q") or "").strip()
-    if q:
-        docs = filter_contains_any(
-            SystemDocument.objects.select_related("category"),
-            ("title", "description"),
-            q,
-            prefix="doc_search_",
-        )
-    else:
-        docs = SystemDocument.objects.filter(category__isnull=True)
-    return render(
-        request,
-        "system/docs.html",
-        {
-            "categories": categories,
-            "category": None,
-            "docs": docs,
-            "can_manage": _is_admin(request.user),
-            "form": DocForm(),
-            "active_nav": "docs",
-        },
-    )
+    """Главная документации (wiki-стиль): все документы и категории."""
+    return render(request, "system/docs.html", _docs_context(request))
 
 
 @login_required
@@ -1255,18 +1434,8 @@ def doc_category(request, slug):
     category = get_object_or_404(
         DocCategory.objects.prefetch_related("docs"), slug=slug
     )
-    categories = DocCategory.objects.annotate(docs_total=Count("docs"))
     return render(
-        request,
-        "system/docs.html",
-        {
-            "categories": categories,
-            "category": category,
-            "docs": category.docs.all(),
-            "can_manage": _is_admin(request.user),
-            "form": DocForm(),
-            "active_nav": "docs",
-        },
+        request, "system/docs.html", _docs_context(request, category=category)
     )
 
 
@@ -1302,6 +1471,9 @@ def doc_upload(request):
         ]
         detail = "; ".join(errors)
         messages.error(request, f"Не удалось добавить документ. {detail}")
+        return render(
+            request, "system/docs.html", _docs_context(request, form=form), status=400
+        )
     return redirect("system:docs")
 
 
@@ -1394,10 +1566,7 @@ def doc_delete(request, pk):
 # ---------------------------------------------------------------------------
 
 
-@login_required
-@require_safe
-def news_list(request):
-    """Карточки новостей с поиском и фильтрами (PRD v3 §2.7)."""
+def _news_context(request, *, form=None):
     qs = NewsItem.objects.select_related("author", "category")
     status = request.GET.get("status", "")
     category_slug = request.GET.get("category", "")
@@ -1438,18 +1607,21 @@ def news_list(request):
         )
 
     page = _paginate(request, qs)
-    return render(
-        request,
-        "system/news.html",
-        {
-            "page": page,
-            "categories": NewsCategory.objects.all(),
-            "can_manage": _is_admin(request.user),
-            "form": NewsForm(),
-            "filter_error": filter_error,
-            "active_nav": "news",
-        },
-    )
+    return {
+        "page": page,
+        "categories": NewsCategory.objects.all(),
+        "can_manage": _is_admin(request.user),
+        "form": form if form is not None else NewsForm(),
+        "filter_error": filter_error,
+        "active_nav": "news",
+    }
+
+
+@login_required
+@require_safe
+def news_list(request):
+    """Карточки новостей с поиском и фильтрами (PRD v3 §2.7)."""
+    return render(request, "system/news.html", _news_context(request))
 
 
 @admin_required
@@ -1476,6 +1648,9 @@ def news_create(request):
         messages.success(request, "Новость опубликована.")
     else:
         messages.error(request, "Не удалось опубликовать новость: проверьте форму.")
+        return render(
+            request, "system/news.html", _news_context(request, form=form), status=400
+        )
     return redirect("system:news")
 
 
@@ -1658,12 +1833,31 @@ def table_prefs(request, table_key):
             (k for k in selected if k in default_order),
             key=lambda k: position.get(k, 999),
         )
+        if not selected_sorted:
+            error = "Оставьте видимой хотя бы одну колонку."
+            if is_modal:
+                return JsonResponse({"ok": False, "error": error}, status=400)
+            messages.error(request, error)
+            return redirect(request.META.get("HTTP_REFERER") or "journal:list")
         sort_field = request.POST.get("sort_field", "")
         sort_dir = request.POST.get("sort_dir", "-")
         if sort_field not in meta["allowed_sorts"]:
             sort_field = ""
         if sort_dir not in ("", "-"):
             sort_dir = "-"
+        pinned_columns = [
+            key
+            for key in request.POST.getlist("pinned_columns")
+            if key in selected_sorted
+        ]
+        available_groups = {
+            column["group"] for column in meta["columns"] if column.get("group")
+        }
+        grouped_headers = [
+            group
+            for group in request.POST.getlist("grouped_headers")
+            if group in available_groups
+        ]
         with transaction.atomic():
             UserTableViewPref.objects.update_or_create(
                 user=request.user,
@@ -1676,6 +1870,8 @@ def table_prefs(request, table_key):
                         else {}
                     ),
                     "fixed_first": request.POST.get("fixed_first") == "on",
+                    "pinned_columns": pinned_columns,
+                    "grouped_headers": grouped_headers,
                 },
             )
             log_event(
@@ -1706,6 +1902,8 @@ def table_prefs(request, table_key):
                 "current": [column["key"] for column in columns if column["key"] in current],
                 "sorting": sorting,
                 "fixed_first": pref.fixed_first,
+                "pinned_columns": pref.pinned_columns or [],
+                "grouped_headers": pref.grouped_headers or [],
             }
         )
     template_name = "system/table_prefs_modal.html" if is_modal else "system/table_prefs.html"
@@ -1721,6 +1919,15 @@ def table_prefs(request, table_key):
             "pref": pref,
             "sort_field": sorting.get("field", ""),
             "sort_dir": sorting.get("dir", "-"),
+            "pinned_columns": set(pref.pinned_columns or []),
+            "grouped_headers": set(pref.grouped_headers or []),
+            "available_groups": list(
+                dict.fromkeys(
+                    column["group"]
+                    for column in meta["columns"]
+                    if column.get("group")
+                )
+            ),
             "active_nav": "prefs",
             "is_modal": is_modal,
         },

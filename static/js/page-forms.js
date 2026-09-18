@@ -160,17 +160,37 @@
   }
 
   function initTaskTabs() {
-    document.querySelectorAll(".tab[data-tab]").forEach(function (tab) {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab[data-tab]'));
+    function activate(tab, focus) {
+      var target = tab.dataset.tab;
+      tabs.forEach(function (item) {
+        var active = item === tab;
+        item.classList.toggle('is-active', active);
+        item.setAttribute('aria-selected', String(active));
+        item.tabIndex = active ? 0 : -1;
+      });
+      document.querySelectorAll('.tab-panel[data-panel]').forEach(function (panel) {
+        var active = panel.dataset.panel === target;
+        panel.classList.toggle('is-active', active);
+        panel.hidden = !active;
+      });
+      if (focus) tab.focus();
+    }
+    tabs.forEach(function (tab, index) {
+      if (tab.dataset.tabReady === 'true') return;
+      tab.dataset.tabReady = 'true';
       tab.addEventListener("click", function () {
-        var target = tab.dataset.tab;
-        document.querySelectorAll(".tab[data-tab]").forEach(function (item) {
-          var active = item === tab;
-          item.classList.toggle("is-active", active);
-          item.setAttribute("aria-selected", String(active));
-        });
-        document.querySelectorAll(".tab-panel[data-panel]").forEach(function (panel) {
-          panel.classList.toggle("is-active", panel.dataset.panel === target);
-        });
+        activate(tab, false);
+      });
+      tab.addEventListener('keydown', function (event) {
+        var next = index;
+        if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = tabs.length - 1;
+        else return;
+        event.preventDefault();
+        activate(tabs[next], true);
       });
     });
   }

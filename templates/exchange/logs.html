@@ -4,7 +4,7 @@
 {% block content %}
 <header class="page-heading page-heading--action">
   <div><p class="page-heading__eyebrow">Обмен данными</p><h1>Загрузки файлов</h1><p class="page-heading__lead">История обработки входящих реестров и протоколы проверки</p></div>
-  <div class="page-heading__actions"><a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a><a class="btn btn--primary" href="{% url 'exchange:upload' %}">+ Загрузить файл</a></div>
+  <div class="page-heading__actions"><a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a>{% if can_exchange_upload %}<a class="btn btn--primary" href="{% url 'exchange:upload' %}">+ Загрузить файл</a>{% endif %}</div>
 </header>
 
 <div class="card table-card">
@@ -45,5 +45,12 @@
     </div>
   </dialog>
   {% endif %}{% endfor %}
+  {% if page.paginator.num_pages > 1 %}
+  <div class="pagination">
+    {% if page.has_previous %}<a href="{% querystring page=page.previous_page_number %}">‹ Назад</a>{% endif %}
+    <span class="current">Стр. {{ page.number }} из {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="{% querystring page=page.next_page_number %}">Вперёд ›</a>{% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

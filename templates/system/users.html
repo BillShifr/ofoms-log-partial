@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load ui_components %}
+{% load system_filters ui_components %}
 {% block title %}Пользователи{% endblock %}
 {% block content %}
 <header class="page-heading page-heading--action">
@@ -23,15 +23,15 @@
 </div>
 
 <div class="card table-card">
-  {% data_table responsive=True sortable=True table_key="system-users" title="Пользователи" label="Таблица пользователей; на узком экране показана карточками" %}
+  {% data_table responsive=True table_key="system-users" title="Пользователи" label="Таблица пользователей; на узком экране показана карточками" %}
       <thead>
         <tr>
-          <th>ФИО</th>
-          <th>Логин</th>
-          <th>Организация</th>
-          <th>Должность</th>
+          {% with header=sort_headers|get_item:"full_name" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">ФИО</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"username" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Логин</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"org" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Организация</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"job_title" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Должность</a></th>{% endwith %}
           <th>Роли (группы)</th>
-          <th>Статус</th>
+          {% with header=sort_headers|get_item:"status" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Статус</a></th>{% endwith %}
           <th class="cell-actions" data-no-sort>Действия</th>
         </tr>
       </thead>

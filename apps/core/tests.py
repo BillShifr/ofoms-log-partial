@@ -115,6 +115,28 @@ class SystemMetaContextTests(TestCase):
 
         self.assertFalse(context["can_manage_system"])
 
+    def test_context_exposes_action_capabilities_and_counts_unread_messages(self):
+        user = User.objects.create_user(
+            username="operator-context", password="GoodPass!1", org=81000
+        )
+        author = User.objects.create_user(
+            username="author-context", password="GoodPass!1", org=81000
+        )
+        user.groups.add(Group.objects.get(name="ОП1"))
+        conversation = Conversation.objects.create(title="Два сообщения")
+        conversation.participants.set([user, author])
+        thread = MessageThread.objects.create(
+            conversation=conversation, created_by=author, title="Тема"
+        )
+        MessageReply.objects.create(thread=thread, author=author, body="Первое")
+        MessageReply.objects.create(thread=thread, author=author, body="Второе")
+
+        context = system_meta(mock.Mock(user=user))
+
+        self.assertTrue(context["can_journal_create"])
+        self.assertTrue(context["can_exchange_upload"])
+        self.assertEqual(context["unread_messages"], 2)
+
 
 class CapabilityOrganizationBoundaryTests(TestCase):
     @classmethod
@@ -1578,6 +1600,9 @@ class AuthenticationAuditTests(TestCase):
         self.assertEqual(event.event_type, EventLog.EventType.LOGIN)
         self.assertEqual(event.result, EventLog.Result.OK)
         self.assertEqual(event.user, self.user)
+        self.assertEqual(
+            EventLog.objects.filter(event_type=EventLog.EventType.LOGIN).count(), 1
+        )
 
     def test_failed_login_is_recorded_without_user(self):
         response = self.client.post(
@@ -1590,6 +1615,9 @@ class AuthenticationAuditTests(TestCase):
         self.assertEqual(event.event_type, EventLog.EventType.LOGIN_FAILED)
         self.assertEqual(event.result, EventLog.Result.FAILED)
         self.assertIsNone(event.user)
+        self.assertEqual(
+            EventLog.objects.filter(event_type=EventLog.EventType.LOGIN_FAILED).count(), 1
+        )
 
     def test_token_login_is_recorded_as_authenticated_login(self):
         response = self.client.post(

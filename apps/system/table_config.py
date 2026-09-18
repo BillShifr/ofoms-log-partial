@@ -29,8 +29,10 @@ TABLES = {
     "system-task-runs": {
         "title": "История запусков",
         "columns": _columns(
+            ("queued_at", "В очереди", "Период", True),
             ("started_at", "Начало", "Период", True),
             ("finished_at", "Завершение", "Период", True),
+            ("attempt", "Попытка", "Запуск", True),
             ("triggered_by", "Инициатор", "Запуск", True),
             ("result", "Результат", "Запуск", True),
             ("log", "Лог", "Запуск", False),
@@ -81,6 +83,15 @@ TABLES = {
             ("job_title", "Должность", "Работа", True),
             ("roles", "Роли (группы)", "Доступ", False),
             ("status", "Статус", "Доступ", True),
+            ("actions", "Действия", "", False),
+        ),
+    },
+    "system-groups": {
+        "title": "Группы пользователей",
+        "columns": _columns(
+            ("name", "Наименование", "Группа", True),
+            ("type", "Тип", "Группа", True),
+            ("member_count", "Участников", "Состав", True),
             ("actions", "Действия", "", False),
         ),
     },

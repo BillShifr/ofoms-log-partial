@@ -11,7 +11,7 @@
 
   <section class="messenger__main">
     <header class="conversation-heading">
-      <a class="conversation-heading__back" href="{% url 'system:conversation' conv.pk %}">← {{ conv.display_title }}</a>
+      <a class="conversation-heading__back" href="{% url 'system:conversation' conv.pk %}">← {{ conv_title }}</a>
       <div class="conversation-heading__title"><p class="page-heading__eyebrow">Тема обсуждения</p><h1>{{ thread.title }}</h1></div>
       <div class="flex flex--wrap gap-6">
         {% if thread.is_closed %}<span class="badge badge--open">Закрыта</span>{% endif %}
@@ -77,9 +77,10 @@
           {% for error in reply_form.body.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
         </div>
         <div class="field">
-          <label for="id_attachment">Вложение (необязательно)</label>
-          <input type="file" id="id_attachment" name="attachment" accept=".doc,.docx,.odt,.ods,.pdf,.rtf,.txt,.xls,.xlsx,.zip">
+          <label for="{{ reply_form.attachment.id_for_label }}">{{ reply_form.attachment.label }}</label>
+          {{ reply_form.attachment }}
           <span class="text-muted">PDF, DOC/XLS, до 20 МБ</span>
+          {% for error in reply_form.attachment.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
         </div>
         <button class="btn btn--primary" type="submit">Отправить</button>
       </form>

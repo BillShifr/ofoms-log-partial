@@ -162,12 +162,25 @@
     return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   }
 
+  function widthStyleId(key) {
+    var value = String(key);
+    var hash = 0;
+    for (var index = 0; index < value.length; index += 1) {
+      hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
+    }
+    return 'datatable-widths-' + Math.abs(hash);
+  }
+
   function syncWidthRules(table, widths) {
     var key = table.getAttribute('data-table-key') || location.pathname;
-    var sheet = Array.prototype.find.call(document.styleSheets, function (candidate) {
-      return candidate.href && candidate.href.indexOf('/static/css/portal.css') !== -1;
-    }) || document.styleSheets[0];
-    if (!sheet) return;
+    var styleId = widthStyleId(key);
+    var style = document.getElementById(styleId);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      style.dataset.datatableWidthKey = key;
+      document.head.appendChild(style);
+    }
     var rules = [];
     Object.keys(widths).forEach(function (index) {
       if (index === '__table') return;
@@ -181,11 +194,12 @@
       var tableWidth = Math.max(table.getBoundingClientRect().width, Math.round(Number(widths.__table) || 0));
       rules.push(tableSelector + '{width:' + tableWidth + 'px;min-width:' + tableWidth + 'px;}');
     }
-    rules.forEach(function (rule) {
-      try {
-        sheet.insertRule(rule, sheet.cssRules.length);
-      } catch (e) {}
-    });
+    style.textContent = rules.join('\n');
+  }
+
+  function clearWidthRules(tableKey) {
+    var style = document.getElementById(widthStyleId(tableKey || location.pathname));
+    if (style) style.remove();
   }
 
   function indexColumns(table) {
@@ -203,6 +217,28 @@
   function setColumnWidth(table, index, width) {
     var clamped = Math.max(56, Math.round(width));
     return clamped;
+  }
+
+  function refreshPinnedOffsets(table) {
+    var headerRow = table.tHead && table.tHead.rows[table.tHead.rows.length - 1];
+    if (!headerRow) return;
+    var key = table.getAttribute('data-table-key') || location.pathname;
+    var styleId = widthStyleId('pinned:' + key);
+    var sheet = document.getElementById(styleId);
+    if (!sheet) {
+      sheet = document.createElement('style');
+      sheet.id = styleId;
+      document.head.appendChild(sheet);
+    }
+    var left = 0;
+    var rules = [];
+    Array.prototype.forEach.call(headerRow.cells, function (header, index) {
+      if (!header.classList.contains('data-pinned')) return;
+      var selector = 'table.data[data-table-key="' + attrValue(key) + '"] tr:not(.column-group-row) > .data-pinned:nth-child(' + (index + 1) + ')';
+      rules.push(selector + '{--pinned-left:' + left + 'px;}');
+      left += header.getBoundingClientRect().width;
+    });
+    sheet.textContent = rules.join('\n');
   }
 
   function initResize() {
@@ -232,6 +268,7 @@
           }, 0);
           syncWidthRules(table, widths);
           writeWidths(table, widths);
+          refreshPinnedOffsets(table);
           document.querySelectorAll('table.data td.cell-long').forEach(function (td) {
             td.dispatchEvent(new Event('datatable:resize'));
           });
@@ -255,6 +292,7 @@
           persist(th.getBoundingClientRect().width + (event.key === 'ArrowRight' ? 16 : -16));
         });
       });
+      refreshPinnedOffsets(table);
     });
   }
 
@@ -274,6 +312,7 @@
           .then(function (html) {
             content.innerHTML = html;
             content.dataset.loaded = 'true';
+            ensureDialogNames();
           })
           .catch(function () {
             content.innerHTML = '<p class="alert alert--error">Не удалось загрузить настройки колонок.</p>';
@@ -290,6 +329,15 @@
       var form = event.target.closest('[data-table-prefs-form]');
       if (!form) return;
       event.preventDefault();
+      var error = form.querySelector('[data-table-prefs-error]');
+      if (!form.querySelector('input[name="columns"]:checked')) {
+        if (error) {
+          error.textContent = 'Оставьте видимой хотя бы одну колонку.';
+          error.hidden = false;
+        }
+        return;
+      }
+      if (error) error.hidden = true;
       fetch(form.action, {
         method: 'POST',
         body: new FormData(form),
@@ -297,7 +345,11 @@
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
       })
         .then(function (response) {
-          if (!response.ok) throw new Error('save failed');
+          if (!response.ok) {
+            return response.json().catch(function () { return {}; }).then(function (payload) {
+              throw new Error(payload.error || 'Не удалось сохранить настройки.');
+            });
+          }
           var dialog = form.closest('dialog');
           if (dialog && typeof dialog.close === 'function') dialog.close();
           if (window.portalNavigate) return window.portalNavigate(window.location.href, {
@@ -305,51 +357,123 @@
           });
           window.location.reload();
         })
-        .catch(function () {
-          var error = form.querySelector('[data-table-prefs-error]');
-          if (error) error.hidden = false;
+        .catch(function (requestError) {
+          if (error) {
+            error.textContent = requestError.message;
+            error.hidden = false;
+          }
         });
     });
 
     document.addEventListener('click', function (event) {
       var reset = event.target.closest('[data-table-reset-widths]');
       if (!reset) return;
-      try { localStorage.removeItem(storageKeyByName(reset.getAttribute('data-table-key'))); }
+      var tableKey = reset.getAttribute('data-table-key');
+      try { localStorage.removeItem(storageKeyByName(tableKey)); }
       catch (e) {}
+      clearWidthRules(tableKey);
       if (window.portalNavigate) {
         window.portalNavigate(window.location.href, { history: 'replace', preserveScroll: true });
       } else {
         window.location.reload();
       }
     });
+
+    document.addEventListener('click', function (event) {
+      var selectAll = event.target.closest('[data-table-select-all]');
+      if (!selectAll) return;
+      var form = selectAll.closest('form');
+      if (!form) return;
+      form.querySelectorAll('input[name="columns"]').forEach(function (checkbox) {
+        checkbox.checked = true;
+      });
+      var error = form.querySelector('[data-table-prefs-error]');
+      if (error) error.hidden = true;
+    });
   }
 
   function applyTablePreferences(table, payload) {
-    if (!payload || !payload.columns || table.dataset.tableServerManaged === 'true') return;
+    if (!payload || !payload.columns) return;
     var keys = payload.columns.map(function (column) { return column.key; });
     var selected = payload.current && payload.current.length ? payload.current : keys;
     var selectedSet = new Set(selected);
     var orderedKeys = selected.concat(keys.filter(function (key) {
       return selected.indexOf(key) === -1;
     }));
+    var serverManaged = table.dataset.tableServerManaged === 'true';
 
-    Array.prototype.forEach.call(table.rows, function (row) {
-      if (row.cells.length !== keys.length || row.querySelector('[colspan]')) return;
-      var byKey = {};
-      Array.prototype.forEach.call(row.cells, function (cell, index) {
-        byKey[keys[index]] = cell;
+    if (!serverManaged) {
+      Array.prototype.forEach.call(table.rows, function (row) {
+        if (row.classList.contains('column-group-row')) return;
+        if (row.cells.length !== keys.length || row.querySelector('[colspan]')) return;
+        var byKey = {};
+        Array.prototype.forEach.call(row.cells, function (cell, index) {
+          var key = cell.dataset.columnKey || keys[index];
+          cell.dataset.columnKey = key;
+          byKey[key] = cell;
+        });
+        orderedKeys.forEach(function (key) {
+          var cell = byKey[key];
+          if (!cell) return;
+          cell.hidden = !selectedSet.has(key);
+          row.appendChild(cell);
+        });
       });
-      orderedKeys.forEach(function (key) {
-        var cell = byKey[key];
-        if (!cell) return;
-        cell.hidden = !selectedSet.has(key);
-        row.appendChild(cell);
+    }
+    if (serverManaged) {
+      Array.prototype.forEach.call(table.rows, function (row) {
+        if (row.classList.contains('column-group-row') || row.querySelector('[colspan]')) return;
+        Array.prototype.forEach.call(row.cells, function (cell, index) {
+          if (selected[index]) cell.dataset.columnKey = selected[index];
+        });
       });
-    });
+    }
     table.querySelectorAll('tr [colspan]').forEach(function (cell) {
       cell.colSpan = selected.length;
     });
-    table.classList.toggle('th-sticky', Boolean(payload.fixed_first));
+    table.classList.remove('th-sticky');
+
+    var oldGroupRow = table.tHead && table.tHead.querySelector('.column-group-row');
+    if (oldGroupRow) oldGroupRow.remove();
+    var groupedHeaders = new Set(payload.grouped_headers || []);
+    if (table.tHead && groupedHeaders.size) {
+      var groupByKey = {};
+      payload.columns.forEach(function (column) { groupByKey[column.key] = column.group || ''; });
+      var groupRow = document.createElement('tr');
+      groupRow.className = 'column-group-row';
+      var segments = [];
+      selected.forEach(function (key) {
+        var group = groupedHeaders.has(groupByKey[key]) ? groupByKey[key] : '';
+        var last = segments[segments.length - 1];
+        if (last && last.label === group) last.span += 1;
+        else segments.push({ label: group, span: 1 });
+      });
+      segments.forEach(function (segment) {
+        var th = document.createElement('th');
+        th.scope = 'colgroup';
+        th.colSpan = segment.span;
+        th.textContent = segment.label;
+        if (!segment.label) th.className = 'column-group-row__empty';
+        groupRow.appendChild(th);
+      });
+      table.tHead.insertBefore(groupRow, table.tHead.firstChild);
+    }
+
+    var pinned = payload.pinned_columns || [];
+    if (!pinned.length && payload.fixed_first && selected.length) pinned = [selected[0]];
+    var pinnedSet = new Set(pinned.filter(function (key) { return selectedSet.has(key); }));
+    var headerRow = table.tHead && table.tHead.rows[table.tHead.rows.length - 1];
+    if (headerRow) {
+      Array.prototype.forEach.call(headerRow.cells, function (header, index) {
+        var key = header.dataset.columnKey || selected[index];
+        var isPinned = pinnedSet.has(key);
+        Array.prototype.forEach.call(table.rows, function (row) {
+          if (row.classList.contains('column-group-row') || !row.cells[index]) return;
+          row.cells[index].classList.toggle('data-pinned', isPinned);
+        });
+      });
+    }
+    refreshPinnedOffsets(table);
 
     var sorting = payload.sorting || {};
     if (sorting.field && table.hasAttribute('data-client-sort')) {
@@ -365,7 +489,6 @@
     var requests = Array.prototype.map.call(
       document.querySelectorAll('table.data[data-table-settings-url]'),
       function (table) {
-        if (table.dataset.tableServerManaged === 'true') return Promise.resolve();
         var url = table.dataset.tableSettingsUrl;
         url += (url.indexOf('?') === -1 ? '?' : '&') + 'format=json';
         return fetch(url, { credentials: 'same-origin' })
@@ -398,10 +521,38 @@
     });
   }
 
+  function ensureDialogNames() {
+    document.querySelectorAll('dialog.modal').forEach(function (dialog, index) {
+      if (dialog.hasAttribute('aria-label') || dialog.hasAttribute('aria-labelledby')) return;
+      var heading = dialog.querySelector('h1, h2, h3');
+      if (!heading) return;
+      if (!heading.id) heading.id = (dialog.id || 'dialog-' + index) + '-title';
+      dialog.setAttribute('aria-labelledby', heading.id);
+    });
+  }
+
+  function initEventDetails() {
+    document.querySelectorAll('.event-detail-toggle').forEach(function (button) {
+      if (button.dataset.detailReady === 'true') return;
+      button.dataset.detailReady = 'true';
+      button.addEventListener('click', function () {
+        var detail = document.getElementById(button.getAttribute('aria-controls'));
+        if (!detail) return;
+        var expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        detail.hidden = expanded;
+        var label = button.querySelector('.sr-only');
+        if (label) label.textContent = expanded ? ': показать детали события' : ': скрыть детали события';
+      });
+    });
+  }
+
   function initContent() {
     initSort();
     initTooltips();
     initCellTruncate();
+    ensureDialogNames();
+    initEventDetails();
     initTablePreferences().then(initResize);
   }
 

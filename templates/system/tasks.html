@@ -20,7 +20,7 @@
           <th>Режим</th>
           <th>Последний запуск</th>
           <th>Результат</th>
-          <th class="cell-actions" data-no-sort></th>
+          <th class="cell-actions task-cell--actions" data-no-sort></th>
         </tr>
       </thead>
       <tbody>
@@ -30,7 +30,7 @@
           <td class="cell-long" data-label="Команда" data-tip="{{ t.command }}"><span class="cell-clip">{{ command_tips|get_item:t.command|default:t.command }}</span></td>
           <td data-label="Статус">
             {% if t.status == 'completed' %}<span class="badge badge--closed">{{ t.get_status_display }}</span>
-            {% elif t.status == 'failed' %}<span class="badge badge--overdue">{{ t.get_status_display }}</span>
+            {% elif t.status == 'failed' %}<button class="status-detail-button badge badge--overdue" type="button" data-modal-open="task-result-{{ t.pk }}">{{ t.get_status_display }}</button>
             {% elif t.status == 'running' %}<span class="badge badge--running">{{ t.get_status_display }}</span>
             {% elif t.status == 'cancelled' %}<span class="badge badge--cancelled">{{ t.get_status_display }}</span>
             {% else %}<span class="badge badge--open">{{ t.get_status_display }}</span>{% endif %}
@@ -41,7 +41,7 @@
             {% elif t.priority == 1 %}<span class="badge badge--open">Средний</span>
             {% else %}<span class="badge badge--cancelled">Низкий</span>{% endif %}
           </td>
-          <td data-label="Режим">{{ t.get_run_mode_display }}</td>
+          <td data-label="Режим">{{ t.get_run_mode_display }}<br><span class="badge {% if t.enabled %}badge--closed{% else %}badge--cancelled{% endif %}">{% if t.enabled %}Активна{% else %}Приостановлена{% endif %}</span></td>
           <td data-label="Последний запуск" data-value="{{ t.last_finished_at|date:'Y-m-d\TH:i:s' }}">{{ t.last_finished_at|date:"d.m.Y H:i"|default:"—" }}</td>
           <td data-label="Результат">
             {% if t.last_result == 'failed' %}
@@ -55,7 +55,7 @@
               <button class="btn btn--sm btn--primary" type="submit"{% if not t.enabled %} disabled title="Сначала включите задание"{% endif %}>Запустить</button>
             </form>
             <form method="post" action="{% url 'system:task_toggle' t.pk %}" class="inline-form">{% csrf_token %}
-              <button class="btn btn--sm btn--ghost" type="submit">{{ t.enabled|yesno:"Стоп,Вкл" }}</button>
+              <button class="btn btn--sm btn--ghost" type="submit">{% if t.enabled %}Приостановить{% else %}Возобновить{% endif %}</button>
             </form>
           </div></td>
         </tr>

@@ -1,5 +1,6 @@
 (function () {
   "use strict";
+  var pageController = null;
 
   function initExchangeUpload() {
     var form = document.getElementById("upload-form");
@@ -39,7 +40,7 @@
     });
   }
 
-  function initParticipants() {
+  function initParticipants(signal) {
     var search = document.getElementById("participant-search");
     var list = document.querySelector(".participant-pick");
     var tokens = document.querySelector(".participant-tokens");
@@ -154,7 +155,7 @@
     });
     document.addEventListener("click", function (event) {
       if (panel && !panel.contains(event.target) && event.target !== search) closePanel();
-    });
+    }, { signal: signal });
     renderTokens();
   }
 
@@ -174,7 +175,7 @@
     });
   }
 
-  function initAssigneeSearch() {
+  function initAssigneeSearch(signal) {
     var search = document.querySelector("[data-assignee-search]");
     var selectBox = document.getElementById("assignee-select");
     var panel = document.getElementById("assignee-options");
@@ -283,7 +284,7 @@
       if (!panel.contains(event.target) && !event.target.closest("#assignee-wrap")) {
         closePanel();
       }
-    });
+    }, { signal: signal });
     select.addEventListener("change", syncFromSelect);
     syncFromSelect();
   }
@@ -350,13 +351,93 @@
     });
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
+  function restoreSubmitButton(form) {
+    var button = form.querySelector('[aria-busy="true"][data-original-label]');
+    if (!button) return;
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+    button.textContent = button.dataset.originalLabel;
+    delete button.dataset.originalLabel;
+  }
+
+  function initGlobalActions() {
+    document.addEventListener("click", function (event) {
+      var toggle = event.target.closest("[data-control-group-toggle]");
+      if (!toggle) return;
+      var group = toggle.closest("tbody[data-control-group]");
+      if (!group) return;
+      var expanded = toggle.getAttribute("aria-expanded") === "true";
+      group.querySelectorAll("tr[data-control-row]").forEach(function (row) {
+        row.hidden = expanded;
+      });
+      toggle.setAttribute("aria-expanded", String(!expanded));
+      var label = toggle.querySelector(".control-group__action");
+      if (label) label.textContent = expanded ? "Развернуть" : "Свернуть";
+    });
+
+    document.addEventListener("submit", function (event) {
+      var form = event.target.closest("[data-theme-create-form]");
+      if (!form) return;
+      event.preventDefault();
+      var errorBox = form.querySelector("[data-theme-form-errors]");
+      if (errorBox) {
+        errorBox.hidden = true;
+        errorBox.textContent = "";
+      }
+      fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        credentials: "same-origin",
+        headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
+      }).then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok || !data.ok) throw data;
+          return data;
+        });
+      }).then(function (data) {
+        document.querySelectorAll('select[name="theme"]').forEach(function (select) {
+          var option = document.createElement("option");
+          option.value = String(data.id);
+          option.textContent = data.label;
+          option.selected = select.closest("form[data-validate]") !== null;
+          select.appendChild(option);
+        });
+        form.reset();
+        var dialog = form.closest("dialog");
+        if (dialog && typeof dialog.close === "function") dialog.close();
+        if (window.showToast) window.showToast("Тема создана и доступна в списке.", "success");
+      }).catch(function (data) {
+        var messages = [];
+        Object.keys((data && data.errors) || {}).forEach(function (field) {
+          data.errors[field].forEach(function (error) {
+            messages.push(error.message || String(error));
+          });
+        });
+        if (errorBox) {
+          errorBox.textContent = messages.join(" ") || "Не удалось создать тему.";
+          errorBox.hidden = false;
+        }
+      }).finally(function () {
+        restoreSubmitButton(form);
+      });
+    });
+  }
+
+  function initPage() {
+    if (pageController) pageController.abort();
+    pageController = new AbortController();
     initExchangeUpload();
     initDocumentTitle();
-    initParticipants();
+    initParticipants(pageController.signal);
     initTaskTabs();
-    initAssigneeSearch();
+    initAssigneeSearch(pageController.signal);
     initConditionalFields();
     initReactions();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    initGlobalActions();
+    initPage();
   });
+  document.addEventListener("portal:render", initPage);
 })();

@@ -1901,6 +1901,28 @@ class TemplateHygieneTests(TestCase):
                     "data-require-input" in markup or "data-require-selector" in markup
                 )
 
+    def test_portal_navigation_progressively_enhances_links_and_forms(self):
+        script = (
+            Path(settings.BASE_DIR) / "static" / "js" / "portal-nav.js"
+        ).read_text(encoding="utf-8-sig")
+        required = [
+            'fetch(target.href, fetchOptions)',
+            'currentMain.replaceWith',
+            'history.pushState',
+            'document.addEventListener("submit"',
+            'document.addEventListener("DOMContentLoaded"',
+            'document.dispatchEvent(new CustomEvent("portal:render"',
+            'link.dataset.noAjax',
+            'form.dataset.noAjax',
+            'form.getAttribute("action")',
+        ]
+        self.assertEqual([needle for needle in required if needle not in script], [])
+
+        base = (Path(settings.BASE_DIR) / "templates" / "base.html").read_text(
+            encoding="utf-8-sig"
+        )
+        self.assertLess(base.index("page-forms.js"), base.index("portal-nav.js"))
+
     def test_badge_css_keeps_text_inside_badge_box(self):
         css = (Path(settings.BASE_DIR) / "static" / "css" / "portal.css").read_text(
             encoding="utf-8-sig"

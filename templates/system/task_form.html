@@ -8,10 +8,13 @@
   {% if task %}
   <div class="page-heading__actions">
     <form method="post" action="{% url 'system:task_run' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--primary" type="submit"{% if not task.enabled %} disabled title="Сначала включите задание"{% endif %}>Запустить</button></form>
-    <form method="post" action="{% url 'system:task_toggle' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--ghost" type="submit">{% if task.enabled %}Отключить{% else %}Включить{% endif %}</button></form>
+    <form method="post" action="{% url 'system:task_toggle' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--ghost" type="submit">{% if task.enabled %}Приостановить{% else %}Возобновить{% endif %}</button></form>
   </div>
   {% endif %}
 </header>
+{% if task %}
+<p class="task-availability"><span class="badge {% if task.enabled %}badge--closed{% else %}badge--cancelled{% endif %}">{% if task.enabled %}Активна{% else %}Приостановлена{% endif %}</span><span class="text-muted">{% if task.enabled %}Ручной и автоматический запуск разрешён.{% else %}Любой запуск заблокирован до возобновления задачи.{% endif %}</span></p>
+{% endif %}
 
 <div class="card task-form-card">
   <form method="post" data-validate>
@@ -94,7 +97,7 @@
             <td data-label="Начало">{{ r.started_at|date:"d.m.Y H:i:s" }}</td>
             <td data-label="Завершение">{{ r.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
             <td data-label="Инициатор">{% if r.triggered_by == "auto" %}Автоматически{% elif r.triggered_by == "legacy" %}Исторический запуск{% else %}Пользователь{% endif %}</td>
-            <td data-label="Результат">{% if r.result == 'ok' %}<span class="badge badge--closed">успешно</span>{% elif r.result == 'failed' %}<span class="badge badge--overdue">ошибка</span>{% else %}<span class="badge badge--open">{{ r.result }}</span>{% endif %}</td>
+            <td data-label="Результат">{% if r.result == 'ok' %}<span class="badge badge--closed">успешно</span>{% elif r.result == 'failed' %}<button class="status-detail-button badge badge--overdue" type="button" data-modal-open="task-run-error-{{ r.pk }}">ошибка</button>{% else %}<span class="badge badge--open">{{ r.result }}</span>{% endif %}</td>
             <td class="mono cell-long responsive-cell--wide" data-label="Лог"><span class="cell-clip">{{ r.log }}</span></td>
           </tr>
           {% endfor %}
@@ -115,7 +118,7 @@
           <div class="task-audit__meta">
             <time datetime="{{ event.started_at|date:'c' }}">{{ event.started_at|date:"d.m.Y H:i:s" }}</time>
             <span>{% if event.user %}{{ event.user.full_name|default:event.user.username }}{% else %}Система{% endif %}</span>
-            {% if event.result == 'failed' %}<span class="badge badge--overdue">Ошибка</span>{% endif %}
+            {% if event.result == 'failed' %}<button class="status-detail-button badge badge--overdue" type="button" data-modal-open="task-event-error-{{ event.pk }}">Ошибка</button>{% endif %}
           </div>
           <p>{{ event.audit_summary }}</p>
           {% if event.audit_detail %}
@@ -136,10 +139,10 @@
 
   <div class="tab-panel" data-panel="notes">
     {% for n in notes %}
-    <div class="message">
-      <div class="flex flex--between gap-8">
-        <span>
-          <strong>{{ n.author.full_name }}</strong>
+    <article class="task-note">
+      <header class="task-note__head">
+        <span class="task-note__author">
+          <strong>{{ n.author.full_name|default:n.author.username }}</strong>
           <span class="text-muted"> · {{ n.created_at|date:"d.m.Y H:i" }}</span>
         </span>
         <form method="post" class="inline-form">{% csrf_token %}
@@ -147,9 +150,9 @@
           <input type="hidden" name="note_id" value="{{ n.pk }}">
           <button class="btn btn--sm btn--ghost" type="submit" data-confirm="Удалить эту заметку?">Удалить</button>
         </form>
-      </div>
-      <p>{{ n.text }}</p>
-      <details class="collapsible collapsible--sm">
+      </header>
+      <p class="task-note__text">{{ n.text }}</p>
+      <details class="task-note__editor">
         <summary class="collapsible__toggle">Изменить</summary>
         <form method="post" data-validate>
           {% csrf_token %}
@@ -161,11 +164,11 @@
           </div>
         </form>
       </details>
-    </div>
+    </article>
     {% empty %}
     <p class="text-muted">Заметок нет.</p>
     {% endfor %}
-    <form method="post" class="answer-form answer-form--embedded" data-validate>
+    <form method="post" class="answer-form answer-form--embedded task-note-form" data-validate>
       {% csrf_token %}
       <input type="hidden" name="action" value="note">
       <div class="field field--grow">{{ note_form.text }}</div>
@@ -176,7 +179,7 @@
   <div class="tab-panel" data-panel="files">
     {% for f in files %}
     <div class="message">
-      <span class="text-nowrap">Файл: <a href="{% url 'system:task_file_download' f.pk %}">{{ f.file.name|cut:"tasks/" }}</a></span>
+      <span class="text-nowrap">Файл: <a data-no-ajax href="{% url 'system:task_file_download' f.pk %}">{{ f.file.name|cut:"tasks/" }}</a></span>
       <span class="text-muted"> · {{ f.uploaded_by.full_name|default:f.uploaded_by.username }} · {{ f.created_at|date:"d.m.Y H:i" }}</span>
     </div>
     {% empty %}
@@ -207,5 +210,15 @@
     </form>
   </div>
 </div>
+{% for r in runs %}{% if r.result == 'failed' %}
+<dialog class="modal" id="task-run-error-{{ r.pk }}">
+  <div class="modal__dialog"><div class="modal__head"><h2>Ошибка запуска</h2><button class="btn btn--ghost btn--icon" type="button" data-modal-close aria-label="Закрыть">×</button></div><div class="modal__body"><dl class="detail-list"><dt>Начало</dt><dd>{{ r.started_at|date:"d.m.Y H:i:s" }}</dd><dt>Завершение</dt><dd>{{ r.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</dd><dt>Инициатор</dt><dd>{% if r.triggered_by == 'auto' %}Автоматически{% elif r.triggered_by == 'legacy' %}Исторический запуск{% else %}Пользователь{% endif %}</dd></dl><pre class="error-detail">{{ r.log }}</pre><div class="modal__actions"><button class="btn btn--ghost" type="button" data-modal-close>Закрыть</button></div></div></div>
+</dialog>
+{% endif %}{% endfor %}
+{% for event in task_events %}{% if event.result == 'failed' %}
+<dialog class="modal" id="task-event-error-{{ event.pk }}">
+  <div class="modal__dialog"><div class="modal__head"><h2>Ошибка в журнале задачи</h2><button class="btn btn--ghost btn--icon" type="button" data-modal-close aria-label="Закрыть">×</button></div><div class="modal__body"><p>{{ event.audit_summary }}</p><pre class="error-detail">{{ event.audit_detail|default:event.detail }}</pre><div class="modal__actions"><button class="btn btn--ghost" type="button" data-modal-close>Закрыть</button></div></div></div>
+</dialog>
+{% endif %}{% endfor %}
 {% endif %}
 {% endblock %}

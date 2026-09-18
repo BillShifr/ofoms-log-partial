@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static ui_components %}
+{% load ui_components %}
 {% block title %}Журнал обращений{% endblock %}
 {% block content %}
 <div class="page-heading">
@@ -51,6 +51,7 @@
       </div>
       <div class="journal-actions__secondary">
         <a class="btn btn--ghost btn--sm" href="{{ print_url }}" target="_blank">Печать</a>
+        <button class="btn btn--ghost" type="button" data-modal-open="theme-create-modal">+ Новая тема</button>
         <a class="btn btn--accent" href="{% url 'journal:create' %}"><span aria-hidden="true">＋</span> Новое обращение</a>
       </div>
     </div>
@@ -131,7 +132,5 @@
   </div>
   {% endif %}
 </div>
-{% endblock %}
-{% block scripts %}
-<script src="{% static 'js/infinite-scroll.js' %}?v=20260912" defer></script>
+{% include "journal/_theme_create_modal.html" %}
 {% endblock %}

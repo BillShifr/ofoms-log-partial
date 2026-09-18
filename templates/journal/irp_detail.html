@@ -97,7 +97,7 @@
     {% if answer.files.all %}
     <ul class="file-list">
       {% for f in answer.files.all %}
-      <li><a href="{% url 'journal:file_download' f.pk %}">{{ f.file.name }}</a></li>
+      <li><a data-no-ajax href="{% url 'journal:file_download' f.pk %}">{{ f.file.name }}</a></li>
       {% endfor %}
     </ul>
     {% endif %}

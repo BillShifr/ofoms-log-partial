@@ -7,7 +7,7 @@
   <div><p class="page-heading__eyebrow">Автоматизированное задание</p><h1>{{ title }}</h1></div>
   {% if task %}
   <div class="page-heading__actions">
-    <form method="post" action="{% url 'system:task_run' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--primary" type="submit"{% if not task.enabled %} disabled title="Сначала включите задание"{% endif %}>Запустить</button></form>
+    <form method="post" action="{% url 'system:task_run' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--primary" type="submit"{% if not task.enabled %} disabled title="Сначала включите задание"{% elif task.status == 'queued' or task.status == 'running' %} disabled title="Задание уже ожидает выполнения"{% endif %}>Поставить в очередь</button></form>
     <form method="post" action="{% url 'system:task_toggle' task.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn--ghost" type="submit">{% if task.enabled %}Приостановить{% else %}Возобновить{% endif %}</button></form>
   </div>
   {% endif %}
@@ -24,9 +24,24 @@
       <div class="form-grid task-form-grid">
         <div class="field"><label for="{{ form.name.id_for_label }}">Наименование</label>{{ form.name }}{% for error in form.name.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field"><label for="{{ form.command.id_for_label }}">Действие</label>{{ form.command }}
-          <span class="text-muted">Выберите готовое системное действие. Новые действия добавляются разработчиком в серверный реестр и не создаются из этой формы. Проверка доступности ничего не меняет и нужна для контроля расписания.</span>
+          <span class="text-muted">Выберите системное действие. Его параметры и допустимые значения проверяются на сервере.</span>
           {% for error in form.command.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field field--wide"><label for="{{ form.description.id_for_label }}">Описание</label>{{ form.description }}</div>
+      </div>
+    </details>
+
+    <details class="collapsible" open data-key="task-form-params">
+      <summary class="collapsible__toggle">Параметры действия</summary>
+      <div class="form-grid task-form-grid">
+        {% for parameter in task_parameter_fields %}
+        <div class="field" data-conditional-controller="{{ form.command.id_for_label }}" data-conditional-values="{{ parameter.command }}">
+          <label for="{{ parameter.field.id_for_label }}">{{ parameter.field.label }}</label>
+          {% if parameter.kind == 'boolean' %}<input type="hidden" name="{{ parameter.field.html_name }}" value="0">{% endif %}
+          {{ parameter.field }}
+          {% if parameter.field.help_text %}<span class="text-muted">{{ parameter.field.help_text }}</span>{% endif %}
+          {% for error in parameter.field.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
+        </div>
+        {% empty %}<p class="text-muted">Для выбранных действий параметры не требуются.</p>{% endfor %}
       </div>
     </details>
 
@@ -63,6 +78,8 @@
         <div class="field" data-conditional-controller="{{ form.run_mode.id_for_label }}" data-conditional-values="scheduled"><label for="{{ form.interval_minutes.id_for_label }}">Интервал автозапуска (минут)</label>{{ form.interval_minutes }}
           <span class="text-muted">{{ form.interval_minutes.help_text }}</span>
           {% for error in form.interval_minutes.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field"><label for="{{ form.max_retries.id_for_label }}">Повторных попыток</label>{{ form.max_retries }}<span class="text-muted">{{ form.max_retries.help_text }}</span>{% for error in form.max_retries.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
+        <div class="field"><label for="{{ form.retry_delay_seconds.id_for_label }}">Задержка повтора (секунд)</label>{{ form.retry_delay_seconds }}<span class="text-muted">{{ form.retry_delay_seconds.help_text }}</span>{% for error in form.retry_delay_seconds.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field field--narrow"><label class="checkbox">{{ form.enabled }}{{ form.enabled.label }}</label></div>
         {% for error in form.non_field_errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
       </div>
@@ -77,27 +94,29 @@
 
 {% if task %}
 <div class="card">
-  <div class="tabs" role="tablist">
-    <button class="tab is-active" type="button" data-tab="runs">Запуски <span class="nav__badge">{{ runs|length }}</span></button>
-    <button class="tab" type="button" data-tab="audit">Журнал <span class="nav__badge">{{ task_event_count }}</span></button>
-    <button class="tab" type="button" data-tab="notes">Заметки <span class="nav__badge">{{ notes|length }}</span></button>
-    <button class="tab" type="button" data-tab="files">Файлы <span class="nav__badge">{{ files|length }}</span></button>
-    <button class="tab" type="button" data-tab="reports">Отчёты <span class="nav__badge">{{ reports|length }}</span></button>
+  <div class="tabs" role="tablist" aria-label="Разделы задачи">
+    <button class="tab is-active" id="task-tab-runs" type="button" role="tab" data-tab="runs" aria-selected="true" aria-controls="task-panel-runs" tabindex="0">Запуски <span class="nav__badge">{{ runs|length }}</span></button>
+    <button class="tab" id="task-tab-audit" type="button" role="tab" data-tab="audit" aria-selected="false" aria-controls="task-panel-audit" tabindex="-1">Журнал <span class="nav__badge">{{ task_event_count }}</span></button>
+    <button class="tab" id="task-tab-notes" type="button" role="tab" data-tab="notes" aria-selected="false" aria-controls="task-panel-notes" tabindex="-1">Заметки <span class="nav__badge">{{ notes|length }}</span></button>
+    <button class="tab" id="task-tab-files" type="button" role="tab" data-tab="files" aria-selected="false" aria-controls="task-panel-files" tabindex="-1">Файлы <span class="nav__badge">{{ files|length }}</span></button>
+    <button class="tab" id="task-tab-reports" type="button" role="tab" data-tab="reports" aria-selected="false" aria-controls="task-panel-reports" tabindex="-1">Отчёты <span class="nav__badge">{{ reports|length }}</span></button>
   </div>
 
-  <div class="tab-panel is-active" data-panel="runs">
+  <div class="tab-panel is-active" id="task-panel-runs" role="tabpanel" aria-labelledby="task-tab-runs" data-panel="runs">
     {% if runs %}
     {% data_table responsive=True table_key="system-task-runs" title="История запусков" label="История запусков; на узком экране показана карточками" %}
         <thead>
-          <tr><th>Начало</th><th>Завершение</th><th>Инициатор</th><th>Результат</th><th>Лог</th></tr>
+          <tr><th>В очереди</th><th>Начало</th><th>Завершение</th><th>Попытка</th><th>Инициатор</th><th>Результат</th><th>Лог</th></tr>
         </thead>
         <tbody>
           {% for r in runs %}
           <tr class="responsive-row">
-            <td data-label="Начало">{{ r.started_at|date:"d.m.Y H:i:s" }}</td>
+            <td data-label="В очереди">{{ r.queued_at|date:"d.m.Y H:i:s" }}</td>
+            <td data-label="Начало">{{ r.started_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
             <td data-label="Завершение">{{ r.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
+            <td data-label="Попытка">{{ r.attempt }} / {{ r.max_attempts }}</td>
             <td data-label="Инициатор">{% if r.triggered_by == "auto" %}Автоматически{% elif r.triggered_by == "legacy" %}Исторический запуск{% else %}Пользователь{% endif %}</td>
-            <td data-label="Результат">{% if r.result == 'ok' %}<span class="badge badge--closed">успешно</span>{% elif r.result == 'failed' %}<button class="status-detail-button badge badge--overdue" type="button" data-modal-open="task-run-error-{{ r.pk }}">ошибка</button>{% else %}<span class="badge badge--open">{{ r.result }}</span>{% endif %}</td>
+            <td data-label="Результат">{% if r.result == 'ok' %}<span class="badge badge--closed">успешно</span>{% elif r.result == 'failed' %}<button class="status-detail-button badge badge--overdue" type="button" data-modal-open="task-run-error-{{ r.pk }}">ошибка</button>{% elif r.started_at %}<span class="badge badge--open">выполняется</span>{% else %}<span class="badge badge--open">в очереди</span>{% endif %}</td>
             <td class="mono cell-long responsive-cell--wide" data-label="Лог"><span class="cell-clip">{{ r.log }}</span></td>
           </tr>
           {% endfor %}
@@ -108,7 +127,7 @@
     {% endif %}
   </div>
 
-  <div class="tab-panel" data-panel="audit">
+  <div class="tab-panel" id="task-panel-audit" role="tabpanel" aria-labelledby="task-tab-audit" data-panel="audit" hidden>
     {% if task_events %}
     <div class="task-audit" aria-label="Журнал изменений задания">
       {% for event in task_events %}
@@ -137,7 +156,7 @@
     {% endif %}
   </div>
 
-  <div class="tab-panel" data-panel="notes">
+  <div class="tab-panel" id="task-panel-notes" role="tabpanel" aria-labelledby="task-tab-notes" data-panel="notes" hidden>
     {% for n in notes %}
     <article class="task-note">
       <header class="task-note__head">
@@ -176,7 +195,7 @@
     </form>
   </div>
 
-  <div class="tab-panel" data-panel="files">
+  <div class="tab-panel" id="task-panel-files" role="tabpanel" aria-labelledby="task-tab-files" data-panel="files" hidden>
     {% for f in files %}
     <div class="message">
       <span class="text-nowrap">Файл: <a data-no-ajax href="{% url 'system:task_file_download' f.pk %}">{{ f.file.name|cut:"tasks/" }}</a></span>
@@ -193,7 +212,7 @@
     </form>
   </div>
 
-  <div class="tab-panel" data-panel="reports">
+  <div class="tab-panel" id="task-panel-reports" role="tabpanel" aria-labelledby="task-tab-reports" data-panel="reports" hidden>
     {% for rep in reports %}
     <div class="message">
       <strong>{{ rep.title }}</strong> <span class="text-muted"> · {{ rep.created_at|date:"d.m.Y H:i" }}</span>

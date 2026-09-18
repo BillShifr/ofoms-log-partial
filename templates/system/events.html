@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load ui_components %}
+{% load system_filters ui_components %}
 {% block title %}Журнал событий{% endblock %}
 {% block content %}
 <header class="page-heading">
@@ -38,25 +38,25 @@
 </div>
 
 <div class="card table-card">
-  {% data_table responsive=True sortable=True table_key="system-events" title="Журнал событий" label="Таблица событий; на узком экране показана карточками" %}
+  {% data_table responsive=True table_key="system-events" title="Журнал событий" label="Таблица событий; на узком экране показана карточками" %}
       <thead>
         <tr>
-          <th data-type="num">ID</th>
-          <th>Начало</th>
-          <th>Завершение</th>
-          <th>Тип</th>
-          <th>Модуль</th>
-          <th>Результат</th>
-          <th>Инициатор</th>
-          <th>Объект</th>
-          <th>IP</th>
-          <th data-type="num">Длит., мс</th>
+          {% with header=sort_headers|get_item:"id" %}<th data-type="num" aria-sort="{{ header.aria }}"><a href="{{ header.url }}">ID</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"started_at" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Начало</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"finished_at" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Завершение</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"event_type" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Тип</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"module" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Модуль</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"result" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Результат</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"user" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Инициатор</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"target" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Объект</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"ip" %}<th aria-sort="{{ header.aria }}"><a href="{{ header.url }}">IP</a></th>{% endwith %}
+          {% with header=sort_headers|get_item:"duration" %}<th data-type="num" aria-sort="{{ header.aria }}"><a href="{{ header.url }}">Длит., мс</a></th>{% endwith %}
         </tr>
       </thead>
       <tbody>
         {% for e in page.object_list %}
         <tr class="js-event-row responsive-row" data-sort-group="event-{{ e.pk }}" title="{% if e.detail %}{{ e.detail }}{% else %}Событие {{ e.get_event_type_display }} (модуль {{ e.module }}){% endif %}">
-          <td data-label="ID" data-type="num">{{ e.id }}</td>
+          <td data-label="ID" data-type="num"><button class="event-detail-toggle" type="button" aria-expanded="false" aria-controls="event-detail-{{ e.pk }}">{{ e.id }}<span class="sr-only">: показать детали события</span></button></td>
           <td data-label="Начало" data-value="{{ e.started_at|date:'Y-m-d\TH:i:s' }}">{{ e.started_at|date:"d.m.Y H:i:s" }}</td>
           <td data-label="Завершение">{% if e.finished_at %}<span data-value="{{ e.finished_at|date:'Y-m-d\TH:i:s' }}">{{ e.finished_at|date:"d.m.Y H:i:s" }}</span>{% endif %}</td>
           <td data-label="Тип">{{ e.get_event_type_display }}</td>
@@ -71,7 +71,7 @@
           <td class="mono" data-label="IP">{{ e.ip|default:"—" }}</td>
           <td data-label="Длительность, мс" data-type="num">{{ e.duration_ms|default:"—" }}</td>
         </tr>
-        <tr class="row-detail js-event-detail" data-sort-group="event-{{ e.pk }}" hidden>
+        <tr class="row-detail js-event-detail" id="event-detail-{{ e.pk }}" data-sort-group="event-{{ e.pk }}" hidden>
           <td colspan="10">{{ e.detail|default:"Описание события отсутствует." }}</td>
         </tr>
         {% empty %}

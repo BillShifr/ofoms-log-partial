@@ -280,7 +280,7 @@ class Conversation(models.Model):
 
     @property
     def display_title(self) -> str:
-        """Заголовок диалога без текущего пользователя (для личных чатов)."""
+        """Общий заголовок диалога, когда контекст текущего пользователя неизвестен."""
         if self.title:
             return self.title
         others = [
@@ -415,6 +415,7 @@ class TaskJob(models.Model):
 
     class Status(models.TextChoices):
         CREATED = "created", "Создана"
+        QUEUED = "queued", "В очереди"
         RUNNING = "running", "В работе"
         COMPLETED = "completed", "Завершена"
         FAILED = "failed", "Ошибка"
@@ -463,6 +464,12 @@ class TaskJob(models.Model):
     interval_minutes = models.PositiveIntegerField(
         null=True, blank=True, verbose_name="Интервал (минут)"
     )
+    max_retries = models.PositiveSmallIntegerField(
+        default=2, verbose_name="Повторных попыток"
+    )
+    retry_delay_seconds = models.PositiveIntegerField(
+        default=60, verbose_name="Задержка повтора (секунд)"
+    )
     enabled = models.BooleanField(default=True, verbose_name="Активно")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -489,12 +496,8 @@ class TaskJob(models.Model):
         ordering = ["name"]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(command__in=("noop", "exchange_import")),
-                name="system_task_command_valid",
-            ),
-            models.CheckConstraint(
                 condition=models.Q(
-                    status__in=("created", "running", "completed", "failed", "cancelled")
+                    status__in=("created", "queued", "running", "completed", "failed", "cancelled")
                 ),
                 name="system_task_status_valid",
             ),
@@ -561,7 +564,7 @@ class TaskJob(models.Model):
         """Готово к автозапуску по интервалу."""
         if (
             not self.enabled
-            or self.status == TaskJob.Status.RUNNING
+            or self.status in (TaskJob.Status.QUEUED, TaskJob.Status.RUNNING)
             or self.run_mode != TaskJob.RunMode.SCHEDULED
         ):
             return False
@@ -572,93 +575,122 @@ class TaskJob(models.Model):
         delta = timedelta(minutes=self.interval_minutes)
         return timezone.now() >= self.last_finished_at + delta
 
-    def run(self, user=None) -> "TaskRun":
-        """Выполняет команду задания, фиксирует результат и события."""
+    def enqueue(self, user=None) -> "TaskRun":
+        """Атомарно ставит ручной или плановый запуск в очередь БД."""
         from apps.core.models import EventLog, log_event
         from apps.system.models import TaskRun
-        from apps.system.tasks import run_command
 
-        started_at = timezone.now()
-        triggered_by = "user" if user is not None else "auto"
         with transaction.atomic():
             current = TaskJob.objects.select_for_update().get(pk=self.pk)
             if not current.enabled:
                 raise TaskDisabled(f"Задание {self.pk} отключено")
-            if current.status == TaskJob.Status.RUNNING:
-                raise TaskAlreadyRunning(f"Задание {self.pk} уже выполняется")
-            current.status = TaskJob.Status.RUNNING
-            current.last_started_at = started_at
-            current.save(update_fields=["status", "last_started_at"])
-            run = TaskRun.objects.create(
-                task_id=self.pk, triggered_by=triggered_by, started_at=started_at
-            )
+            if current.status in (TaskJob.Status.QUEUED, TaskJob.Status.RUNNING) or current.runs.filter(
+                finished_at__isnull=True
+            ).exists():
+                raise TaskAlreadyRunning(f"Задание {self.pk} уже поставлено в очередь")
             event = log_event(
                 module="system",
                 event_type=EventLog.EventType.TASK,
                 user=user,
-                target=f"task:{self.pk}:{self.command}",
+                target=f"task:{self.pk}:{current.command}",
+                detail="Запуск поставлен в очередь",
                 pending=True,
             )
-        self.status = TaskJob.Status.RUNNING
-        self.last_started_at = started_at
+            run = TaskRun.objects.create(
+                task=current,
+                triggered_by=(TaskRun.TriggeredBy.USER if user else TaskRun.TriggeredBy.AUTO),
+                requested_by=user,
+                attempt=1,
+                max_attempts=current.max_retries + 1,
+                audit_event=event,
+            )
+            current.status = TaskJob.Status.QUEUED
+            current.save(update_fields=["status"])
+        self.status = TaskJob.Status.QUEUED
+        return run
+
+    @classmethod
+    def execute_run(cls, run_id: int) -> "TaskRun | None":
+        """Захватывает один запуск из очереди и выполняет его вне транзакции."""
+        from apps.core.models import EventLog, log_event
+        from apps.system.models import TaskRun
+        from apps.system.tasks import run_command
+
+        with transaction.atomic():
+            run = TaskRun.objects.select_for_update().select_related("task").get(pk=run_id)
+            now = timezone.now()
+            if run.finished_at or run.started_at or run.available_at > now:
+                return None
+            task = cls.objects.select_for_update().get(pk=run.task_id)
+            if not task.enabled:
+                raise TaskDisabled(f"Задание {task.pk} отключено")
+            run.started_at = now
+            run.save(update_fields=["started_at"])
+            task.status = cls.Status.RUNNING
+            task.last_started_at = now
+            task.save(update_fields=["status", "last_started_at"])
+
         try:
-            log = run_command(self.command, self.params or {})
+            output = run_command(task.command, task.params or {})
             ok = True
-        except Exception as exc:  # noqa: BLE001 — любая ошибка задания фиксируется
-            logger.exception("task %s failed", self.pk)
-            log = (
-                f"TASK-RUN-001 | Действие: {self.command} | "
-                f"Категория: {type(exc).__name__} | {SAFE_TASK_FAILURE_LOG}"
+        except Exception as exc:  # noqa: BLE001 — worker обязан зафиксировать любой сбой
+            logger.exception("task %s attempt %s failed", task.pk, run.attempt)
+            output = (
+                f"TASK-RUN-001 | Действие: {task.command} | Попытка: "
+                f"{run.attempt}/{run.max_attempts} | Категория: {type(exc).__name__} | "
+                f"{SAFE_TASK_FAILURE_LOG}"
             )
             ok = False
 
         finished_at = timezone.now()
         result = EventLog.Result.OK if ok else EventLog.Result.FAILED
         with transaction.atomic():
-            current = TaskJob.objects.select_for_update().get(pk=self.pk)
-            if (
-                current.status != TaskJob.Status.RUNNING
-                or current.last_started_at != started_at
-            ):
-                raise TaskRunSuperseded(
-                    f"Запуск задания {self.pk} уже завершён другим процессом"
-                )
+            current = cls.objects.select_for_update().get(pk=task.pk)
             current_run = TaskRun.objects.select_for_update().get(pk=run.pk)
-            current_run.result = result
+            if current_run.finished_at or current_run.started_at != run.started_at:
+                raise TaskRunSuperseded(f"Запуск задания {task.pk} уже завершён")
             current_run.finished_at = finished_at
-            current_run.log = log
-            current_run.save(update_fields=["result", "finished_at", "log"])
+            current_run.result = result
+            current_run.log = output
+            current_run.save(update_fields=["finished_at", "result", "log"])
+            if current_run.audit_event_id:
+                log_event(
+                    module="system", event_type=EventLog.EventType.TASK,
+                    obj=current_run.audit_event, user=current_run.requested_by,
+                    result=result, detail=output[:2000],
+                    duration_ms=int((finished_at - run.started_at).total_seconds() * 1000),
+                )
 
+            retry = not ok and current.enabled and current_run.attempt < current_run.max_attempts
+            if retry:
+                next_attempt = current_run.attempt + 1
+                available_at = finished_at + timedelta(seconds=current.retry_delay_seconds)
+                retry_event = log_event(
+                    module="system", event_type=EventLog.EventType.TASK,
+                    user=current_run.requested_by,
+                    target=f"task:{current.pk}:{current.command}:attempt:{next_attempt}",
+                    detail=f"Повторная попытка {next_attempt}/{current_run.max_attempts} поставлена в очередь",
+                    pending=True,
+                )
+                TaskRun.objects.create(
+                    task=current, triggered_by=current_run.triggered_by,
+                    requested_by=current_run.requested_by, queued_at=finished_at,
+                    available_at=available_at, attempt=next_attempt,
+                    max_attempts=current_run.max_attempts, audit_event=retry_event,
+                )
+                current.status = cls.Status.QUEUED
+            else:
+                current.status = cls.Status.COMPLETED if ok else cls.Status.FAILED
             current.last_finished_at = finished_at
             current.last_result = result
-            current.last_log = log
-            current.status = (
-                TaskJob.Status.COMPLETED if ok else TaskJob.Status.FAILED
-            )
-            current.save(
-                update_fields=[
-                    "status",
-                    "last_finished_at",
-                    "last_result",
-                    "last_log",
-                ]
-            )
+            current.last_log = output
+            current.save(update_fields=["status", "last_finished_at", "last_result", "last_log"])
+        return current_run
 
-            log_event(
-                module="system",
-                event_type=EventLog.EventType.TASK,
-                user=user,
-                obj=event,
-                result=result,
-                detail=log[:2000],
-                duration_ms=int((finished_at - started_at).total_seconds() * 1000),
-            )
-        self.status = current.status
-        self.last_finished_at = current.last_finished_at
-        self.last_result = current.last_result
-        self.last_log = current.last_log
-        run = current_run
-        return run
+    def run(self, user=None) -> "TaskRun":
+        """Совместимый worker-вызов: поставить в очередь и немедленно обработать."""
+        queued = self.enqueue(user=user)
+        return type(self).execute_run(queued.pk)
 
     @classmethod
     def recover_stale(cls, *, stale_after_seconds: int | None = None) -> int:
@@ -697,17 +729,19 @@ class TaskJob(models.Model):
                         "last_log",
                     ]
                 )
+                active_run = task.runs.filter(finished_at__isnull=True).first()
                 task.runs.filter(finished_at__isnull=True).update(
                     finished_at=finished_at,
                     result=EventLog.Result.FAILED,
                     log=message,
                 )
-                event = EventLog.objects.filter(
-                    module="system",
-                    event_type=EventLog.EventType.TASK,
-                    target=f"task:{task.pk}:{task.command}",
-                    finished_at__isnull=True,
-                ).order_by("-started_at").first()
+                event = active_run.audit_event if active_run and active_run.audit_event_id else None
+                if event is None:
+                    event = EventLog.objects.filter(
+                        module="system", event_type=EventLog.EventType.TASK,
+                        target__startswith=f"task:{task.pk}:{task.command}",
+                        finished_at__isnull=True,
+                    ).order_by("-started_at").first()
                 if event:
                     log_event(
                         module="system",
@@ -741,8 +775,22 @@ class TaskRun(models.Model):
         default=TriggeredBy.USER,
         verbose_name="Инициатор",
     )
-    started_at = models.DateTimeField(verbose_name="Начало")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="requested_task_runs", verbose_name="Запросил",
+    )
+    queued_at = models.DateTimeField(default=timezone.now, verbose_name="Поставлен в очередь")
+    available_at = models.DateTimeField(
+        default=timezone.now, db_index=True, verbose_name="Доступен для выполнения"
+    )
+    started_at = models.DateTimeField(null=True, blank=True, verbose_name="Начало")
     finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Завершение")
+    attempt = models.PositiveSmallIntegerField(default=1, verbose_name="Попытка")
+    max_attempts = models.PositiveSmallIntegerField(default=1, verbose_name="Всего попыток")
+    audit_event = models.OneToOneField(
+        "core.EventLog", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="task_run", verbose_name="Событие аудита",
+    )
     result = models.CharField(
         max_length=16,
         choices=Result.choices,
@@ -755,7 +803,7 @@ class TaskRun(models.Model):
     class Meta:
         verbose_name = "Запуск задания"
         verbose_name_plural = "Запуски заданий"
-        ordering = ["-started_at"]
+        ordering = ["-queued_at", "-pk"]
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(triggered_by__in=("user", "auto", "legacy")),
@@ -771,10 +819,20 @@ class TaskRun(models.Model):
                 ),
                 name="system_taskrun_result_state",
             ),
+            models.CheckConstraint(
+                condition=models.Q(attempt__gte=1, max_attempts__gte=1)
+                & models.Q(attempt__lte=models.F("max_attempts")),
+                name="system_taskrun_attempt_valid",
+            ),
+            models.UniqueConstraint(
+                fields=("task",), condition=models.Q(finished_at__isnull=True),
+                name="system_one_active_taskrun",
+            ),
         ]
 
     def __str__(self):
-        return f"{self.task_id} @ {self.started_at:%Y-%m-%d %H:%M}"
+        moment = self.started_at or self.queued_at
+        return f"{self.task_id} @ {moment:%Y-%m-%d %H:%M}"
 
 
 class TaskNote(models.Model):
@@ -864,6 +922,12 @@ class UserTableViewPref(models.Model):
     columns = models.JSONField(default=list, blank=True, verbose_name="Колонки (порядок)")
     sorting = models.JSONField(default=dict, blank=True, verbose_name="Сортировка")
     fixed_first = models.BooleanField(default=False, verbose_name="Фиксировать первую колонку")
+    pinned_columns = models.JSONField(
+        default=list, blank=True, verbose_name="Закреплённые колонки"
+    )
+    grouped_headers = models.JSONField(
+        default=list, blank=True, verbose_name="Групповые заголовки"
+    )
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
 
     class Meta:

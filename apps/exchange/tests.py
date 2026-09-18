@@ -1481,3 +1481,129 @@ class XsdValidationTests(ExchangeTestMixin, TestCase):
         self.assertFalse(out.validated)
         self.assertEqual(out.errors[0]["OSHIB"], FLCP_ERROR)
         self.assertEqual(Irp.objects.count(), 0)
+
+
+class OutboundExchangeTests(ExchangeTestMixin, TestCase):
+    def _make_irp(self, *, owner=None, suffix="1", date_create=None):
+        owner = owner or self.emp1
+        return Irp.objects.create(
+            n_irp=f"outbound-{suffix}",
+            irp_type=1,
+            date_create=date_create or datetime.date(2026, 9, 18),
+            way=1,
+            how=2,
+            theme=self.theme,
+            otv_t=1,
+            otv_kon=owner.org,
+            employee_one=owner,
+            employee_it=owner,
+            data_plan=datetime.date(2026, 10, 18),
+            z_f="Иванов",
+            z_i="Иван",
+        )
+
+    def test_export_is_versioned_valid_and_scoped_by_org(self):
+        from lxml import etree
+
+        from apps.exchange.outbound import CONTRACT_MARKER
+
+        own = self._make_irp(suffix="own")
+        foreign_owner = Employee.objects.create_user(
+            username="outbound_foreign", org=81001, is_active=False
+        )
+        self._make_irp(owner=foreign_owner, suffix="foreign")
+        self.client.force_login(self.tfoms)
+
+        response = self.client.get(reverse("exchange:export"), {"org": 81000})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Exchange-Contract"], CONTRACT_MARKER)
+        root = etree.fromstring(response.content)
+        self.assertEqual(root.findtext("ZGLV/version"), CONTRACT_MARKER)
+        self.assertEqual(root.xpath("count(IRP)"), 1.0)
+        self.assertEqual(root.findtext("IRP/n_irp"), own.n_irp)
+        schema_path = Path(__file__).with_name("contracts") / "journal-outbound-v1.xsd"
+        schema = etree.XMLSchema(etree.parse(str(schema_path)))
+        self.assertTrue(schema.validate(root), schema.error_log)
+        self.assertTrue(
+            EventLog.objects.filter(
+                event_type=EventLog.EventType.EXPORT,
+                target=f"outbound:{CONTRACT_MARKER}:81000",
+            ).exists()
+        )
+
+    def test_smo_cannot_export_another_organization(self):
+        self.client.force_login(self.smo)
+        response = self.client.get(reverse("exchange:export"), {"org": 81000})
+        self.assertEqual(response.status_code, 403)
+
+    def test_contract_explicitly_disclaims_official_appendix(self):
+        self.client.force_login(self.tfoms)
+        response = self.client.get(reverse("exchange:export_contract"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("НЕ ЯВЛЯЕТСЯ".encode(), response.content)
+        self.assertIn(b"tfoms-journal-current/1.0", response.content)
+
+    def test_exchange_logs_are_paginated_without_hundred_row_cap(self):
+        self.client.force_login(self.tfoms)
+        ImportLog.objects.bulk_create(
+            [
+                ImportLog(
+                    org=81000,
+                    kind=ImportLog.Kind.IRP,
+                    filename=f"file-{index}.xml",
+                    status=ImportLog.Status.OK,
+                    rows=1,
+                )
+                for index in range(105)
+            ]
+        )
+
+        response = self.client.get(reverse("exchange:logs"), {"page": 5})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].paginator.count, 105)
+        self.assertEqual(len(response.context["logs"]), 5)
+        self.assertContains(response, "Стр. 5 из 5")
+
+
+class UnifiedAppealValidationTests(ExchangeTestMixin, TestCase):
+    def test_manual_form_and_import_flc_share_business_rule_message(self):
+        from apps.exchange.flc import validate_irp_record
+        from apps.journal.forms import IrpForm
+
+        manual_form = IrpForm(
+            {
+                "n_irp": "same-flc",
+                "irp_type": 1,
+                "date_create": "2026-09-18",
+                "way": 5,
+                "how": 2,
+                "theme": self.theme.pk,
+                "otv_t": 1,
+                "otv_kon": 81000,
+                "data_plan": "2026-10-18",
+            },
+            user=self.tfoms,
+        )
+        self.assertFalse(manual_form.is_valid())
+        manual_message = manual_form.errors["way_n"][0]
+
+        flc_errors = validate_irp_record(
+            {
+                "n_irp": "same-flc",
+                "irp_type": 1,
+                "date_create": datetime.date(2026, 9, 18),
+                "way": 5,
+                "how": 2,
+                "theme": self.theme.code_name,
+                "otv_t": 1,
+                "otv_kon": 81000,
+                "employee_1": str(self.emp1.guid),
+                "data_plan": datetime.date(2026, 10, 18),
+            }
+        )
+        import_message = next(
+            error["COMMENT"] for error in flc_errors if error["IM_POL"] == "WAY_N"
+        )
+        self.assertEqual(import_message, manual_message)

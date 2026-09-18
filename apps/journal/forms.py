@@ -57,6 +57,15 @@ class IrpForm(forms.ModelForm):
             self.fields["employee_it"].queryset = _assignable_employees(
                 user, self.instance.employee_it_id
             )
+            repeats = Irp.objects.select_related("employee_one", "employee_it")
+            if not _has_global_org_scope(user):
+                repeats = repeats.filter(employee_one__org=user.org)
+            if self.instance.pk:
+                repeats = repeats.exclude(pk=self.instance.pk)
+                self.fields["repeat_of"].help_text = (
+                    "Связь позволяет сохранить цепочку повторных обращений."
+                )
+            self.fields["repeat_of"].queryset = repeats.order_by("-date_create", "-pk")
             if self.instance.pk is None:
                 # По умолчанию: исполнитель = текущий пользователь,
                 # организация-ответственный = организация пользователя
@@ -75,6 +84,7 @@ class IrpForm(forms.ModelForm):
         model = Irp
         fields = [
             "n_irp", "irp_type", "date_create", "time_create",
+            "repeat_of",
             "way", "way_n", "how", "theme", "theme_comment", "text",
             "zh_d", "otv_t", "otv_kon",
             "employee_one", "line_one", "employee_it", "line_it",
@@ -108,22 +118,13 @@ class IrpForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        # Неактивные условные поля браузер может прислать со старым значением.
+        # Нормализуем их до единого доменного ФЛК модели.
         if cleaned.get("irp_type") != 2:
             cleaned["zh_d"] = None
         if not cleaned.get("pr_out"):
             cleaned["date_cross"] = None
             cleaned["time_cross"] = None
-        date_close = cleaned.get("date_close")
-        result = cleaned.get("result")
-        if bool(date_close) != bool(result):
-            raise forms.ValidationError(
-                "Для закрытия обращения одновременно укажите дату и исход."
-            )
-        date_create = cleaned.get("date_create")
-        if date_close and date_create and date_close < date_create:
-            self.add_error(
-                "date_close", "Дата закрытия не может быть раньше даты поступления."
-            )
         return cleaned
 
 

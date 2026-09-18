@@ -19,6 +19,7 @@
       <div class="field"><label>Вид обращения</label>{{ form.irp_type }}{{ form.irp_type.errors }}</div>
       <div class="field"><label>Дата поступления</label>{{ form.date_create }}{{ form.date_create.errors }}</div>
       <div class="field"><label>Время поступления</label>{{ form.time_create }}{{ form.time_create.errors }}</div>
+      <div class="field"><label>Повторное обращение по</label>{{ form.repeat_of }}{{ form.repeat_of.errors }}{% if form.repeat_of.help_text %}<span class="helptext">{{ form.repeat_of.help_text }}</span>{% endif %}</div>
       <div class="field"><label>Источник</label>{{ form.way }}{{ form.way.errors }}</div>
       <div class="field"><label>Организация-источник</label>{{ form.way_n }}{{ form.way_n.errors }}</div>
       <div class="field"><label>Способ</label>{{ form.how }}{{ form.how.errors }}</div>

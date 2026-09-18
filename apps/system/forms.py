@@ -19,10 +19,11 @@ from apps.system.models import (
     TaskNote,
     TaskReport,
 )
-from apps.system.tasks import TASK_COMMAND_CHOICES
+from apps.system.tasks import get_task_command, task_command_choices, validate_command_params
 from apps.system.validators import (
     ALLOWED_ATTACHMENT_EXTENSIONS,
     ALLOWED_DOCUMENT_EXTENSIONS,
+    validate_attachment_file,
     validate_document_file,
 )
 
@@ -56,6 +57,14 @@ class RoleAssignmentMixin:
         self.fields["roles"].queryset = Group.objects.filter(
             name__in=ROLE_GROUP_MAP.values()
         ).order_by("name")
+        self.fields["additional_groups"].queryset = Group.objects.exclude(
+            name__in=ROLE_GROUP_MAP.values()
+        ).order_by("name")
+
+    def _save_groups(self, user):
+        roles = self.cleaned_data.get("roles", ())
+        additional = self.cleaned_data.get("additional_groups", ())
+        user.groups.set([*roles, *additional])
 
     def clean_roles(self):
         roles = self.cleaned_data.get("roles")
@@ -80,6 +89,12 @@ class EmployeeCreateForm(RoleAssignmentMixin, UserCreationForm):
         widget=forms.SelectMultiple,
         label="Роли (группы)",
     )
+    additional_groups = forms.ModelMultipleChoiceField(
+        queryset=Group.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple,
+        label="Дополнительные группы",
+    )
 
     class Meta(UserCreationForm.Meta):
         model = Employee
@@ -91,7 +106,7 @@ class EmployeeCreateForm(RoleAssignmentMixin, UserCreationForm):
 
     def save(self, commit=True):
         user = super().save(commit=commit)
-        user.groups.set(self.cleaned_data.get("roles", ()))
+        self._save_groups(user)
         return user
 
 
@@ -104,6 +119,12 @@ class EmployeeUpdateForm(RoleAssignmentMixin, forms.ModelForm):
         widget=forms.SelectMultiple,
         label="Роли (группы)",
     )
+    additional_groups = forms.ModelMultipleChoiceField(
+        queryset=Group.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple,
+        label="Дополнительные группы",
+    )
 
     class Meta:
         model = Employee
@@ -114,7 +135,12 @@ class EmployeeUpdateForm(RoleAssignmentMixin, forms.ModelForm):
         self.actor = actor
         self._configure_roles()
         if self.instance.pk:
-            self.fields["roles"].initial = self.instance.groups.all()
+            self.fields["roles"].initial = self.instance.groups.filter(
+                name__in=ROLE_GROUP_MAP.values()
+            )
+            self.fields["additional_groups"].initial = self.instance.groups.exclude(
+                name__in=ROLE_GROUP_MAP.values()
+            )
 
     def clean(self):
         cleaned = super().clean()
@@ -143,8 +169,29 @@ class EmployeeUpdateForm(RoleAssignmentMixin, forms.ModelForm):
     def save(self, commit=True):
         user = super().save(commit=commit)
         if commit:
-            user.groups.set(self.cleaned_data.get("roles", ()))
+            self._save_groups(user)
         return user
+
+
+class UserGroupForm(forms.ModelForm):
+    """Произвольная организационная группа без неявных системных прав."""
+
+    class Meta:
+        model = Group
+        fields = ("name",)
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if not name:
+            raise forms.ValidationError("Укажите наименование группы.")
+        if name in ROLE_GROUP_MAP.values():
+            raise forms.ValidationError("Это имя зарезервировано системной ролью.")
+        duplicate = Group.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if duplicate.exists():
+            raise forms.ValidationError("Группа с таким наименованием уже существует.")
+        return name
 
 
 class EventFilterForm(forms.Form):
@@ -210,12 +257,15 @@ class NewConversationForm(forms.ModelForm):
             "title": forms.TextInput(attrs={"placeholder": "Тема разговора (необязательно)"}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["participants"].widget = forms.CheckboxSelectMultiple()
-        self.fields["participants"].queryset = Employee.objects.filter(
-            is_active=True
-        ).order_by("last_name", "first_name")
+        participants = Employee.objects.filter(is_active=True)
+        if user is not None:
+            participants = participants.exclude(pk=user.pk)
+        self.fields["participants"].queryset = participants.order_by(
+            "last_name", "first_name"
+        )
         self.fields["participants"].label_from_instance = (
             lambda u: f"{u.full_name()} ({u.get_org_display()})"
         )
@@ -246,6 +296,15 @@ class ThreadForm(forms.ModelForm):
 
 class ReplyForm(forms.ModelForm):
     """Ответ в теме диалога (PRD v3 §2.6)."""
+
+    attachment = forms.FileField(
+        required=False,
+        validators=[validate_attachment_file],
+        widget=forms.ClearableFileInput(
+            attrs={"accept": ",".join(sorted(ALLOWED_ATTACHMENT_EXTENSIONS))}
+        ),
+        label="Вложение (необязательно)",
+    )
 
     class Meta:
         model = MessageReply
@@ -289,7 +348,7 @@ class TaskForm(forms.ModelForm):
     """Задание (ТЗ разд. 3.6, PRD v3 §2.11)."""
 
     command = forms.ChoiceField(
-        choices=TASK_COMMAND_CHOICES,
+        choices=(),
         label="Действие",
     )
 
@@ -298,7 +357,8 @@ class TaskForm(forms.ModelForm):
         fields = (
             "name", "command", "description",
             "assigned_to", "priority",
-            "run_mode", "interval_minutes", "enabled",
+            "run_mode", "interval_minutes", "max_retries", "retry_delay_seconds",
+            "enabled",
         )
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
@@ -307,8 +367,15 @@ class TaskForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["command"].choices = task_command_choices()
         self.fields["interval_minutes"].help_text = "Интервал автозапуска в минутах"
         self.fields["interval_minutes"].required = False
+        self.fields["max_retries"].widget.attrs.update({"min": 0, "max": 10})
+        self.fields["retry_delay_seconds"].widget.attrs.update({"min": 0, "max": 86400})
+        self.fields["max_retries"].required = False
+        self.fields["retry_delay_seconds"].required = False
+        self.fields["max_retries"].help_text = "От 0 до 10 повторов после ошибки."
+        self.fields["retry_delay_seconds"].help_text = "Пауза между попытками, до 24 часов."
         self.fields["priority"].help_text = "0 — низкий, 1 — средний, 2 — высокий"
         self.fields["priority"].required = False
         available_assignees = Q(is_active=True)
@@ -325,6 +392,37 @@ class TaskForm(forms.ModelForm):
             )
         )
         self.fields["assigned_to"].widget.attrs["hidden"] = True
+        self.task_parameter_fields = []
+        for command_code, _label in task_command_choices():
+            definition = get_task_command(command_code)
+            for parameter in definition.parameters:
+                field_name = f"param__{command_code}__{parameter.key}"
+                common = {
+                    "required": parameter.required,
+                    "label": parameter.label,
+                    "help_text": parameter.help_text,
+                    "initial": (self.instance.params or {}).get(parameter.key, parameter.default)
+                    if self.instance.pk and self.instance.command == command_code
+                    else parameter.default,
+                }
+                if parameter.kind == "boolean":
+                    field = forms.BooleanField(**common)
+                elif parameter.kind == "integer":
+                    field = forms.IntegerField(
+                        min_value=parameter.minimum, max_value=parameter.maximum, **common
+                    )
+                elif parameter.kind == "multi_choice":
+                    field = forms.MultipleChoiceField(
+                        choices=parameter.choices, widget=forms.CheckboxSelectMultiple, **common
+                    )
+                else:
+                    field = forms.CharField(**common)
+                self.fields[field_name] = field
+                self.task_parameter_fields.append({
+                    "command": command_code,
+                    "kind": parameter.kind,
+                    "field": self[field_name],
+                })
 
     def clean(self):
         cleaned = super().clean()
@@ -343,7 +441,38 @@ class TaskForm(forms.ModelForm):
             )
         if cleaned.get("run_mode") == TaskJob.RunMode.MANUAL:
             cleaned["interval_minutes"] = None
+        retries = cleaned.get("max_retries")
+        delay = cleaned.get("retry_delay_seconds")
+        if retries is None:
+            retries = cleaned["max_retries"] = 2
+        if delay is None:
+            delay = cleaned["retry_delay_seconds"] = 60
+        if retries is not None and not 0 <= retries <= 10:
+            self.add_error("max_retries", "Допустимо от 0 до 10 повторов.")
+        if delay is not None and not 0 <= delay <= 86400:
+            self.add_error("retry_delay_seconds", "Допустимо от 0 до 86 400 секунд.")
+        command = cleaned.get("command")
+        if command:
+            definition = get_task_command(command)
+            submitted_names = {
+                f"param__{command}__{parameter.key}" for parameter in definition.parameters
+            }
+            if self.is_bound and not any(name in self.data for name in submitted_names) and self.instance.pk:
+                cleaned["params"] = dict(self.instance.params or {})
+            else:
+                raw_params = {
+                    parameter.key: cleaned.get(f"param__{command}__{parameter.key}")
+                    for parameter in definition.parameters
+                }
+                try:
+                    cleaned["params"] = validate_command_params(command, raw_params)
+                except forms.ValidationError as exc:
+                    self.add_error(None, exc)
         return cleaned
+
+    def save(self, commit=True):
+        self.instance.params = self.cleaned_data.get("params", {})
+        return super().save(commit=commit)
 
 
 class TaskNoteForm(forms.ModelForm):

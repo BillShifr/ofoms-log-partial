@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ conv.display_title }}{% endblock %}
+{% block title %}{{ conv_title }}{% endblock %}
 {% block content %}
 <div class="messenger">
   <aside class="messenger__side">
@@ -11,7 +11,7 @@
   <section class="messenger__main">
     <header class="conversation-heading">
       <a class="conversation-heading__back" href="{% url 'system:messages' %}">← Все диалоги</a>
-      <div class="conversation-heading__title"><p class="page-heading__eyebrow">Диалог</p><h1>{{ conv.display_title }}</h1></div>
+      <div class="conversation-heading__title"><p class="page-heading__eyebrow">Диалог</p><h1>{{ conv_title }}</h1></div>
       {% if unread_total %}<span class="badge badge--result">непрочитанных: {{ unread_total }}</span>{% endif %}
       <p>Участники: {% for p in conv.participants.all %}{{ p.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
     </header>

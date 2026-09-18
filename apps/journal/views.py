@@ -540,6 +540,8 @@ def irp_cover(request, pk):
 def _get_irp_for_user(request, pk, *, for_update=False):
     _require_capability(request, JOURNAL_READ)
     queryset = Irp.objects.select_related("employee_one")
+    if not for_update:
+        queryset = queryset.select_related("repeat_of")
     if for_update:
         queryset = queryset.select_for_update()
     irp = get_object_or_404(queryset, pk=pk)

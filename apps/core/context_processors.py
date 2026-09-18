@@ -6,7 +6,15 @@ from django.conf import settings
 def system_meta(request):
     """Передаёт SYSTEM_META, текущую роль, признак администратора и число
     непрочитанных сообщений (для пунктов меню base.html)."""
-    from apps.core.policy import role_codes_for_user, user_is_system_admin
+    from apps.core.policy import (
+        EXCHANGE_UPLOAD,
+        JOURNAL_CHANGE,
+        JOURNAL_CREATE,
+        JOURNAL_REDIRECT,
+        role_codes_for_user,
+        user_has_capability,
+        user_is_system_admin,
+    )
     from apps.core.roles import ROLE_CHOICES, ROLE_GROUP_MAP
 
     user = getattr(request, "user", None)
@@ -23,8 +31,6 @@ def system_meta(request):
             MessageReply.objects.filter(thread__conversation__participants=user)
             .exclude(author=user)
             .exclude(read_by=user)
-            .values("thread__conversation_id")
-            .distinct()
             .count()
         )
 
@@ -39,5 +45,9 @@ def system_meta(request):
         "SYSTEM_ROLE": role_code,
         "SYSTEM_ROLE_LABEL": role_label,
         "can_manage_system": is_admin,
+        "can_journal_create": user_has_capability(user, JOURNAL_CREATE),
+        "can_journal_change": user_has_capability(user, JOURNAL_CHANGE),
+        "can_journal_redirect": user_has_capability(user, JOURNAL_REDIRECT),
+        "can_exchange_upload": user_has_capability(user, EXCHANGE_UPLOAD),
         "unread_messages": unread,
     }

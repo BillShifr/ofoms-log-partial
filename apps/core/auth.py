@@ -54,7 +54,7 @@ def on_login_failed(sender, credentials, request=None, **kwargs):
         )
         if user is not None:
             user.record_failed_login()
-            log_event(
+            event = log_event(
                 module="auth",
                 event_type=EventLog.EventType.BLOCK
                 if user.failed_attempts >= _max_failed()
@@ -63,6 +63,8 @@ def on_login_failed(sender, credentials, request=None, **kwargs):
                 target=f"login:{username}",
                 ip=_client_ip(request),
             )
+            if request is not None:
+                request._canonical_auth_event = event
 
 
 @receiver(user_logged_in)
@@ -74,13 +76,15 @@ def on_logged_in(sender, request, user, **kwargs):
                 current.reset_failed_logins()
                 user.failed_attempts = current.failed_attempts
                 user.lock_until = current.lock_until
-            log_event(
+            event = log_event(
                 module="auth",
                 event_type=EventLog.EventType.LOGIN,
                 user=current,
                 target=f"login:{current.username}",
                 ip=_client_ip(request),
             )
+            if request is not None:
+                request._canonical_auth_event = event
 
 
 def _max_failed():

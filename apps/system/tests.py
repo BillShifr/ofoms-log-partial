@@ -40,6 +40,7 @@ from apps.journal.table import JOURNAL_TABLE_KEY
 from apps.system.forms import ThreadForm
 from apps.system.models import (
     Conversation,
+    DocCategory,
     MessageAttachment,
     MessageReply,
     MessageThread,
@@ -180,7 +181,8 @@ class AccessTests(BaseSystemTestCase):
         self.assertContains(response, reverse("system:events"))
         self.assertContains(response, "/admin/")
         self.assertContains(response, "nav__menu-link--active")
-        self.assertContains(response, 'class="data data--responsive" data-client-sort data-table-key="system-users"')
+        self.assertContains(response, 'class="data data--responsive" data-table-key="system-users"')
+        self.assertNotContains(response, 'data-client-sort data-table-key="system-users"')
         self.assertContains(response, 'class="responsive-row"')
         self.assertContains(response, 'data-label="Действия"')
 
@@ -216,6 +218,81 @@ class PaginationTests(TestCase):
 
 
 class UserManagementTests(BaseSystemTestCase):
+    def test_user_sort_is_applied_before_pagination(self):
+        for index in range(30):
+            Employee.objects.create_user(
+                username=f"sorted_{29 - index:02d}", password=PASSWORD, org=81000
+            )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse("system:users"), {"sort": "username", "page": "2"}
+        )
+
+        expected = list(
+            Employee.objects.order_by("username").values_list("username", flat=True)[25:50]
+        )
+        actual = [employee.username for employee in response.context["page"].object_list]
+        self.assertEqual(actual, expected)
+
+    def test_superuser_creates_and_assigns_additional_group(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse("system:groups"), {"name": "Контроль качества"})
+        self.assertRedirects(response, reverse("system:groups"))
+        group = Group.objects.get(name="Контроль качества")
+
+        response = self.client.post(
+            reverse("system:user_create"),
+            {
+                "username": "quality_user",
+                "password1": PASSWORD,
+                "password2": PASSWORD,
+                "org": "81000",
+                "roles": [Group.objects.get(name="ОП1").pk],
+                "additional_groups": [group.pk],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        user = Employee.objects.get(username="quality_user")
+        self.assertEqual(
+            set(user.groups.values_list("name", flat=True)),
+            {"ОП1", "Контроль качества"},
+        )
+
+    def test_group_table_uses_shared_settings(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("system:groups"))
+
+        self.assertContains(response, 'data-table-key="system-groups"')
+        self.assertContains(response, "Настроить таблицу Группы")
+        prefs = self.client.get(
+            reverse("system:table_prefs", args=["system-groups"]),
+            {"format": "json"},
+        )
+        self.assertEqual(prefs.status_code, 200)
+        self.assertEqual(prefs.json()["columns"][0]["key"], "name")
+
+    def test_deleting_additional_group_removes_membership(self):
+        group = Group.objects.create(name="Временная группа")
+        self.operator.groups.add(group)
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("system:group_delete", args=[group.pk]))
+
+        self.assertRedirects(response, reverse("system:groups"))
+        self.assertFalse(Group.objects.filter(pk=group.pk).exists())
+        self.assertFalse(self.operator.groups.filter(name="Временная группа").exists())
+
+    def test_canonical_role_cannot_be_deleted(self):
+        role = Group.objects.get(name="ОП1")
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("system:group_delete", args=[role.pk]))
+
+        self.assertRedirects(response, reverse("system:groups"))
+        self.assertTrue(Group.objects.filter(pk=role.pk).exists())
+
     def test_non_superuser_admin_cannot_discover_or_mutate_superuser(self):
         root = Employee.objects.create_superuser(
             username="protected_portal_root",
@@ -538,7 +615,9 @@ class EventLogScreenTests(BaseSystemTestCase):
         self.assertContains(resp, "irp:1")
         event = EventLog.objects.filter(target="irp:1").get()
         self.assertContains(resp, f'data-sort-group="event-{event.pk}"', count=2)
-        self.assertContains(resp, 'class="data data--responsive" data-client-sort data-table-key="system-events"')
+        self.assertContains(resp, 'class="data data--responsive" data-table-key="system-events"')
+        self.assertNotContains(resp, 'data-client-sort data-table-key="system-events"')
+        self.assertContains(resp, 'class="event-detail-toggle"')
         self.assertContains(resp, 'class="js-event-row responsive-row"')
         self.assertContains(resp, 'data-label="Длительность, мс"')
         visual_qa = (settings.BASE_DIR / "scripts/visual_qa.mjs").read_text(encoding="utf-8")
@@ -795,7 +874,8 @@ class MessageTests(BaseSystemTestCase):
         resp = self.client.post(
             reverse("system:conversation_create"), {"title": "x"}
         )
-        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'value="x"')
         self.assertFalse(Conversation.objects.exists())
 
     def test_new_thread_cannot_be_created_closed(self):
@@ -1104,8 +1184,8 @@ class MessageTests(BaseSystemTestCase):
             follow=True,
         )
         self.assertEqual(resp.status_code, 200)
-        reply = MessageReply.objects.get(thread=thread)
-        self.assertEqual(reply.attachments.count(), 0)
+        self.assertContains(resp, "Недопустимый тип вложения")
+        self.assertFalse(MessageReply.objects.filter(thread=thread).exists())
 
     def test_participant_suggest_uses_database_and_excludes_inactive_users(self):
         active = Employee.objects.create_user(
@@ -1151,12 +1231,13 @@ class MessageTests(BaseSystemTestCase):
 
         choices = response.context["form"].fields["participants"].queryset
         self.assertNotIn(inactive, choices)
+        self.assertNotIn(self.operator, choices)
 
         post_response = self.client.post(
             reverse("system:conversation_create"),
             {"title": "Недопустимый диалог", "participants": [inactive.pk]},
         )
-        self.assertEqual(post_response.status_code, 302)
+        self.assertEqual(post_response.status_code, 200)
         self.assertFalse(Conversation.objects.filter(title="Недопустимый диалог").exists())
 
     def test_attachment_download_is_limited_to_conversation_participants(self):
@@ -1277,6 +1358,31 @@ class DocTests(BaseSystemTestCase):
         resp = self.client.get(reverse("system:docs"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Спецификация")
+
+    def test_all_documents_includes_categorized_documents(self):
+        category = DocCategory.objects.create(name="Обмен", slug="exchange")
+        SystemDocument.objects.create(
+            title="Инструкция обмена",
+            category=category,
+            file=SimpleUploadedFile("exchange.pdf", b"%PDF-1.4"),
+            uploaded_by=self.admin,
+        )
+        self.client.force_login(self.operator)
+
+        response = self.client.get(reverse("system:docs"))
+
+        self.assertContains(response, "Инструкция обмена")
+
+    def test_invalid_document_upload_keeps_bound_form(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:doc_upload"), {"title": "Несохранённый документ"}
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Несохранённый документ", status_code=400)
+        self.assertFalse(SystemDocument.objects.exists())
 
     def test_regular_user_cannot_upload_or_delete(self):
         self.client.force_login(self.operator)
@@ -1519,8 +1625,20 @@ class NewsTests(BaseSystemTestCase):
             {"title": "Большая обложка", "text": "Текст", "cover_image": oversized},
         )
 
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Большая обложка", status_code=400)
         self.assertFalse(NewsItem.objects.filter(title="Большая обложка").exists())
+
+    def test_invalid_news_create_keeps_bound_values(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:news_create"), {"summary": "Несохранённый анонс"}
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Несохранённый анонс", status_code=400)
+        self.assertFalse(NewsItem.objects.exists())
 
     def test_news_create_rollback_removes_cover_from_storage(self):
         self.client.force_login(self.admin)
@@ -1871,7 +1989,7 @@ class NewsTests(BaseSystemTestCase):
 class TaskTests(BaseSystemTestCase):
     def _make_task(self, **kw):
         defaults = {
-            "name": "Проверка", "command": "noop", "run_mode": TaskJob.RunMode.MANUAL, "enabled": True,
+            "name": "Проверка", "command": "database_health", "run_mode": TaskJob.RunMode.MANUAL, "enabled": True,
             "created_by": self.admin,
         }
         defaults.update(kw)
@@ -1932,7 +2050,7 @@ class TaskTests(BaseSystemTestCase):
                 reverse("system:task_create"),
                 {
                     "name": "Откат создания задачи",
-                    "command": "noop",
+                    "command": "database_health",
                     "run_mode": TaskJob.RunMode.MANUAL,
                     "enabled": "on",
                 },
@@ -2025,7 +2143,7 @@ class TaskTests(BaseSystemTestCase):
             reverse("system:task_create"),
             {
                 "name": "Подмена статуса",
-                "command": "noop",
+                "command": "database_health",
                 "status": TaskJob.Status.RUNNING,
                 "run_mode": TaskJob.RunMode.MANUAL,
                 "enabled": "on",
@@ -2060,9 +2178,9 @@ class TaskTests(BaseSystemTestCase):
 
         response = self.client.get(reverse("system:task_create"))
 
-        self.assertContains(response, "Проверка доступности задания")
+        self.assertContains(response, "Проверка базы данных")
         self.assertContains(response, "Действие")
-        self.assertContains(response, "Новые действия добавляются разработчиком")
+        self.assertContains(response, "проверяются на сервере")
         self.assertContains(response, 'class="readonly-field"')
         self.assertNotContains(response, '<select name="status"')
         self.assertContains(response, "data-assignee-search")
@@ -2149,7 +2267,7 @@ class TaskTests(BaseSystemTestCase):
             reverse("system:task_create"),
             {
                 "name": "Недопустимый исполнитель",
-                "command": "noop",
+                "command": "database_health",
                 "assigned_to": inactive.pk,
                 "run_mode": TaskJob.RunMode.MANUAL,
                 "enabled": "on",
@@ -2167,12 +2285,17 @@ class TaskTests(BaseSystemTestCase):
         resp = self.client.post(reverse("system:task_run", args=[task.pk]))
         self.assertEqual(resp.status_code, 302)
         task.refresh_from_db()
-        self.assertEqual(task.last_result, EventLog.Result.OK)
+        self.assertEqual(task.status, TaskJob.Status.QUEUED)
         run = TaskRun.objects.get(task=task)
         self.assertEqual(run.triggered_by, "user")
+        self.assertEqual(run.result, "")
+        TaskJob.execute_run(run.pk)
+        task.refresh_from_db()
+        run.refresh_from_db()
+        self.assertEqual(task.last_result, EventLog.Result.OK)
         self.assertEqual(run.result, EventLog.Result.OK)
         self.assertTrue(
-            EventLog.objects.filter(event_type=EventLog.EventType.TASK, target=f"task:{task.pk}:noop").exists()
+            EventLog.objects.filter(event_type=EventLog.EventType.TASK, target=f"task:{task.pk}:database_health").exists()
         )
 
     def test_task_and_log_rows_share_sort_group(self):
@@ -2338,7 +2461,7 @@ class TaskTests(BaseSystemTestCase):
         self.assertIn("таймаута", task.last_log)
 
     def test_failed_command_logged(self):
-        task = self._make_task()
+        task = self._make_task(max_retries=0)
         secret = "postgresql://admin:do-not-expose@database/ejournal"
         with patch("apps.system.tasks.run_command", side_effect=RuntimeError(secret)):
             run = task.run()
@@ -2361,9 +2484,17 @@ class TaskTests(BaseSystemTestCase):
         self.assertNotIn(secret, run.log)
         self.assertNotIn(secret, event.detail)
 
-    def test_database_rejects_invalid_task_command_and_schedule(self):
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            self._make_task(command="missing_cmd")
+    def test_database_allows_extensible_command_but_form_rejects_unregistered(self):
+        task = self._make_task(command="plugin_command")
+        self.assertEqual(task.command, "plugin_command")
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("system:task_update", args=[task.pk]),
+            {"name": task.name, "command": "missing_cmd", "run_mode": "manual", "enabled": "on"},
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_database_rejects_invalid_task_schedule(self):
         with self.assertRaises(IntegrityError), transaction.atomic():
             self._make_task(
                 run_mode=TaskJob.RunMode.SCHEDULED,
@@ -2629,7 +2760,7 @@ class TaskTests(BaseSystemTestCase):
         from django.utils import timezone
 
         task = self._make_task(
-            command="noop",
+            command="database_health",
             run_mode=TaskJob.RunMode.SCHEDULED,
             interval_minutes=10,
             last_started_at=timezone.now() - datetime.timedelta(minutes=30),
@@ -2708,7 +2839,7 @@ class TaskTests(BaseSystemTestCase):
         from django.utils import timezone
 
         self._make_task(
-            command="noop",
+            command="database_health",
             run_mode=TaskJob.RunMode.SCHEDULED,
             interval_minutes=70,
             last_started_at=timezone.now(),
@@ -2770,7 +2901,17 @@ class GeneratedSlugConcurrencyTests(TransactionTestCase):
         self._create_concurrently(SystemDocument, create_document)
 
 
-class TaskEnabledStateMigrationTests(TransactionTestCase):
+class SystemMigrationTestCase(TransactionTestCase):
+    """Возвращает общую схему к актуальной system-миграции после проверки истории."""
+
+    def tearDown(self):
+        MigrationExecutor(connection).migrate(
+            [("system", "0015_table_grouping_and_pinning")]
+        )
+        super().tearDown()
+
+
+class TaskEnabledStateMigrationTests(SystemMigrationTestCase):
     migrate_from = [("system", "0010_require_message_attachment_reply")]
     migrate_to = [("system", "0011_enforce_task_enabled_state")]
 
@@ -2795,7 +2936,7 @@ class TaskEnabledStateMigrationTests(TransactionTestCase):
         self.assertEqual(NewTaskJob.objects.get(pk=task.pk).status, "created")
 
 
-class TaskRunLifecycleMigrationTests(TransactionTestCase):
+class TaskRunLifecycleMigrationTests(SystemMigrationTestCase):
     migrate_from = [("system", "0011_enforce_task_enabled_state")]
     migrate_to = [("system", "0012_enforce_taskrun_lifecycle")]
 
@@ -2840,7 +2981,7 @@ class TaskRunLifecycleMigrationTests(TransactionTestCase):
         self.assertEqual(finished.result, "failed")
 
 
-class TaskLastResultMigrationTests(TransactionTestCase):
+class TaskLastResultMigrationTests(SystemMigrationTestCase):
     migrate_from = [("system", "0012_enforce_taskrun_lifecycle")]
     migrate_to = [("system", "0013_enforce_task_last_result_state")]
 
@@ -2964,14 +3105,43 @@ class PrefTests(BaseSystemTestCase):
                 "order_z_f": "0",
                 "sort_field": "date_create",
                 "sort_dir": "-",
-                "fixed_first": "on",
+                "pinned_columns": ["id", "z_f", "status"],
+                "grouped_headers": ["Заявитель / застрахованный", "Неизвестная"],
             },
         )
         self.assertEqual(resp.status_code, 302)
         pref = UserTableViewPref.objects.get(user=self.operator, table_key=JOURNAL_TABLE_KEY)
         self.assertEqual(pref.columns, ["z_f", "id"])
         self.assertEqual(pref.sorting, {"field": "date_create", "dir": "-"})
-        self.assertTrue(pref.fixed_first)
+        self.assertEqual(pref.pinned_columns, ["id", "z_f"])
+        self.assertEqual(pref.grouped_headers, ["Заявитель / застрахованный"])
+
+        response = self.client.get(
+            reverse("system:table_prefs", args=[JOURNAL_TABLE_KEY]),
+            {"format": "json"},
+        )
+        self.assertEqual(response.json()["pinned_columns"], ["id", "z_f"])
+        self.assertEqual(
+            response.json()["grouped_headers"], ["Заявитель / застрахованный"]
+        )
+
+    def test_table_preferences_reject_hiding_every_column(self):
+        self.client.force_login(self.operator)
+
+        response = self.client.post(
+            reverse("system:table_prefs", args=[JOURNAL_TABLE_KEY]) + "?modal=1",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["error"], "Оставьте видимой хотя бы одну колонку."
+        )
+        self.assertFalse(
+            UserTableViewPref.objects.filter(
+                user=self.operator, table_key=JOURNAL_TABLE_KEY
+            ).exists()
+        )
 
     def test_table_prefs_save_rolls_back_when_audit_fails(self):
         original = UserTableViewPref.objects.create(
@@ -3163,7 +3333,7 @@ class DocUploadSecurityTests(BaseSystemTestCase):
             {"title": "Угроза", "file": SimpleUploadedFile("evil.php", b"<?php")},
             follow=True,
         )
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 400)
         self.assertFalse(SystemDocument.objects.filter(title="Угроза").exists())
         self.assertIn(
             "Недопустимый тип файла",

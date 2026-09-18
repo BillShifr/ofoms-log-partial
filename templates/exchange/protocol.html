@@ -5,7 +5,7 @@
 <header class="module-heading module-heading--actions">
   <a class="module-heading__back" href="{% url 'exchange:logs' %}">← Журнал загрузок</a>
   <div><p class="page-heading__eyebrow">Результат проверки</p><h1>Протокол обработки</h1></div>
-  <div class="page-heading__actions"><a class="btn btn--primary" href="{% url 'exchange:upload' %}">Загрузить ещё</a></div>
+  {% if can_exchange_upload %}<div class="page-heading__actions"><a class="btn btn--primary" href="{% url 'exchange:upload' %}">Загрузить ещё</a></div>{% endif %}
 </header>
 
 <div class="card">

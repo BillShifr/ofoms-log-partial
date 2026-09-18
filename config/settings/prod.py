@@ -118,6 +118,33 @@ def _trusted_token_origins():
     return tuple(dict.fromkeys(origins))
 
 
+def _account_repository():
+    backend = os.getenv("ACCOUNT_REPOSITORY_BACKEND", "local").strip().lower()
+    if backend not in {"local", "http"}:
+        raise ImproperlyConfigured("ACCOUNT_REPOSITORY_BACKEND must be local or http.")
+    url = os.getenv("ACCOUNT_REPOSITORY_URL", "").strip()
+    token = os.getenv("ACCOUNT_REPOSITORY_TOKEN", "").strip()
+    if backend == "http":
+        parsed = urlsplit(url)
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ImproperlyConfigured(
+                "ACCOUNT_REPOSITORY_URL must be an HTTPS base URL without credentials, "
+                "query string, or fragment."
+            )
+        if len(token) < 32:
+            raise ImproperlyConfigured(
+                "ACCOUNT_REPOSITORY_TOKEN must contain at least 32 characters for HTTP mode."
+            )
+    return backend, url.rstrip("/"), token
+
+
 def _trusted_proxy_networks(*, required):
     networks = []
     for raw_network in os.getenv(
@@ -161,6 +188,12 @@ if DB_POOL_MIN_SIZE > DB_POOL_MAX_SIZE:
 
 ALLOWED_HOSTS = _production_hosts()
 TOKEN_LOGIN_TRUSTED_ORIGINS = _trusted_token_origins()
+ACCOUNT_REPOSITORY_BACKEND, ACCOUNT_REPOSITORY_URL, ACCOUNT_REPOSITORY_TOKEN = (
+    _account_repository()
+)
+ACCOUNT_REPOSITORY_TIMEOUT = _bounded_int(
+    "ACCOUNT_REPOSITORY_TIMEOUT", 5, minimum=1, maximum=30
+)
 LOG_LEVEL = _production_log_level()
 LOGGING["root"]["level"] = LOG_LEVEL  # noqa: F405
 for _logger_config in LOGGING["loggers"].values():  # noqa: F405

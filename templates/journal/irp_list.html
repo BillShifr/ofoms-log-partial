@@ -52,7 +52,7 @@
       <div class="journal-actions__secondary">
         <a class="btn btn--ghost btn--sm" href="{{ print_url }}" target="_blank">Печать</a>
         <button class="btn btn--ghost" type="button" data-modal-open="theme-create-modal">+ Новая тема</button>
-        <a class="btn btn--accent" href="{% url 'journal:create' %}"><span aria-hidden="true">＋</span> Новое обращение</a>
+        {% if can_journal_create %}<a class="btn btn--accent" href="{% url 'journal:create' %}"><span aria-hidden="true">＋</span> Новое обращение</a>{% endif %}
       </div>
     </div>
   </form>

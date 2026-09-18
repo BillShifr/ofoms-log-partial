@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Внутренний контракт исходящего пакета tfoms-journal-current/1.0.
+  Основан на фактически поддерживаемой структурой G1 этой системы.
+  НЕ ЯВЛЯЕТСЯ официальным Приложением №10 к техническому заданию.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:simpleType name="ContractVersion">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="tfoms-journal-current/1.0"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="IRP_LIST">
+    <xs:complexType><xs:sequence>
+      <xs:element name="ZGLV" type="ZglvType"/>
+      <xs:element name="IRP" type="IrpType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence></xs:complexType>
+  </xs:element>
+  <xs:complexType name="ZglvType"><xs:sequence>
+    <xs:element name="filename" type="xs:string"/>
+    <xs:element name="version" type="ContractVersion"/>
+    <xs:element name="data" type="xs:date"/>
+    <xs:element name="year" type="xs:string"/>
+    <xs:element name="month" type="xs:string"/>
+    <xs:element name="day" type="xs:string"/>
+    <xs:element name="time" type="xs:time"/>
+    <xs:element name="smo" type="xs:int"/>
+  </xs:sequence></xs:complexType>
+  <xs:complexType name="IrpType"><xs:sequence>
+    <xs:element name="n_irp" type="xs:string"/>
+    <xs:element name="irp_type" type="xs:int"/>
+    <xs:element name="date_create" type="xs:date"/>
+    <xs:element name="time_create" type="xs:time" minOccurs="0"/>
+    <xs:element name="way" type="xs:int"/>
+    <xs:element name="way_n" type="xs:string" minOccurs="0"/>
+    <xs:element name="how" type="xs:int"/>
+    <xs:element name="theme" type="xs:string"/>
+    <xs:element name="theme_comment" type="xs:string" minOccurs="0"/>
+    <xs:element name="text" type="xs:string" minOccurs="0"/>
+    <xs:element name="zh_d" type="xs:string" minOccurs="0"/>
+    <xs:element name="otv_t" type="xs:int"/>
+    <xs:element name="otv_kon" type="xs:int"/>
+    <xs:element name="employee_one" type="xs:string"/>
+    <xs:element name="line_one" type="xs:int" minOccurs="0"/>
+    <xs:element name="employee_it" type="xs:string" minOccurs="0"/>
+    <xs:element name="line_it" type="xs:int" minOccurs="0"/>
+    <xs:element name="data_plan" type="xs:date"/>
+    <xs:element name="date_close" type="xs:date" minOccurs="0"/>
+    <xs:element name="result" type="xs:int" minOccurs="0"/>
+    <xs:element name="z_sv" type="ZsvType" minOccurs="0"/>
+    <xs:element name="in_sv" type="InsvType" minOccurs="0"/>
+    <xs:element name="pr_out" type="xs:int" minOccurs="0"/>
+    <xs:element name="date_cross" type="xs:date" minOccurs="0"/>
+    <xs:element name="time_cross" type="xs:time" minOccurs="0"/>
+  </xs:sequence></xs:complexType>
+  <xs:complexType name="ZsvType"><xs:sequence>
+    <xs:element name="z_f" type="xs:string" minOccurs="0"/><xs:element name="z_i" type="xs:string" minOccurs="0"/><xs:element name="z_o" type="xs:string" minOccurs="0"/><xs:element name="z_dr" type="xs:date" minOccurs="0"/><xs:element name="z_enp" type="xs:string" minOccurs="0"/><xs:element name="z_smo" type="xs:int" minOccurs="0"/><xs:element name="z_doctype" type="xs:int" minOccurs="0"/><xs:element name="z_docser" type="xs:string" minOccurs="0"/><xs:element name="z_docnum" type="xs:string" minOccurs="0"/><xs:element name="adr" type="xs:string" minOccurs="0"/><xs:element name="phone" type="xs:string" minOccurs="0"/><xs:element name="e_mail" type="xs:string" minOccurs="0"/>
+  </xs:sequence></xs:complexType>
+  <xs:complexType name="InsvType"><xs:sequence>
+    <xs:element name="in_f" type="xs:string" minOccurs="0"/><xs:element name="in_i" type="xs:string" minOccurs="0"/><xs:element name="in_o" type="xs:string" minOccurs="0"/><xs:element name="in_dr" type="xs:date" minOccurs="0"/><xs:element name="in_enp" type="xs:string" minOccurs="0"/><xs:element name="in_smo" type="xs:int" minOccurs="0"/><xs:element name="in_doctype" type="xs:int" minOccurs="0"/><xs:element name="in_docser" type="xs:string" minOccurs="0"/><xs:element name="in_docnum" type="xs:string" minOccurs="0"/>
+  </xs:sequence></xs:complexType>
+</xs:schema>

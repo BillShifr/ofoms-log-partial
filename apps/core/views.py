@@ -13,7 +13,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from apps.core.tokens import EmployeeRepository, consume_token, decode_token
+from apps.core.tokens import consume_token, decode_token, get_employee_repository
 
 _MAX_TOKEN_LENGTH = 4096
 
@@ -99,7 +99,7 @@ def token_login(request):
 
     try:
         payload = decode_token(token)
-        user = EmployeeRepository().get_by_guid(payload["sub"])
+        user = get_employee_repository().get_by_guid(payload["sub"])
     except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
         payload = None
         user = None

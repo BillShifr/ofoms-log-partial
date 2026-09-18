@@ -2,6 +2,7 @@
 
 import datetime
 import io
+import json
 import os
 import re
 import subprocess
@@ -39,8 +40,10 @@ from apps.core.roles import ensure_role_groups, role_code_for_user
 from apps.core.storage import close_file_on_error
 from apps.core.tokens import (
     EmployeeRepository,
+    HttpEmployeeRepository,
     consume_token,
     decode_token,
+    get_employee_repository,
     issue_token,
     resolve_user,
 )
@@ -1199,6 +1202,83 @@ class TokenTests(TestCase):
         resolved = resolve_user(issue_token(self.user), repository=repository)
         self.assertEqual(resolved, self.user)
         self.assertEqual(repository.guid, str(self.user.guid))
+
+    @override_settings(ACCOUNT_REPOSITORY_BACKEND="http")
+    @mock.patch("apps.core.tokens.HttpEmployeeRepository")
+    def test_configured_http_repository_is_selected(self, repository_class):
+        repository = get_employee_repository()
+
+        self.assertIs(repository, repository_class.return_value)
+
+    def test_http_repository_syncs_valid_external_profile(self):
+        ensure_role_groups()
+        guid = uuid.uuid4()
+        payload = {
+            "guid": str(guid),
+            "username": "external-user",
+            "org": 81000,
+            "is_active": True,
+            "first_name": "Иван",
+            "last_name": "Петров",
+            "job_title": "Оператор",
+            "roles": ["ОП1"],
+        }
+
+        class Response(io.BytesIO):
+            status = 200
+
+        repository = HttpEmployeeRepository(
+            base_url="https://accounts.example/api",
+            token="service-token",
+            timeout=2,
+            opener=lambda request, timeout: Response(json.dumps(payload).encode()),
+        )
+
+        user = repository.get_by_guid(guid)
+
+        self.assertEqual(user.username, "external-user")
+        self.assertEqual(user.org, 81000)
+        self.assertTrue(user.is_active)
+        self.assertFalse(user.has_usable_password())
+        self.assertEqual(list(user.groups.values_list("name", flat=True)), ["ОП1"])
+
+    def test_http_repository_rejects_identity_mismatch(self):
+        guid = uuid.uuid4()
+
+        class Response(io.BytesIO):
+            status = 200
+
+        repository = HttpEmployeeRepository(
+            base_url="https://accounts.example/api",
+            token="service-token",
+            opener=lambda request, timeout: Response(
+                b'{"guid":"00000000-0000-0000-0000-000000000000"}'
+            ),
+        )
+
+        self.assertIsNone(repository.get_by_guid(guid))
+        self.assertFalse(User.objects.filter(guid=guid).exists())
+
+    def test_http_repository_rejects_role_from_another_organization(self):
+        guid = uuid.uuid4()
+        payload = {
+            "guid": str(guid),
+            "username": "external-role-conflict",
+            "org": 81001,
+            "is_active": True,
+            "roles": ["ОП1"],
+        }
+
+        class Response(io.BytesIO):
+            status = 200
+
+        repository = HttpEmployeeRepository(
+            base_url="https://accounts.example/api",
+            token="service-token",
+            opener=lambda request, timeout: Response(json.dumps(payload).encode()),
+        )
+
+        self.assertIsNone(repository.get_by_guid(guid))
 
     def test_token_identifier_is_consumed_once(self):
         payload = decode_token(issue_token(self.user))

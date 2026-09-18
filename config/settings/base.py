@@ -194,6 +194,10 @@ TOKEN_LOGIN_TRUSTED_ORIGINS = tuple(
     for origin in os.getenv("TOKEN_LOGIN_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 )
+ACCOUNT_REPOSITORY_BACKEND = os.getenv("ACCOUNT_REPOSITORY_BACKEND", "local").strip().lower()
+ACCOUNT_REPOSITORY_URL = os.getenv("ACCOUNT_REPOSITORY_URL", "").strip()
+ACCOUNT_REPOSITORY_TOKEN = os.getenv("ACCOUNT_REPOSITORY_TOKEN", "").strip()
+ACCOUNT_REPOSITORY_TIMEOUT = int(os.getenv("ACCOUNT_REPOSITORY_TIMEOUT", "5"))
 TASK_STALE_AFTER_SECONDS = int(os.getenv("TASK_STALE_AFTER_SECONDS", "3600"))
 
 # ---------------------------------------------------------------------------

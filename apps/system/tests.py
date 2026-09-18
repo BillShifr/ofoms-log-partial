@@ -2958,9 +2958,8 @@ class SystemMigrationTestCase(TransactionTestCase):
     """Возвращает общую схему к актуальной system-миграции после проверки истории."""
 
     def tearDown(self):
-        MigrationExecutor(connection).migrate(
-            [("system", "0015_table_grouping_and_pinning")]
-        )
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
         super().tearDown()
 
 

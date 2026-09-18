@@ -122,13 +122,15 @@ def _database_health(params):
 
 
 def _cleanup_expired_tokens(params):
-    from django.utils import timezone
+    import datetime as _dt
 
     from apps.core.models import ConsumedToken
 
     batch_size = params.get("batch_size", 1000)
     ids = list(
-        ConsumedToken.objects.filter(expires_at__lt=timezone.now())
+        ConsumedToken.objects.filter(
+            expires_at__lt=_dt.datetime.now(tz=_dt.UTC)
+        )
         .order_by("expires_at")
         .values_list("pk", flat=True)[:batch_size]
     )

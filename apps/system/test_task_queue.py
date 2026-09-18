@@ -1,10 +1,10 @@
 import uuid
+import datetime
 from datetime import timedelta
 from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import TestCase
-from django.utils import timezone
 
 from apps.core.models import ConsumedToken, EventLog
 from apps.employee.models import Employee
@@ -31,12 +31,16 @@ class TaskCommandRegistryTests(TestCase):
     def test_expired_token_cleanup_is_bounded_and_real(self):
         expired = [
             ConsumedToken.objects.create(
-                jti=uuid.uuid4(), expires_at=timezone.now() - timedelta(minutes=index + 1)
+                jti=uuid.uuid4(),
+                expires_at=datetime.datetime.now(tz=datetime.timezone.utc)
+                - timedelta(minutes=index + 1),
             )
             for index in range(3)
         ]
         ConsumedToken.objects.create(
-            jti=uuid.uuid4(), expires_at=timezone.now() + timedelta(hours=1)
+            jti=uuid.uuid4(),
+            expires_at=datetime.datetime.now(tz=datetime.timezone.utc)
+            + timedelta(hours=1),
         )
 
         result = run_command("expired_token_cleanup", {"batch_size": 2})

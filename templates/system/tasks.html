@@ -49,13 +49,13 @@
             {% elif t.last_result == 'ok' %}<span class="badge badge--closed">Успешно</span>
             {% else %}<span class="text-muted">Не запускалось</span>{% endif %}
           </td>
-          <td class="text-nowrap cell-actions responsive-cell--actions task-cell--actions" data-label="Действия"><div class="table-actions">
-            <a class="btn btn--sm btn--ghost" href="{% url 'system:task_update' t.pk %}">Карточка</a>
+          <td class="text-nowrap cell-actions responsive-cell--actions task-cell--actions" data-label="Действия"><div class="table-actions table-actions--icon">
+            <a class="btn btn--sm btn--ghost btn--icon" href="{% url 'system:task_update' t.pk %}" aria-label="Открыть карточку задания {{ t.name }}" title="Карточка"><span aria-hidden="true">↗</span></a>
             <form method="post" action="{% url 'system:task_run' t.pk %}" class="inline-form">{% csrf_token %}
-              <button class="btn btn--sm btn--primary" type="submit"{% if not t.enabled %} disabled title="Сначала включите задание"{% endif %}>Запустить</button>
+              <button class="btn btn--sm btn--primary btn--icon" type="submit" aria-label="Запустить задание {{ t.name }}" title="{% if not t.enabled %}Сначала включите задание{% else %}Запустить{% endif %}"{% if not t.enabled %} disabled{% endif %}><span aria-hidden="true">▶</span></button>
             </form>
             <form method="post" action="{% url 'system:task_toggle' t.pk %}" class="inline-form">{% csrf_token %}
-              <button class="btn btn--sm btn--ghost" type="submit">{% if t.enabled %}Приостановить{% else %}Возобновить{% endif %}</button>
+              <button class="btn btn--sm btn--ghost btn--icon" type="submit" aria-label="{% if t.enabled %}Приостановить{% else %}Возобновить{% endif %} задание {{ t.name }}" title="{% if t.enabled %}Приостановить{% else %}Возобновить{% endif %}"><span aria-hidden="true">{% if t.enabled %}Ⅱ{% else %}↻{% endif %}</span></button>
             </form>
           </div></td>
         </tr>

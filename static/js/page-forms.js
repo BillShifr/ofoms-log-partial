@@ -441,6 +441,54 @@
         restoreSubmitButton(form);
       });
     });
+
+    document.addEventListener("submit", function (event) {
+      var form = event.target.closest("[data-task-action-create-form]");
+      if (!form) return;
+      event.preventDefault();
+      var errorBox = form.querySelector("[data-task-action-form-errors]");
+      if (errorBox) {
+        errorBox.hidden = true;
+        errorBox.textContent = "";
+      }
+      fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        credentials: "same-origin",
+        headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
+      }).then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok || !data.ok) throw data;
+          return data;
+        });
+      }).then(function (data) {
+        document.querySelectorAll('select[name="command"]').forEach(function (select) {
+          var option = document.createElement("option");
+          option.value = String(data.id);
+          option.textContent = data.label;
+          option.selected = true;
+          select.appendChild(option);
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        form.reset();
+        var dialog = form.closest("dialog");
+        if (dialog && typeof dialog.close === "function") dialog.close();
+        if (window.showToast) window.showToast("Действие создано и выбрано в задаче.", "success");
+      }).catch(function (data) {
+        var messages = [];
+        Object.keys((data && data.errors) || {}).forEach(function (field) {
+          data.errors[field].forEach(function (error) {
+            messages.push(error.message || String(error));
+          });
+        });
+        if (errorBox) {
+          errorBox.textContent = messages.join(" ") || "Не удалось создать действие.";
+          errorBox.hidden = false;
+        }
+      }).finally(function () {
+        restoreSubmitButton(form);
+      });
+    });
   }
 
   function initPage() {

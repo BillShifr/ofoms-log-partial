@@ -24,7 +24,8 @@
       <div class="form-grid task-form-grid">
         <div class="field"><label for="{{ form.name.id_for_label }}">Наименование</label>{{ form.name }}{% for error in form.name.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field"><label for="{{ form.command.id_for_label }}">Действие</label>{{ form.command }}
-          <span class="text-muted">Выберите системное действие. Его параметры и допустимые значения проверяются на сервере.</span>
+          <button class="field-help-link" type="button" data-modal-open="task-action-create-modal">+ Создать действие</button>
+          <span class="text-muted">Выберите встроенное действие или создайте пользовательское действие для ручного регламентного запуска. Параметры и допустимые значения проверяются на сервере.</span>
           {% for error in form.command.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
         <div class="field field--wide"><label for="{{ form.description.id_for_label }}">Описание</label>{{ form.description }}</div>
       </div>
@@ -91,6 +92,34 @@
     </div>
   </form>
 </div>
+
+<dialog class="modal" id="task-action-create-modal">
+  <div class="modal__dialog">
+    <div class="modal__head">
+      <h2>Новое действие задачи</h2>
+      <button class="btn btn--ghost btn--icon" type="button" data-modal-close aria-label="Закрыть">×</button>
+    </div>
+    <form method="post" action="{% url 'system:task_action_create' %}" data-task-action-create-form data-validate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="modal__body">
+        <p class="alert alert--error" data-task-action-form-errors hidden></p>
+        <div class="form-grid">
+          <div class="field field--wide">
+            <label for="{{ action_form.name.id_for_label }}">Наименование</label>{{ action_form.name }}
+          </div>
+          <div class="field field--wide">
+            <label for="{{ action_form.description.id_for_label }}">Описание</label>{{ action_form.description }}
+          </div>
+        </div>
+        <div class="modal__actions">
+          <button class="btn btn--primary" type="submit">Создать действие</button>
+          <button class="btn btn--ghost" type="button" data-modal-close>Отмена</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</dialog>
 
 {% if task %}
 <div class="card">

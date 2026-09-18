@@ -19,7 +19,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import IntegrityError, transaction
-from django.utils import timezone
 
 from apps.core.models import ConsumedToken
 from apps.core.roles import GROUP_ROLE_MAP, SMO_ROLES, TFOMS_ROLES
@@ -179,7 +178,9 @@ def consume_token(payload: dict) -> bool:
 
     try:
         with transaction.atomic():
-            ConsumedToken.objects.filter(expires_at__lt=timezone.now()).delete()
+            ConsumedToken.objects.filter(
+                expires_at__lt=_dt.datetime.now(tz=_dt.UTC)
+            ).delete()
             ConsumedToken.objects.create(jti=jti, expires_at=expires_at)
     except IntegrityError:
         return False

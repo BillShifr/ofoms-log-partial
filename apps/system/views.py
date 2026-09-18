@@ -17,10 +17,11 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import InvalidPage, Paginator
 from django.db import transaction
-from django.db.models import CharField, Count, F, OuterRef, Subquery, Value
+from django.db.models import CharField, Count, F, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Coalesce, Concat
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_safe
 
@@ -44,6 +45,7 @@ from apps.system.forms import (
     NewConversationForm,
     NewsForm,
     ReplyForm,
+    TaskActionForm,
     TaskFileForm,
     TaskForm,
     TaskNoteForm,
@@ -60,6 +62,7 @@ from apps.system.models import (
     NewsCategory,
     NewsItem,
     SystemDocument,
+    TaskAction,
     TaskAlreadyRunning,
     TaskDisabled,
     TaskFile,
@@ -76,6 +79,19 @@ PAGE_SIZE = 25
 
 def _is_admin(user) -> bool:
     return user_is_system_admin(user)
+
+
+def _task_command_labels():
+    from apps.system.tasks import task_command_labels
+
+    labels = task_command_labels()
+    labels.update(
+        {
+            action.command_code: f"{action.name} (пользовательское)"
+            for action in TaskAction.objects.filter(is_active=True)
+        }
+    )
+    return labels
 
 
 def admin_required(view):
@@ -626,20 +642,32 @@ def _conversations_meta(user, q=""):
         latest_reply_id=Subquery(latest_reply.values("pk")[:1])
     )
     if q:
-        conversations = conversations.annotate(
-            participant_name=Concat(
-                Coalesce("participants__first_name", Value("")),
-                Value(" "),
-                Coalesce("participants__last_name", Value("")),
-                output_field=CharField(),
-            )
-        )
-        conversations = filter_contains_any(
-            conversations,
-            ("title", "participant_name", "participants__username", "threads__replies__body"),
+        visible_conversation_ids = conversations.values("pk")
+        title_matches = filter_contains_any(
+            Conversation.objects.filter(pk__in=visible_conversation_ids),
+            ("title",),
             q,
-            prefix="conversation_search_",
+            prefix="conversation_title_search_",
+        )
+        primary = filter_contains_any(
+            Conversation.objects.filter(pk__in=visible_conversation_ids),
+            ("participants__first_name", "participants__last_name", "participants__username"),
+            q,
+            prefix="conversation_participant_search_",
+        )
+        primary = conversations.filter(
+            Q(pk__in=title_matches.values("pk"))
+            | Q(pk__in=primary.values("pk"))
         ).distinct()
+        if primary.exists():
+            conversations = primary
+        else:
+            conversations = filter_contains_any(
+                conversations,
+                ("threads__replies__body",),
+                q,
+                prefix="conversation_body_search_",
+            ).distinct()
     conversations = list(conversations.prefetch_related("participants"))
     latest_by_id = MessageReply.objects.select_related("author").in_bulk(
         conv.latest_reply_id for conv in conversations if conv.latest_reply_id
@@ -1089,9 +1117,7 @@ def _task_audit(task):
 @require_safe
 def task_list(request):
     tasks = TaskJob.objects.select_related("assigned_to", "created_by").prefetch_related("runs")
-    from apps.system.tasks import task_command_labels
-
-    command_labels = task_command_labels()
+    command_labels = _task_command_labels()
 
     return render(
         request,
@@ -1141,9 +1167,7 @@ def task_assignee_suggest(request):
 @admin_required
 @require_http_methods(["GET", "POST"])
 def task_create(request):
-    from apps.system.tasks import task_command_labels
-
-    command_labels = task_command_labels()
+    command_labels = _task_command_labels()
 
     if request.method == "POST":
         form = TaskForm(request.POST)
@@ -1170,6 +1194,7 @@ def task_create(request):
         form = TaskForm()
     return render(request, "system/task_form.html", {
         "form": form, "task_parameter_fields": form.task_parameter_fields,
+        "action_form": TaskActionForm(),
         "title": "Новое задание", "active_nav": "tasks",
     })
 
@@ -1188,9 +1213,7 @@ def _task_update(request, pk, *, for_update=False):
     if for_update:
         queryset = queryset.select_for_update(of=("self",))
     task = get_object_or_404(queryset, pk=pk)
-    from apps.system.tasks import task_command_labels
-
-    command_labels = task_command_labels()
+    command_labels = _task_command_labels()
 
     action = request.POST.get("action") if request.method == "POST" else None
     if action == "note":
@@ -1305,6 +1328,7 @@ def _task_update(request, pk, *, for_update=False):
             "note_form": TaskNoteForm(),
             "file_form": TaskFileForm(),
             "report_form": TaskReportForm(),
+            "action_form": TaskActionForm(),
             "command_tips": command_labels,
             "task_parameter_fields": form.task_parameter_fields,
             "task_events": task_events,
@@ -1373,6 +1397,44 @@ def task_toggle(request, pk):
     state = "включено" if task.enabled else "выключено"
     messages.success(request, f"Задание «{task.name}» {state}.")
     return redirect("system:tasks")
+
+
+@login_required
+@require_http_methods(["POST"])
+def task_action_create(request):
+    form = TaskActionForm(request.POST)
+    if form.is_valid():
+        with transaction.atomic():
+            action = form.save(commit=False)
+            action.created_by = request.user
+            action.save()
+            log_event(
+                module="system",
+                event_type=EventLog.EventType.CREATE,
+                user=request.user,
+                target=f"task-action:{action.pk}:{action.name}",
+                ip=request.META.get("REMOTE_ADDR"),
+                detail="Создано пользовательское действие задачи",
+            )
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "id": action.command_code,
+                    "label": f"{action.name} (пользовательское)",
+                },
+                status=201,
+            )
+        messages.success(request, f"Действие «{action.name}» создано.")
+    else:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {"ok": False, "errors": form.errors.get_json_data()},
+                status=400,
+            )
+        messages.error(request, "Не удалось создать действие. Проверьте поля формы.")
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or reverse("system:tasks")
+    return redirect(next_url)
 
 
 @admin_required

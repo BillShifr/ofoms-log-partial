@@ -2,6 +2,8 @@
 // Разметка: table.data[data-client-sort] — сортировка по th без вложенных ссылок;
 // tr[data-href] — переход по строке; [data-tip] — кастомный тултип.
 (function () {
+  var dynamicSheets = {};
+
   function isInteractive(el) {
     return el && (el.closest('a, button, input, select, textarea, form, label') !== null);
   }
@@ -171,16 +173,42 @@
     return 'datatable-widths-' + Math.abs(hash);
   }
 
+  function setDynamicRules(id, rules) {
+    if ('adoptedStyleSheets' in document && typeof CSSStyleSheet === 'function') {
+      if (!dynamicSheets[id]) {
+        dynamicSheets[id] = new CSSStyleSheet();
+        document.adoptedStyleSheets = Array.prototype.concat.call(
+          document.adoptedStyleSheets,
+          dynamicSheets[id]
+        );
+      }
+      dynamicSheets[id].replaceSync(rules.join('\n'));
+      return;
+    }
+    var style = document.getElementById(id);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = id;
+      document.head.appendChild(style);
+    }
+    style.textContent = rules.join('\n');
+  }
+
+  function clearDynamicRules(id) {
+    if (dynamicSheets[id]) {
+      document.adoptedStyleSheets = Array.prototype.filter.call(
+        document.adoptedStyleSheets,
+        function (sheet) { return sheet !== dynamicSheets[id]; }
+      );
+      delete dynamicSheets[id];
+    }
+    var style = document.getElementById(id);
+    if (style) style.remove();
+  }
+
   function syncWidthRules(table, widths) {
     var key = table.getAttribute('data-table-key') || location.pathname;
     var styleId = widthStyleId(key);
-    var style = document.getElementById(styleId);
-    if (!style) {
-      style = document.createElement('style');
-      style.id = styleId;
-      style.dataset.datatableWidthKey = key;
-      document.head.appendChild(style);
-    }
     var rules = [];
     Object.keys(widths).forEach(function (index) {
       if (index === '__table') return;
@@ -194,15 +222,28 @@
       var tableWidth = Math.max(table.getBoundingClientRect().width, Math.round(Number(widths.__table) || 0));
       rules.push(tableSelector + '{width:' + tableWidth + 'px;min-width:' + tableWidth + 'px;}');
     }
-    style.textContent = rules.join('\n');
+    setDynamicRules(styleId, rules);
   }
 
   function clearWidthRules(tableKey) {
-    var style = document.getElementById(widthStyleId(tableKey || location.pathname));
-    if (style) style.remove();
+    clearDynamicRules(widthStyleId(tableKey || location.pathname));
   }
 
   function indexColumns(table) {
+    var headerRow = table.tHead && table.tHead.rows[table.tHead.rows.length - 1];
+    var columnCount = headerRow ? headerRow.cells.length : 0;
+    var colgroup = table.querySelector('colgroup');
+    if (!colgroup && columnCount) {
+      colgroup = document.createElement('colgroup');
+      for (var created = 0; created < columnCount; created += 1) {
+        colgroup.appendChild(document.createElement('col'));
+      }
+      table.insertBefore(colgroup, table.firstChild);
+    } else if (colgroup && columnCount) {
+      while (colgroup.children.length < columnCount) {
+        colgroup.appendChild(document.createElement('col'));
+      }
+    }
     var cols = table.querySelectorAll('colgroup col');
     Array.prototype.forEach.call(cols, function (col, index) {
       col.setAttribute('data-col-index', String(index));
@@ -224,12 +265,6 @@
     if (!headerRow) return;
     var key = table.getAttribute('data-table-key') || location.pathname;
     var styleId = widthStyleId('pinned:' + key);
-    var sheet = document.getElementById(styleId);
-    if (!sheet) {
-      sheet = document.createElement('style');
-      sheet.id = styleId;
-      document.head.appendChild(sheet);
-    }
     var left = 0;
     var rules = [];
     Array.prototype.forEach.call(headerRow.cells, function (header, index) {
@@ -238,7 +273,7 @@
       rules.push(selector + '{--pinned-left:' + left + 'px;}');
       left += header.getBoundingClientRect().width;
     });
-    sheet.textContent = rules.join('\n');
+    setDynamicRules(styleId, rules);
   }
 
   function initResize() {

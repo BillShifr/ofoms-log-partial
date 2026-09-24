@@ -183,6 +183,16 @@ DB_POOL_MIN_SIZE = _bounded_int("DB_POOL_MIN_SIZE", 1, minimum=0, maximum=20)
 DB_POOL_MAX_SIZE = _bounded_int("DB_POOL_MAX_SIZE", 4, minimum=1, maximum=50)
 DB_POOL_TIMEOUT = _bounded_int("DB_POOL_TIMEOUT", 3, minimum=1, maximum=60)
 DB_CONNECT_TIMEOUT = _bounded_int("DB_CONNECT_TIMEOUT", 3, minimum=1, maximum=60)
+DB_SSLMODE = os.getenv("DB_SSLMODE", "require").strip().lower()
+if DB_SSLMODE not in {"require", "verify-ca", "verify-full"}:
+    raise ImproperlyConfigured(
+        "DB_SSLMODE must be require, verify-ca, or verify-full in production."
+    )
+DB_SSLROOTCERT = os.getenv("DB_SSLROOTCERT", "").strip()
+if DB_SSLMODE in {"verify-ca", "verify-full"} and not DB_SSLROOTCERT:
+    raise ImproperlyConfigured(
+        "DB_SSLROOTCERT is required when DB_SSLMODE verifies the server certificate."
+    )
 if DB_POOL_MIN_SIZE > DB_POOL_MAX_SIZE:
     raise ImproperlyConfigured("DB_POOL_MIN_SIZE must not exceed DB_POOL_MAX_SIZE.")
 
@@ -241,6 +251,8 @@ DATABASES["default"].update(  # noqa: F405
         "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
             "connect_timeout": DB_CONNECT_TIMEOUT,
+            "sslmode": DB_SSLMODE,
+            **({"sslrootcert": DB_SSLROOTCERT} if DB_SSLROOTCERT else {}),
             "pool": {
                 "min_size": DB_POOL_MIN_SIZE,
                 "max_size": DB_POOL_MAX_SIZE,

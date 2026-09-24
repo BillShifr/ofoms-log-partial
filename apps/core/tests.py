@@ -605,6 +605,7 @@ class ProductionSettingsTests(TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("0 True", result.stdout)
         self.assertIn("'connect_timeout': 3", result.stdout)
+        self.assertIn("'sslmode': 'require'", result.stdout)
         self.assertIn("'min_size': 1", result.stdout)
         self.assertIn("'max_size': 4", result.stdout)
         self.assertIn("'timeout': 3", result.stdout)
@@ -614,6 +615,8 @@ class ProductionSettingsTests(TestCase):
             {"DB_POOL_MIN_SIZE": "5", "DB_POOL_MAX_SIZE": "4"},
             {"DB_POOL_TIMEOUT": "0"},
             {"DB_CONNECT_TIMEOUT": "not-a-number"},
+            {"DB_SSLMODE": "disable"},
+            {"DB_SSLMODE": "verify-full", "DB_SSLROOTCERT": ""},
         )
         for environment in invalid_environments:
             with self.subTest(environment=environment):
@@ -856,7 +859,8 @@ class ProductionSettingsTests(TestCase):
         self.assertNotIn("docker compose up", backup)
         self.assertIn("trap cleanup EXIT HUP INT TERM", backup)
         self.assertIn("trap - EXIT HUP INT TERM", backup)
-        self.assertIn("docker compose exec -T db pg_dump", backup)
+        self.assertIn("--profile ops run --rm --no-deps -T db-tools pg_dump", backup)
+        self.assertNotIn("docker compose exec -T db", backup)
         self.assertEqual(backup.count("docker compose run --rm --no-deps"), 2)
         self.assertIn(
             "sha256sum MANIFEST database.dump media.tar.gz exchange.tar.gz", backup
@@ -925,7 +929,7 @@ class ProductionSettingsTests(TestCase):
     def test_compose_services_restart_and_receive_termination_signals(self):
         compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
 
-        self.assertEqual(compose.count("restart: unless-stopped"), 3)
+        self.assertEqual(compose.count("restart: unless-stopped"), 2)
         self.assertEqual(compose.count("stop_grace_period: 75s"), 2)
         self.assertEqual(compose.count("init: true"), 2)
         self.assertIn(
@@ -941,9 +945,11 @@ class ProductionSettingsTests(TestCase):
         compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
 
         self.assertIn("  migrate:\n    <<: *app-security", compose)
-        self.assertIn(
-            'command: [".venv/bin/python", "manage.py", "migrate", "--noinput"]',
-            compose,
+        self.assertIn("manage.py production_db_preflight", compose)
+        self.assertIn("manage.py migrate --noinput", compose)
+        self.assertLess(
+            compose.index("manage.py production_db_preflight"),
+            compose.index("manage.py migrate --noinput"),
         )
         self.assertEqual(compose.count("condition: service_completed_successfully"), 2)
         self.assertRegex(

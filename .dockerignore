@@ -30,9 +30,13 @@ docs
 .tmp
 .artifacts
 tests
+**/tests.py
+**/test_*.py
 scripts
 .github
 .idea
 .vscode
 output
 tmp
+package.json
+package-lock.json

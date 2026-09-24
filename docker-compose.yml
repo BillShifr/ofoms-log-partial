@@ -20,22 +20,6 @@ x-app-security: &app-security
     - /tmp:size=256m,mode=1777
 
 services:
-  db:
-    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
-    environment:
-      POSTGRES_DB: ${DB_NAME:-ejournal}
-      POSTGRES_USER: ${DB_USER:-ejournal}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ejournal}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-    logging: *default-logging
-
   volume-init:
     image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
     build: *app-build
@@ -62,11 +46,13 @@ services:
     command: [".venv/bin/gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60"]
     environment: &web_env
       DJANGO_SETTINGS_MODULE: config.settings.prod
-      DB_NAME: ${DB_NAME:-ejournal}
-      DB_USER: ${DB_USER:-ejournal}
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
-      DB_HOST: db
-      DB_PORT: "5432"
+      DB_HOST: ${DB_HOST:?DB_HOST is required}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_SSLROOTCERT: ${DB_SSLROOTCERT:-}
       DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
       DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-4}
       DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-3}
@@ -98,8 +84,6 @@ services:
     ports:
       - "${WEB_BIND_ADDRESS:-127.0.0.1}:8000:8000"
     depends_on:
-      db:
-        condition: service_healthy
       volume-init:
         condition: service_completed_successfully
       migrate:
@@ -125,12 +109,34 @@ services:
     <<: *app-security
     image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
     build: *app-build
-    command: [".venv/bin/python", "manage.py", "migrate", "--noinput"]
+    command:
+      - sh
+      - -c
+      - >-
+        .venv/bin/python manage.py production_db_preflight &&
+        .venv/bin/python manage.py migrate --noinput
     environment: *web_env
-    depends_on:
-      db:
-        condition: service_healthy
     restart: "no"
+    logging: *default-logging
+
+  db-tools:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    profiles: ["ops"]
+    environment:
+      PGDATABASE: ${DB_NAME:?DB_NAME is required}
+      PGUSER: ${DB_USER:?DB_USER is required}
+      PGPASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      PGHOST: ${DB_HOST:?DB_HOST is required}
+      PGPORT: ${DB_PORT:-5432}
+      PGSSLMODE: ${DB_SSLMODE:-require}
+      PGSSLROOTCERT: ${DB_SSLROOTCERT:-}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=64m,mode=1777
     logging: *default-logging
 
   scheduler:
@@ -151,6 +157,5 @@ services:
     logging: *default-logging
 
 volumes:
-  pgdata:
   media:
   exchange:

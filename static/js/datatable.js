@@ -85,7 +85,8 @@
         th.tabIndex = 0;
         th.setAttribute('aria-sort', 'none');
         th.setAttribute('aria-label', th.textContent.trim() + ': сортировать');
-        th.addEventListener('click', function () {
+        th.addEventListener('click', function (event) {
+          if (event.target.closest('.col-resizer')) return;
           sortTable(table, Array.prototype.indexOf.call(th.parentNode.cells, th));
         });
         th.addEventListener('keydown', function (event) {
@@ -298,6 +299,11 @@
 
         var startX = 0;
         var startWidth = 0;
+        function stopResizeEvent(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        }
         function persist(width) {
           widths[index] = setColumnWidth(table, index, width);
           widths.__table = Array.prototype.reduce.call(headerRow.cells, function (sum, cell, cellIndex) {
@@ -311,17 +317,32 @@
           });
         }
         grip.addEventListener('pointerdown', function (event) {
-          event.preventDefault();
+          stopResizeEvent(event);
           startX = event.clientX;
           startWidth = th.getBoundingClientRect().width;
+          table.classList.add('is-resizing-columns');
+          grip.classList.add('is-resizing');
           grip.setPointerCapture(event.pointerId);
         });
         grip.addEventListener('pointermove', function (event) {
           if (!grip.hasPointerCapture(event.pointerId)) return;
+          stopResizeEvent(event);
           persist(startWidth + event.clientX - startX);
         });
         grip.addEventListener('pointerup', function (event) {
+          stopResizeEvent(event);
           if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
+          table.classList.remove('is-resizing-columns');
+          grip.classList.remove('is-resizing');
+        });
+        grip.addEventListener('pointercancel', function (event) {
+          stopResizeEvent(event);
+          if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
+          table.classList.remove('is-resizing-columns');
+          grip.classList.remove('is-resizing');
+        });
+        grip.addEventListener('click', function (event) {
+          stopResizeEvent(event);
         });
         grip.addEventListener('keydown', function (event) {
           if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;

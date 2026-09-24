@@ -1973,6 +1973,8 @@ class TemplateHygieneTests(TestCase):
             "sort-desc",
             "keydown",
             "pointerdown",
+            "stopResizeEvent",
+            "stopImmediatePropagation",
             "localStorage.setItem(storageKey(table)",
             "datatable-widths:",
             "ResizeObserver",
@@ -2006,12 +2008,12 @@ class TemplateHygieneTests(TestCase):
         )
         self.assertIsNotNone(sort_icon)
         sort_body = sort_icon.group("body")
-        for rule in ('content: "↕"', "right: 28px", "pointer-events: none"):
+        for rule in ('content: "⇅"', "right: 22px", "pointer-events: none"):
             self.assertIn(rule, sort_body)
         self.assertIn('th.data-sort[aria-sort="ascending"]::after', css)
         self.assertIn('th.data-sort[aria-sort="descending"]::after', css)
-        self.assertIn('content: "↑"', css)
-        self.assertIn('content: "↓"', css)
+        self.assertIn('content: "⇧"', css)
+        self.assertIn('content: "⇩"', css)
 
     def test_shared_form_validation_covers_empty_action_forms(self):
         script = (

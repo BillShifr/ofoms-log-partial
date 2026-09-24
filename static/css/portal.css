@@ -495,7 +495,7 @@ table.data th {
   top: 0;
   z-index: 2;
   overflow: visible;
-  padding-right: 58px;
+  padding-right: 64px;
 }
 table.data td > a,
 table.data td > span:not(.badge),
@@ -524,6 +524,17 @@ table.data td > div:not(.table-actions) {
   cursor: col-resize;
   touch-action: none;
 }
+.col-resizer::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: -5px;
+  bottom: 8px;
+  width: 10px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background-color .12s ease;
+}
 .col-resizer::after {
   content: "";
   position: absolute;
@@ -536,11 +547,21 @@ table.data td > div:not(.table-actions) {
   opacity: .7;
   transition: background-color .12s ease, opacity .12s ease, width .12s ease;
 }
+.col-resizer:hover::before,
+.col-resizer:focus-visible::before,
+.col-resizer.is-resizing::before {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
 .col-resizer:hover::after,
-.col-resizer:focus-visible::after {
+.col-resizer:focus-visible::after,
+.col-resizer.is-resizing::after {
   width: 3px;
   background: var(--accent);
   opacity: 1;
+}
+table.data.is-resizing-columns {
+  cursor: col-resize;
+  user-select: none;
 }
 table.data thead tr:first-child th:first-child { border-top-left-radius: var(--table-radius); }
 table.data thead tr:first-child th:last-child { border-top-right-radius: var(--table-radius); }
@@ -1369,13 +1390,17 @@ th.data-sort { cursor: pointer; user-select: none; white-space: nowrap; }
 th.data-sort a { color: inherit; text-decoration: none; }
 th.data-sort a:hover { color: var(--primary); text-decoration: none; }
 th.data-sort::after {
-  content: "↕";
+  content: "⇅";
   position: absolute;
   top: 50%;
-  right: 28px;
-  width: 14px;
+  right: 22px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
   transform: translateY(-50%);
-  opacity: .45;
+  border-radius: 6px;
+  opacity: .55;
   font-size: .8em;
   line-height: 1;
   text-align: center;
@@ -1383,14 +1408,16 @@ th.data-sort::after {
 }
 th.data-sort.sort-asc::after,
 th.data-sort[aria-sort="ascending"]::after {
-  content: "↑";
+  content: "⇧";
   color: var(--primary);
+  background: color-mix(in srgb, var(--chip-blue) 74%, transparent);
   opacity: 1;
 }
 th.data-sort.sort-desc::after,
 th.data-sort[aria-sort="descending"]::after {
-  content: "↓";
+  content: "⇩";
   color: var(--primary);
+  background: color-mix(in srgb, var(--chip-blue) 74%, transparent);
   opacity: 1;
 }
 th.data-sort:hover { background: var(--chip-green); }

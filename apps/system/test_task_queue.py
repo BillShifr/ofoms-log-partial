@@ -1,5 +1,5 @@
-import uuid
 import datetime
+import uuid
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -32,14 +32,14 @@ class TaskCommandRegistryTests(TestCase):
         expired = [
             ConsumedToken.objects.create(
                 jti=uuid.uuid4(),
-                expires_at=datetime.datetime.now(tz=datetime.timezone.utc)
+                expires_at=datetime.datetime.now(tz=datetime.UTC)
                 - timedelta(minutes=index + 1),
             )
             for index in range(3)
         ]
         ConsumedToken.objects.create(
             jti=uuid.uuid4(),
-            expires_at=datetime.datetime.now(tz=datetime.timezone.utc)
+            expires_at=datetime.datetime.now(tz=datetime.UTC)
             + timedelta(hours=1),
         )
 

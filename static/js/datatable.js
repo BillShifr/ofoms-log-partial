@@ -69,6 +69,8 @@
   function initSort() {
     document.querySelectorAll('table.data th[aria-sort]').forEach(function (th) {
       th.classList.add('data-sort');
+      th.classList.toggle('sort-asc', th.getAttribute('aria-sort') === 'ascending');
+      th.classList.toggle('sort-desc', th.getAttribute('aria-sort') === 'descending');
       var link = th.querySelector('a');
       if (link && !link.getAttribute('aria-label')) {
         link.setAttribute('aria-label', th.textContent.trim() + ': сортировать');

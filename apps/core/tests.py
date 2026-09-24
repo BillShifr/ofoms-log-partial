@@ -1967,6 +1967,10 @@ class TemplateHygieneTests(TestCase):
         required = [
             "localeCompare(String(bv), 'ru')",
             "aria-sort",
+            "getAttribute('aria-sort') === 'ascending'",
+            "getAttribute('aria-sort') === 'descending'",
+            "sort-asc",
+            "sort-desc",
             "keydown",
             "pointerdown",
             "localStorage.setItem(storageKey(table)",
@@ -1978,6 +1982,36 @@ class TemplateHygieneTests(TestCase):
         ]
         missing = [needle for needle in required if needle not in script]
         self.assertEqual(missing, [])
+
+    def test_datatable_css_keeps_resize_handle_on_column_boundary(self):
+        css = (Path(settings.BASE_DIR) / "static" / "css" / "portal.css").read_text(
+            encoding="utf-8-sig"
+        )
+        resizer = re.search(r"\.col-resizer\s*{(?P<body>[^}]+)}", css, re.MULTILINE)
+        self.assertIsNotNone(resizer)
+        resizer_body = resizer.group("body")
+        for rule in ("right: 0", "width: 18px", "cursor: col-resize", "touch-action: none"):
+            self.assertIn(rule, resizer_body)
+
+        indicator = re.search(
+            r"\.col-resizer::after\s*{(?P<body>[^}]+)}", css, re.MULTILINE
+        )
+        self.assertIsNotNone(indicator)
+        indicator_body = indicator.group("body")
+        for rule in ("right: 0", "width: 2px", "opacity: .7"):
+            self.assertIn(rule, indicator_body)
+
+        sort_icon = re.search(
+            r"th\.data-sort::after\s*{(?P<body>[^}]+)}", css, re.MULTILINE
+        )
+        self.assertIsNotNone(sort_icon)
+        sort_body = sort_icon.group("body")
+        for rule in ('content: "↕"', "right: 28px", "pointer-events: none"):
+            self.assertIn(rule, sort_body)
+        self.assertIn('th.data-sort[aria-sort="ascending"]::after', css)
+        self.assertIn('th.data-sort[aria-sort="descending"]::after', css)
+        self.assertIn('content: "↑"', css)
+        self.assertIn('content: "↓"', css)
 
     def test_shared_form_validation_covers_empty_action_forms(self):
         script = (

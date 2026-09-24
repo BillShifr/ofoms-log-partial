@@ -67,6 +67,14 @@ class IrpForm(forms.ModelForm):
         # Темы — актуальная версия (3), как в v1
         self.fields["theme"].queryset = IrpTheme.objects.filter(version=3)
         if user is not None:
+            if self.instance.pk is None and self.instance.employee_one_id is None:
+                initial_line = 1 if user.org == TFOMS else 3
+                self.instance.employee_one = user
+                self.instance.line_one = initial_line
+                self.instance.employee_it = user
+                self.instance.line_it = initial_line
+                self.instance.otv_t = 1 if user.org == TFOMS else 2
+                self.instance.otv_kon = user.org
             self.fields["theme"].empty_label = "— выберите тему —"
             if self.instance.pk is not None:
                 self.fields["n_irp"].disabled = True

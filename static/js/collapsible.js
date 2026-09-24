@@ -11,6 +11,10 @@
       if (el.dataset.collapsibleReady === 'true') return;
       el.dataset.collapsibleReady = 'true';
       var key = stateKey(el);
+      if (el.dataset.forceOpen === 'true') {
+        el.open = true;
+        return;
+      }
       var saved = null;
       try { saved = localStorage.getItem(key); } catch (e) { /* noop */ }
       if (saved === 'closed') el.open = false;

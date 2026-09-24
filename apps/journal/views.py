@@ -382,12 +382,10 @@ def irp_edit(request, pk):
             _require_mutable(irp)
             form = IrpForm(request.POST, instance=irp, user=request.user)
             # ModelForm мутирует instance при валидации — снимок до is_valid()
-            before = {f: getattr(irp, f) for f in (*form.fields, "otv_t")}
+            before = {f: getattr(irp, f) for f in form.fields}
             if form.is_valid():
                 old = {f: before[f] for f in form.changed_data}
                 irp = form.save(commit=False)
-                if irp.otv_t != before["otv_t"]:
-                    old["otv_t"] = before["otv_t"]
                 target = (
                     Irp.Status.CLOSED
                     if irp.date_close and irp.result
@@ -540,10 +538,12 @@ def irp_redirect(request, pk):
             irp = _get_irp_for_user(request, pk, for_update=True)
             _require_mutable(irp)
             form = IrpRedirectForm(request.POST, instance=irp, user=request.user)
-            before = {f: getattr(irp, f) for f in form.fields}
+            before = {f: getattr(irp, f) for f in (*form.fields, "otv_t")}
             if form.is_valid():
                 old = {f: before[f] for f in form.changed_data}
                 irp = form.save(commit=False)
+                if irp.otv_t != before["otv_t"]:
+                    old["otv_t"] = before["otv_t"]
                 _transition(irp, Irp.Status.REDIRECTED)
                 irp.save()
                 _write_history(irp, request.user, old)

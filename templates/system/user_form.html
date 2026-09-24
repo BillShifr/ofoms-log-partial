@@ -6,7 +6,16 @@
 <div class="card management-form">
   <form method="post" data-validate>
     {% csrf_token %}
-    <details class="collapsible" data-key="user-section-auth">
+    {% if form.errors %}
+    <div class="alert alert--error" role="alert">
+      <strong>Пользователь не сохранён. Исправьте ошибки:</strong>
+      <ul>
+        {% for field in form %}{% for error in field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ error }}</a></li>{% endfor %}{% endfor %}
+        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    <details class="collapsible" data-key="user-section-auth"{% if form.username.errors or form.password1.errors or form.password2.errors %} data-force-open="true" open{% endif %}>
       <summary class="collapsible__toggle">Аутентификация</summary>
       <div class="form-grid">
         <div class="field">
@@ -31,7 +40,7 @@
       </div>
     </details>
 
-    <details class="collapsible" data-key="user-section-personal" open>
+    <details class="collapsible" data-key="user-section-personal"{% if form.last_name.errors or form.first_name.errors or form.job_title.errors or form.org.errors or form.is_staff.errors or form.is_active.errors %} data-force-open="true"{% endif %} open>
       <summary class="collapsible__toggle">Данные</summary>
       <div class="form-grid">
         <div class="field"><label for="{{ form.last_name.id_for_label }}">Фамилия</label>{{ form.last_name }}{% for error in form.last_name.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}</div>
@@ -47,7 +56,7 @@
     </details>
 
     {% if form.roles %}
-    <details class="collapsible" data-key="user-section-roles" open>
+    <details class="collapsible" data-key="user-section-roles"{% if form.roles.errors or form.additional_groups.errors %} data-force-open="true"{% endif %} open>
       <summary class="collapsible__toggle">Роли и доступы</summary>
       <div class="field field--roles">
         <label for="{{ form.roles.id_for_label }}">Системные роли</label>

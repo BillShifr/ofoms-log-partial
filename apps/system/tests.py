@@ -374,6 +374,34 @@ class UserManagementTests(BaseSystemTestCase):
             ).exists()
         )
 
+    def test_user_create_exposes_validation_errors_and_opens_affected_section(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system:user_create"),
+            {
+                "username": "broken_user",
+                "password1": PASSWORD,
+                "password2": "DifferentPass!2",
+                "org": "81001",
+                "roles": [Group.objects.get(name="ОП1").pk],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Пользователь не сохранён. Исправьте ошибки:")
+        self.assertContains(response, "Введенные пароли не совпадают")
+        self.assertContains(response, "Роли не соответствуют выбранной организации")
+        self.assertContains(
+            response,
+            'data-key="user-section-auth" data-force-open="true" open',
+        )
+        self.assertContains(
+            response,
+            'data-key="user-section-roles" data-force-open="true" open',
+        )
+        self.assertFalse(Employee.objects.filter(username="broken_user").exists())
+
     def test_user_create_rolls_back_account_and_roles_when_audit_fails(self):
         self.client.force_login(self.admin)
 

@@ -497,13 +497,42 @@ class TaskActionForm(forms.ModelForm):
 
     class Meta:
         model = TaskAction
-        fields = ("name", "description")
+        fields = (
+            "name",
+            "action_type",
+            "condition_logic",
+            "condition_status",
+            "condition_org",
+            "close_result",
+            "description",
+        )
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Например: Проверка выгрузки"}),
             "description": forms.Textarea(
-                attrs={"rows": 3, "placeholder": "Что должен сделать исполнитель при запуске"}
+                attrs={
+                    "rows": 3,
+                    "placeholder": "Что должен сделать исполнитель или что попадёт в журнал выполнения",
+                }
             ),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["action_type"].required = False
+        self.fields["condition_logic"].required = False
+        self.fields["condition_status"].required = False
+        self.fields["condition_status"].choices = [("", "Не учитывать статус")] + list(
+            TaskAction.AppealStatus.choices
+        )
+        self.fields["condition_org"].required = False
+        self.fields["condition_org"].choices = [("", "Любая организация")] + list(ORGS)
+        self.fields["close_result"].required = False
+        self.fields["close_result"].choices = [("", "Рассмотрено обращение")] + list(
+            self.fields["close_result"].choices
+        )
+        self.fields["description"].help_text = (
+            "Для ручного действия это инструкция исполнителю; для закрытия обращений — пояснение в журнале запуска."
+        )
 
     def clean_name(self):
         name = (self.cleaned_data.get("name") or "").strip()
@@ -515,6 +544,26 @@ class TaskActionForm(forms.ModelForm):
         if duplicate.exists():
             raise forms.ValidationError("Действие с таким названием уже есть.")
         return name
+
+    def clean(self):
+        cleaned = super().clean()
+        cleaned["action_type"] = cleaned.get("action_type") or TaskAction.ActionType.MANUAL
+        cleaned["condition_logic"] = (
+            cleaned.get("condition_logic") or TaskAction.ConditionLogic.ALL
+        )
+        if cleaned.get("action_type") == TaskAction.ActionType.CLOSE_APPEALS:
+            has_condition = bool(
+                cleaned.get("condition_status") or cleaned.get("condition_org")
+            )
+            if not has_condition:
+                raise forms.ValidationError(
+                    "Для массового закрытия укажите хотя бы одно условие отбора."
+                )
+        else:
+            cleaned["condition_status"] = ""
+            cleaned["condition_org"] = None
+            cleaned["close_result"] = None
+        return cleaned
 
 
 class TaskNoteForm(forms.ModelForm):

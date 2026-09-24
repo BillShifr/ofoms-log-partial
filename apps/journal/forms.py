@@ -97,6 +97,14 @@ class IrpForm(forms.ModelForm):
             "pr_out", "date_cross", "time_cross",
         ]
         widgets = {
+            "date_create": forms.DateInput(attrs={"type": "date"}),
+            "time_create": forms.TimeInput(attrs={"type": "time"}),
+            "data_plan": forms.DateInput(attrs={"type": "date"}),
+            "date_close": forms.DateInput(attrs={"type": "date"}),
+            "z_dr": forms.DateInput(attrs={"type": "date"}),
+            "in_dr": forms.DateInput(attrs={"type": "date"}),
+            "date_cross": forms.DateInput(attrs={"type": "date"}),
+            "time_cross": forms.TimeInput(attrs={"type": "time"}),
             "theme_comment": forms.Textarea(attrs={"rows": 2}),
             "text": forms.Textarea(attrs={"rows": 3}),
             "phone": forms.TextInput(attrs={"placeholder": "+7 (___) ___-__-__"}),

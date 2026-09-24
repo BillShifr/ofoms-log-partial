@@ -12,6 +12,8 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from apps.core.storage import delete_field_file_after_commit
+from apps.employee.models import ORGS
+from apps.journal.models import RESULTS
 from apps.system.validators import (
     validate_attachment_file,
     validate_document_file,
@@ -838,8 +840,52 @@ class TaskRun(models.Model):
 class TaskAction(models.Model):
     """Пользовательское действие, доступное в поле действия автоматизированной задачи."""
 
+    class ActionType(models.TextChoices):
+        MANUAL = "manual", "Ручное действие"
+        CLOSE_APPEALS = "close_appeals", "Закрыть обращения по условиям"
+
+    class ConditionLogic(models.TextChoices):
+        ALL = "all", "Все условия"
+        ANY = "any", "Любое условие"
+
+    class AppealStatus(models.TextChoices):
+        OPEN = "open", "Открытые"
+        OVERDUE = "overdue", "Просроченные"
+        PRELIMINARY = "preliminary", "С предварительным ответом"
+
     name = models.CharField(max_length=120, unique=True, verbose_name="Наименование")
     description = models.TextField(blank=True, default="", verbose_name="Описание")
+    action_type = models.CharField(
+        max_length=24,
+        choices=ActionType.choices,
+        default=ActionType.MANUAL,
+        verbose_name="Тип сценария",
+    )
+    condition_logic = models.CharField(
+        max_length=8,
+        choices=ConditionLogic.choices,
+        default=ConditionLogic.ALL,
+        verbose_name="Как применять условия",
+    )
+    condition_status = models.CharField(
+        max_length=24,
+        choices=AppealStatus.choices,
+        blank=True,
+        default="",
+        verbose_name="Статус обращений",
+    )
+    condition_org = models.IntegerField(
+        choices=ORGS,
+        null=True,
+        blank=True,
+        verbose_name="Организация обращений",
+    )
+    close_result = models.SmallIntegerField(
+        null=True,
+        blank=True,
+        choices=RESULTS,
+        verbose_name="Исход при закрытии",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -863,6 +909,19 @@ class TaskAction(models.Model):
     @property
     def command_code(self) -> str:
         return f"custom:{self.pk}"
+
+    @property
+    def summary(self) -> str:
+        if self.action_type == self.ActionType.CLOSE_APPEALS:
+            conditions = []
+            if self.condition_status:
+                conditions.append(self.get_condition_status_display().lower())
+            if self.condition_org:
+                conditions.append(dict(ORGS).get(self.condition_org, str(self.condition_org)))
+            target = " и ".join(conditions) if self.condition_logic == self.ConditionLogic.ALL else " или ".join(conditions)
+            result = self.get_close_result_display() if self.close_result else "Рассмотрено обращение"
+            return f"Закрывает обращения: {target or 'без дополнительных условий'}; исход: {result}."
+        return self.description or "Ручное пользовательское действие."
 
 
 class TaskNote(models.Model):

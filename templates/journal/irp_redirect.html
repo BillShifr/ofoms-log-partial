@@ -6,15 +6,26 @@
 <div class="card">
   <form method="post">
     {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert--error">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="form-section-heading"><span>01</span><div><h2>Новый маршрут</h2><p>Организация, ответственный сотрудник и линия обработки</p></div></div>
     <div class="grid-2">
-      {% for field in form %}
+      {% for field in form %}{% if field.name == 'otv_kon' or field.name == 'employee_it' or field.name == 'line_it' %}
       <div class="field">
         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
         {{ field }}
+        {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
         {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
       </div>
-      {% endfor %}
+      {% endif %}{% endfor %}
     </div>
+    <details class="form-disclosure"{% if form.pr_out.value or form.pr_out.errors or form.date_cross.errors or form.time_cross.errors %} open{% endif %}>
+      <summary class="form-section-heading form-disclosure__summary"><span>02</span><div><h2>Межорганизационное направление</h2><p>Реквизиты сопроводительного письма и файлового обмена</p></div><span class="form-disclosure__action" aria-hidden="true">При необходимости</span></summary>
+      <div class="grid-2 form-disclosure__content">
+        <div class="field"><label for="{{ form.pr_out.id_for_label }}">{{ form.pr_out.label }}</label>{{ form.pr_out }}{% if form.pr_out.help_text %}<span class="helptext">{{ form.pr_out.help_text }}</span>{% endif %}{{ form.pr_out.errors }}</div>
+        <div class="field" data-conditional-controller="id_pr_out" data-conditional-values="*"><label for="{{ form.date_cross.id_for_label }}">Дата направления</label>{{ form.date_cross }}{{ form.date_cross.errors }}</div>
+        <div class="field" data-conditional-controller="id_pr_out" data-conditional-values="*"><label for="{{ form.time_cross.id_for_label }}">Время направления</label>{{ form.time_cross }}{{ form.time_cross.errors }}</div>
+      </div>
+    </details>
     <div class="form-actions form-actions--sticky">
       <button class="btn btn--primary" type="submit">Сохранить переадресацию</button>
       <a class="btn btn--ghost" href="{% url 'journal:cover' irp.pk %}" target="_blank" rel="noopener">Сопроводительное письмо</a>

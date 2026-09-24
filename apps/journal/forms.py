@@ -7,6 +7,7 @@ from django import forms
 from django.db.models import Q
 
 from apps.employee.models import ORGS, TFOMS, Employee
+from apps.journal.access import visible_irps_for_user
 from apps.journal.models import (
     IRP_HOW,
     IRP_TYPES,
@@ -31,8 +32,35 @@ def _assignable_employees(user, current_id=None):
     )
 
 
+def _route_organizations(user):
+    """Organizations a user may select as the next internal route."""
+    if _has_global_org_scope(user):
+        return list(ORGS)
+    return [org for org in ORGS if org[0] in {user.org, TFOMS}]
+
+
+class RepeatAppealChoiceField(forms.ModelChoiceField):
+    """Human-readable appeal identity instead of an opaque UUID/row id."""
+
+    def label_from_instance(self, appeal):
+        applicant = " ".join(
+            part for part in (appeal.z_f, appeal.z_i, appeal.z_o) if part
+        ) or "Заявитель не указан"
+        return (
+            f"{applicant} — {appeal.theme.title} — "
+            f"{appeal.date_create:%d.%m.%Y} (№ {appeal.n_irp})"
+        )
+
+
 class IrpForm(forms.ModelForm):
     """Карточка обращения (регистрация / редактирование)."""
+
+    repeat_of = RepeatAppealChoiceField(
+        queryset=Irp.objects.none(),
+        required=False,
+        label="Повторное обращение по",
+        empty_label="— первичное обращение —",
+    )
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -40,26 +68,15 @@ class IrpForm(forms.ModelForm):
         self.fields["theme"].queryset = IrpTheme.objects.filter(version=3)
         if user is not None:
             self.fields["theme"].empty_label = "— выберите тему —"
-            self.fields["otv_kon"].choices = [
-                org
-                for org in ORGS
-                if _has_global_org_scope(user) or org[0] == user.org
-            ]
-            self.fields["employee_one"].disabled = True
-            self.fields["employee_one"].help_text = (
-                "Первичный исполнитель фиксируется при регистрации."
-            )
             if self.instance.pk is not None:
                 self.fields["n_irp"].disabled = True
                 self.fields["n_irp"].help_text = (
                     "Уникальный номер фиксируется при регистрации."
                 )
-            self.fields["employee_it"].queryset = _assignable_employees(
-                user, self.instance.employee_it_id
+            repeats = visible_irps_for_user(
+                user,
+                Irp.objects.select_related("theme", "employee_one", "employee_it"),
             )
-            repeats = Irp.objects.select_related("employee_one", "employee_it")
-            if not _has_global_org_scope(user):
-                repeats = repeats.filter(employee_one__org=user.org)
             if self.instance.pk:
                 repeats = repeats.exclude(pk=self.instance.pk)
                 self.fields["repeat_of"].help_text = (
@@ -69,9 +86,6 @@ class IrpForm(forms.ModelForm):
             if self.instance.pk is None:
                 # По умолчанию: исполнитель = текущий пользователь,
                 # организация-ответственный = организация пользователя
-                self.fields["employee_one"].initial = user
-                self.fields["employee_it"].initial = user
-                self.fields["otv_kon"].initial = user.org
                 # Уникальный номер генерируется сервером при отсутствии явного
                 self.fields["n_irp"].required = False
                 self.fields["n_irp"].initial = str(uuid.uuid4())
@@ -86,15 +100,13 @@ class IrpForm(forms.ModelForm):
             "n_irp", "irp_type", "date_create", "time_create",
             "repeat_of",
             "way", "way_n", "how", "theme", "theme_comment", "text",
-            "zh_d", "otv_t", "otv_kon",
-            "employee_one", "line_one", "employee_it", "line_it",
+            "zh_d",
             "data_plan", "date_close", "result",
             "z_f", "z_i", "z_o", "z_dr", "z_enp", "z_smo",
             "z_doctype", "z_docser", "z_docnum",
             "adr", "phone", "e_mail",
             "in_f", "in_i", "in_o", "in_dr", "in_enp", "in_smo",
             "in_doctype", "in_docser", "in_docnum",
-            "pr_out", "date_cross", "time_cross",
         ]
         widgets = {
             "date_create": forms.DateInput(attrs={"type": "date"}),
@@ -103,8 +115,6 @@ class IrpForm(forms.ModelForm):
             "date_close": forms.DateInput(attrs={"type": "date"}),
             "z_dr": forms.DateInput(attrs={"type": "date"}),
             "in_dr": forms.DateInput(attrs={"type": "date"}),
-            "date_cross": forms.DateInput(attrs={"type": "date"}),
-            "time_cross": forms.TimeInput(attrs={"type": "time"}),
             "theme_comment": forms.Textarea(attrs={"rows": 2}),
             "text": forms.Textarea(attrs={"rows": 3}),
             "phone": forms.TextInput(attrs={"placeholder": "+7 (___) ___-__-__"}),
@@ -119,20 +129,12 @@ class IrpForm(forms.ModelForm):
             self.cleaned_data["n_irp"] = value
         return value
 
-    def clean_otv_t(self):
-        # Ограничение выбора в соответствии с организацией пользователя
-        value = self.cleaned_data.get("otv_t")
-        return value
-
     def clean(self):
         cleaned = super().clean()
         # Неактивные условные поля браузер может прислать со старым значением.
         # Нормализуем их до единого доменного ФЛК модели.
         if cleaned.get("irp_type") != 2:
             cleaned["zh_d"] = None
-        if not cleaned.get("pr_out"):
-            cleaned["date_cross"] = None
-            cleaned["time_cross"] = None
         return cleaned
 
 
@@ -215,7 +217,7 @@ class IrpRedirectForm(forms.ModelForm):
     class Meta:
         model = Irp
         fields = [
-            "otv_t", "otv_kon", "employee_it", "line_it",
+            "otv_kon", "employee_it", "line_it",
             "pr_out", "date_cross", "time_cross",
         ]
         widgets = {
@@ -225,15 +227,56 @@ class IrpRedirectForm(forms.ModelForm):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["otv_kon"].choices = [
-            org
-            for org in ORGS
-            if _has_global_org_scope(user) or org[0] == user.org
-        ]
+        self.fields["otv_kon"].label = "Куда направить"
+        self.fields["otv_kon"].choices = _route_organizations(user)
         self.fields["employee_it"].queryset = _assignable_employees(
             user, self.instance.employee_it_id
         )
+        self.fields["employee_it"].required = True
+        self.fields["employee_it"].label = "Новый ответственный"
+        self.fields["line_it"].required = True
+        self.fields["line_it"].label = "Новая линия рассмотрения"
+        self.fields["pr_out"].label = "Вид межорганизационного направления"
+        self.fields["pr_out"].help_text = (
+            "Заполняется для направления в другую организацию по классификатору обмена."
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        organization = cleaned.get("otv_kon")
+        employee = cleaned.get("employee_it")
+        line = cleaned.get("line_it")
+        if organization and employee and employee.org != organization:
+            self.add_error(
+                "employee_it",
+                "Ответственный сотрудник должен относиться к выбранной организации.",
+            )
+        allowed_lines = {1, 2, 6} if organization == TFOMS else {3, 4, 5}
+        if line and organization and line not in allowed_lines:
+            self.add_error(
+                "line_it",
+                "Линия рассмотрения не соответствует выбранной организации.",
+            )
+        if not cleaned.get("pr_out"):
+            cleaned["date_cross"] = None
+            cleaned["time_cross"] = None
+        return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.otv_t = 1 if instance.otv_kon == TFOMS else 2
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
     def clean_date_cross(self):
         value = self.cleaned_data.get("date_cross")
-        return value or datetime.date.today()
+        if self.cleaned_data.get("pr_out"):
+            return value or datetime.date.today()
+        return None
+
+    def clean_time_cross(self):
+        if not self.cleaned_data.get("pr_out"):
+            return None
+        return self.cleaned_data.get("time_cross")

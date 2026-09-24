@@ -36,6 +36,7 @@ from apps.core.storage import (
     open_field_file_or_404,
 )
 from apps.employee.models import TFOMS
+from apps.journal.access import user_can_access_irp, visible_irps_for_user
 from apps.journal.forms import (
     IrpAnswerForm,
     IrpFilterForm,
@@ -67,9 +68,9 @@ def irp_suggest(request):
     q = (request.GET.get("q") or "").strip()
     if field not in ("n_irp", "z_f", "z_enp") or len(q) < 3:
         return JsonResponse({"suggestions": []})
-    qs = Irp.objects.exclude(**{field: ""}).distinct()
-    if not request.user.is_superuser and request.user.org != TFOMS:
-        qs = qs.filter(employee_one__org=request.user.org)
+    qs = visible_irps_for_user(
+        request.user, Irp.objects.exclude(**{field: ""})
+    )
     qs = contains_folded(qs, field, q, "suggest_match")
     values = list(qs.order_by(field).values_list(field, flat=True).distinct()[:8])
     return JsonResponse({"suggestions": values})
@@ -83,8 +84,7 @@ def irp_list(request):
     qs = Irp.objects.select_related("theme", "employee_one", "employee_it")
 
     # СМО видят только свои обращения (принцип v1 get_queryset)
-    if not request.user.is_superuser and request.user.org != TFOMS:
-        qs = qs.filter(employee_one__org=request.user.org)
+    qs = visible_irps_for_user(request.user, qs)
 
     form = IrpFilterForm(request.GET or None)
     if form.is_bound and form.is_valid():
@@ -294,8 +294,17 @@ def irp_create(request):
     """Ручная регистрация обращения (ТЗ разд. 2.2, Способ 1)."""
     _require_capability(request, JOURNAL_CREATE)
     attachment_error = ""
+    initial_line = _registration_line(request.user)
+    new_irp = Irp(
+        employee_one=request.user,
+        line_one=initial_line,
+        employee_it=request.user,
+        line_it=initial_line,
+        otv_t=1 if request.user.org == TFOMS else 2,
+        otv_kon=request.user.org,
+    )
     if request.method == "POST":
-        form = IrpForm(request.POST, user=request.user)
+        form = IrpForm(request.POST, instance=new_irp, user=request.user)
         uploaded = request.FILES.get("attachment")
         if uploaded:
             try:
@@ -308,7 +317,11 @@ def irp_create(request):
             with UploadedFileRollback() as file_rollback, transaction.atomic():
                 irp = form.save(commit=False)
                 irp.employee_one = request.user
-                irp.line_one = 1 if request.user.org == TFOMS else 3
+                irp.line_one = initial_line
+                irp.employee_it = request.user
+                irp.line_it = initial_line
+                irp.otv_t = 1 if request.user.org == TFOMS else 2
+                irp.otv_kon = request.user.org
                 irp.save()
                 _write_history(irp, request.user, created=True)
                 if uploaded:
@@ -344,7 +357,7 @@ def irp_create(request):
             messages.success(request, "Обращение зарегистрировано.")
             return redirect(reverse("journal:detail", args=[irp.pk]))
     else:
-        form = IrpForm(user=request.user)
+        form = IrpForm(instance=new_irp, user=request.user)
     return render(
         request,
         "journal/irp_form.html",
@@ -369,10 +382,12 @@ def irp_edit(request, pk):
             _require_mutable(irp)
             form = IrpForm(request.POST, instance=irp, user=request.user)
             # ModelForm мутирует instance при валидации — снимок до is_valid()
-            before = {f: getattr(irp, f) for f in form.fields}
+            before = {f: getattr(irp, f) for f in (*form.fields, "otv_t")}
             if form.is_valid():
                 old = {f: before[f] for f in form.changed_data}
                 irp = form.save(commit=False)
+                if irp.otv_t != before["otv_t"]:
+                    old["otv_t"] = before["otv_t"]
                 target = (
                     Irp.Status.CLOSED
                     if irp.date_close and irp.result
@@ -577,13 +592,22 @@ def _get_irp_for_user(request, pk, *, for_update=False):
     if for_update:
         queryset = queryset.select_for_update()
     irp = get_object_or_404(queryset, pk=pk)
-    if (
-        not request.user.is_superuser
-        and request.user.org != TFOMS
-        and irp.employee_one.org != request.user.org
-    ):
+    if not user_can_access_irp(request.user, irp):
         raise PermissionDenied
     return irp
+
+
+def _registration_line(user):
+    """Immutable intake line derived from the role that may register appeals."""
+    from apps.core.policy import role_codes_for_user
+    from apps.core.roles import Roles
+
+    roles = role_codes_for_user(user)
+    if Roles.OP1 in roles:
+        return Roles.OP1
+    if Roles.SP1 in roles:
+        return Roles.SP1
+    return Roles.ADMIN if user.org == TFOMS else Roles.SP1
 
 
 def _log_irp_access(request, irp, event_type, action):

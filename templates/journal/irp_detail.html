@@ -15,7 +15,7 @@
     </div>
   </div>
   <div class="record-actions">
-    <a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a>
+    <a class="btn btn--ghost" href="{% url 'journal:list' %}">← К обращениям</a>
     <a class="btn btn--ghost" href="{% url 'journal:print' irp.pk %}" target="_blank" rel="noopener">Печать</a>
     {% if not irp.is_closed %}
       {% if can_journal_redirect %}<a class="btn btn--ghost" href="{% url 'journal:redirect' irp.pk %}">Переадресовать</a>{% endif %}

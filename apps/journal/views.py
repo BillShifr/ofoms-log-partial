@@ -14,7 +14,7 @@ import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -50,6 +50,7 @@ from apps.journal.table import (
     JOURNAL_TABLE_KEY,
 )
 from apps.system.models import UserTableViewPref
+from apps.system.validators import validate_attachment_file
 
 PAGE_SIZE = 25
 
@@ -292,15 +293,39 @@ def irp_print(request, pk):
 def irp_create(request):
     """Ручная регистрация обращения (ТЗ разд. 2.2, Способ 1)."""
     _require_capability(request, JOURNAL_CREATE)
+    attachment_error = ""
     if request.method == "POST":
         form = IrpForm(request.POST, user=request.user)
-        if form.is_valid():
-            with transaction.atomic():
+        uploaded = request.FILES.get("attachment")
+        if uploaded:
+            try:
+                validate_attachment_file(uploaded)
+            except ValidationError:
+                attachment_error = (
+                    "Файл не прикреплён: допустимы документы и архивы до 20 МБ."
+                )
+        if form.is_valid() and not attachment_error:
+            with UploadedFileRollback() as file_rollback, transaction.atomic():
                 irp = form.save(commit=False)
                 irp.employee_one = request.user
                 irp.line_one = 1 if request.user.org == TFOMS else 3
                 irp.save()
                 _write_history(irp, request.user, created=True)
+                if uploaded:
+                    attachment = IrpFile(
+                        irp=irp,
+                        file=uploaded,
+                        uploader=request.user,
+                    )
+                    file_rollback.track(attachment.file)
+                    attachment.save()
+                    IrpHistory.objects.create(
+                        irp=irp,
+                        user=request.user,
+                        field_name="file",
+                        old_value="—",
+                        new_value=uploaded.name,
+                    )
                 log_event(
                     module="journal",
                     event_type=EventLog.EventType.CREATE,
@@ -308,6 +333,14 @@ def irp_create(request):
                     target=f"irp:{irp.pk}:{irp.n_irp}",
                     ip=request.META.get("REMOTE_ADDR"),
                 )
+                if uploaded:
+                    log_event(
+                        module="journal",
+                        event_type=EventLog.EventType.CREATE,
+                        user=request.user,
+                        target=f"irp:{irp.pk}:file:{uploaded.name}",
+                        ip=request.META.get("REMOTE_ADDR"),
+                    )
             messages.success(request, "Обращение зарегистрировано.")
             return redirect(reverse("journal:detail", args=[irp.pk]))
     else:
@@ -317,6 +350,7 @@ def irp_create(request):
         "journal/irp_form.html",
         {
             "form": form,
+            "attachment_error": attachment_error,
             "theme_form": IrpThemeForm(),
             "title": "Регистрация обращения",
             "active_nav": "journal",
@@ -429,8 +463,6 @@ def irp_file_upload(request, pk):
     _require_mutable(irp)
     uploaded = request.FILES.get("file")
     if uploaded:
-        from apps.system.validators import validate_attachment_file
-
         try:
             validate_attachment_file(uploaded)
         except Exception:  # noqa: BLE001 -- return a stable user-facing error

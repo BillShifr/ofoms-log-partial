@@ -711,6 +711,21 @@ table.data td.task-cell--actions { width: 168px; max-width: 168px; }
 }
 .journal-actions { justify-content: space-between; align-items: center; }
 .journal-actions__primary, .journal-actions__secondary { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.registration-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.registration-actions h2 { margin: 2px 0 0; font-size: 1.05rem; }
+.registration-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.registration-actions__buttons .btn { justify-content: center; }
 
 /* ---------- Карточка обращения и длинные формы ---------- */
 .record-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 22px; }
@@ -1645,6 +1660,12 @@ table.data .control-group__heading th {
   .header__user-name { max-width: 112px; font-size: .82rem; }
   .theme-switch__btn { width: 30px; }
   .form-actions { flex-wrap: wrap; }
+  .registration-actions { grid-template-columns: minmax(0, 1fr); }
+  .registration-actions__buttons {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+  }
   .journal-actions, .journal-actions__primary, .journal-actions__secondary { width: 100%; }
   .journal-actions__primary .btn { flex: 1; justify-content: center; }
   .journal-actions__secondary { display: grid; grid-template-columns: 1fr 1fr; }

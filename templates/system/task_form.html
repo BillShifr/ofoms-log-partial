@@ -36,9 +36,13 @@
       <div class="form-grid task-form-grid">
         {% for parameter in task_parameter_fields %}
         <div class="field" data-conditional-controller="{{ form.command.id_for_label }}" data-conditional-values="{{ parameter.command }}">
+          {% if parameter.kind == 'boolean' %}
+          <input type="hidden" name="{{ parameter.field.html_name }}" value="0">
+          <label class="checkbox task-param-checkbox">{{ parameter.field }}{{ parameter.field.label }}</label>
+          {% else %}
           <label for="{{ parameter.field.id_for_label }}">{{ parameter.field.label }}</label>
-          {% if parameter.kind == 'boolean' %}<input type="hidden" name="{{ parameter.field.html_name }}" value="0">{% endif %}
           {{ parameter.field }}
+          {% endif %}
           {% if parameter.field.help_text %}<span class="text-muted">{{ parameter.field.help_text }}</span>{% endif %}
           {% for error in parameter.field.errors %}<span class="alert alert--error">{{ error }}</span>{% endfor %}
         </div>
@@ -108,8 +112,24 @@
           <div class="field field--wide">
             <label for="{{ action_form.name.id_for_label }}">Наименование</label>{{ action_form.name }}
           </div>
+          <div class="field">
+            <label for="{{ action_form.action_type.id_for_label }}">Тип сценария</label>{{ action_form.action_type }}
+          </div>
+          <div class="field" data-conditional-controller="{{ action_form.action_type.id_for_label }}" data-conditional-values="close_appeals">
+            <label for="{{ action_form.condition_logic.id_for_label }}">Логика условий</label>{{ action_form.condition_logic }}
+          </div>
+          <div class="field" data-conditional-controller="{{ action_form.action_type.id_for_label }}" data-conditional-values="close_appeals">
+            <label for="{{ action_form.condition_status.id_for_label }}">Статус обращений</label>{{ action_form.condition_status }}
+          </div>
+          <div class="field" data-conditional-controller="{{ action_form.action_type.id_for_label }}" data-conditional-values="close_appeals">
+            <label for="{{ action_form.condition_org.id_for_label }}">Организация</label>{{ action_form.condition_org }}
+          </div>
+          <div class="field" data-conditional-controller="{{ action_form.action_type.id_for_label }}" data-conditional-values="close_appeals">
+            <label for="{{ action_form.close_result.id_for_label }}">Исход при закрытии</label>{{ action_form.close_result }}
+          </div>
           <div class="field field--wide">
             <label for="{{ action_form.description.id_for_label }}">Описание</label>{{ action_form.description }}
+            {% if action_form.description.help_text %}<span class="text-muted">{{ action_form.description.help_text }}</span>{% endif %}
           </div>
         </div>
         <div class="modal__actions">

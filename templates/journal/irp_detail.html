@@ -99,7 +99,8 @@
     {% if answer.files.all %}
     <ul class="file-list">
       {% for f in answer.files.all %}
-      <li><a data-no-ajax href="{% url 'journal:file_download' f.pk %}">{{ f.file.name }}</a></li>
+      <li><a data-no-ajax href="{% url 'journal:file_download' f.pk %}">{{ f.file.name }}</a>
+        <span class="text-muted">— загрузил {{ f.uploader.full_name|default:f.uploader.username|default:"—" }}, {{ f.created_at|date:"d.m.Y H:i" }}</span></li>
       {% endfor %}
     </ul>
     {% endif %}
@@ -122,7 +123,7 @@
     {% csrf_token %}
     <div class="field"><label for="id_file">Прикрепить файл</label>
       <input type="file" name="file" id="id_file" required accept=".doc,.docx,.odt,.ods,.pdf,.rtf,.txt,.xls,.xlsx,.zip">
-      <select name="answer" id="id_answer">
+      <select name="answer" id="id_answer"{% if not answers %} hidden{% endif %}>
         <option value="">к обращению</option>
         {% for answer in answers %}<option value="{{ answer.pk }}">к ответу от {{ answer.created_at|date:"d.m.Y H:i" }}</option>{% endfor %}
       </select>
@@ -137,7 +138,8 @@
   {% if files %}
   <ul class="file-list">
     {% for f in files %}
-    <li>{{ f.file.name }} <span class="text-muted">— {{ f.uploader.full_name|default:"—" }}, {{ f.created_at|date:"d.m.Y H:i" }}</span></li>
+    <li><a data-no-ajax href="{% url 'journal:file_download' f.pk %}">{{ f.file.name }}</a>
+      <span class="text-muted">— загрузил {{ f.uploader.full_name|default:f.uploader.username|default:"—" }}, {{ f.created_at|date:"d.m.Y H:i" }}</span></li>
     {% endfor %}
   </ul>
   {% else %}

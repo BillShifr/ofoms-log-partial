@@ -2059,6 +2059,61 @@ class TaskTests(BaseSystemTestCase):
         self.assertIn("Пользовательское действие выполнено", task.last_log)
         self.assertIn("Сверить протокол обмена", task.last_log)
 
+    def test_custom_close_appeals_action_closes_matching_appeals(self):
+        theme = IrpTheme.objects.create(
+            code_name="TASK.CLOSE",
+            title="Закрытие задачей",
+            version=3,
+        )
+        matching = Irp.objects.create(
+            n_irp=str(uuid.uuid4()),
+            irp_type=1,
+            date_create=datetime.date.today() - datetime.timedelta(days=40),
+            way=1,
+            how=2,
+            theme=theme,
+            otv_t=1,
+            otv_kon=81000,
+            employee_one=self.admin,
+            data_plan=datetime.date.today() - datetime.timedelta(days=5),
+            z_f="Закрыть",
+        )
+        untouched = Irp.objects.create(
+            n_irp=str(uuid.uuid4()),
+            irp_type=1,
+            date_create=datetime.date.today(),
+            way=1,
+            how=2,
+            theme=theme,
+            otv_t=1,
+            otv_kon=81001,
+            employee_one=self.smo,
+            data_plan=datetime.date.today() + datetime.timedelta(days=30),
+            z_f="Не закрывать",
+        )
+        action = TaskAction.objects.create(
+            name="Закрыть просроченные ТФОМС",
+            action_type=TaskAction.ActionType.CLOSE_APPEALS,
+            condition_status=TaskAction.AppealStatus.OVERDUE,
+            condition_org=81000,
+            close_result=2,
+            created_by=self.operator,
+        )
+        task = self._make_task(name="Закрытие обращений", command=action.command_code)
+
+        run = task.enqueue(user=self.admin)
+        TaskJob.execute_run(run.pk)
+        matching.refresh_from_db()
+        untouched.refresh_from_db()
+        task.refresh_from_db()
+
+        self.assertEqual(task.status, TaskJob.Status.COMPLETED)
+        self.assertEqual(matching.status, Irp.Status.CLOSED)
+        self.assertEqual(matching.result, 2)
+        self.assertEqual(matching.date_close, datetime.date.today())
+        self.assertIsNone(untouched.date_close)
+        self.assertIn("закрыто обращений 1 из 1", task.last_log)
+
     def test_task_run_history_uses_responsive_rows(self):
         task = self._make_task()
         finished_at = timezone.now()

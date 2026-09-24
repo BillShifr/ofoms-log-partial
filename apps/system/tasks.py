@@ -149,6 +149,52 @@ def _run_exchange_import(params):
     )
 
 
+def _run_custom_action(action):
+    import datetime as _dt
+
+    from django.db.models import Q
+
+    from apps.journal.models import Irp
+
+    if action.action_type != action.ActionType.CLOSE_APPEALS:
+        if action.description:
+            return f"Пользовательское действие выполнено: {action.name}. {action.description}"
+        return f"Пользовательское действие выполнено: {action.name}."
+
+    conditions = []
+    today = _dt.date.today()
+    if action.condition_status == action.AppealStatus.OPEN:
+        conditions.append(Q(date_close__isnull=True))
+    elif action.condition_status == action.AppealStatus.OVERDUE:
+        conditions.append(Q(date_close__isnull=True, data_plan__lt=today))
+    elif action.condition_status == action.AppealStatus.PRELIMINARY:
+        conditions.append(Q(date_close__isnull=True, status=Irp.Status.PRELIMINARY))
+    if action.condition_org:
+        conditions.append(Q(otv_kon=action.condition_org))
+
+    if not conditions:
+        return f"Пользовательское действие «{action.name}» пропущено: условия не заданы."
+
+    query = conditions[0]
+    for condition in conditions[1:]:
+        query = query & condition if action.condition_logic == action.ConditionLogic.ALL else query | condition
+    queryset = Irp.objects.filter(query, date_close__isnull=True)
+    selected = queryset.count()
+    if selected == 0:
+        return f"Пользовательское действие «{action.name}»: подходящих обращений не найдено."
+
+    result = action.close_result or 2
+    updated = queryset.update(
+        date_close=today,
+        result=result,
+        status=Irp.Status.CLOSED,
+    )
+    return (
+        f"Пользовательское действие «{action.name}» выполнено: "
+        f"закрыто обращений {updated} из {selected}. Исход: {dict(Irp._meta.get_field('result').choices).get(result, result)}."
+    )
+
+
 def _register_builtin_commands():
     from apps.employee.models import ORGS
 
@@ -195,8 +241,6 @@ def run_command(command: str, params: dict | None) -> str:
             action = TaskAction.objects.get(pk=action_id, is_active=True)
         except (TaskAction.DoesNotExist, ValueError) as exc:
             raise ValidationError("Пользовательское действие недоступно.") from exc
-        if action.description:
-            return f"Пользовательское действие выполнено: {action.name}. {action.description}"
-        return f"Пользовательское действие выполнено: {action.name}."
+        return _run_custom_action(action)
     definition = get_task_command(command)
     return definition.handler(validate_command_params(command, params))

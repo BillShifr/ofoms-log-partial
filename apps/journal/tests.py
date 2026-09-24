@@ -688,6 +688,14 @@ class JournalScreenTests(TestCase):
         self.assertIn("content: attr(data-label)", css)
         self.assertNotIn("tbody tr:hover { background: color-mix(in srgb, var(--chip-green)", css)
 
+    def test_irp_form_uses_native_date_and_time_controls(self):
+        form = IrpForm(user=self.tfoms_user)
+
+        for field_name in ("date_create", "data_plan", "date_close", "z_dr", "in_dr"):
+            self.assertEqual(form.fields[field_name].widget.input_type, "date")
+        for field_name in ("time_create", "time_cross"):
+            self.assertEqual(form.fields[field_name].widget.input_type, "time")
+
     def test_suggest_runs_in_database_and_preserves_org_scope(self):
         own = self._make_irp(owner=self.smo_user)
         own.z_f = "АЛЕКСАНДР Свой"
@@ -1704,6 +1712,8 @@ class RoutingTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Ответ на обращение")
         self.assertContains(resp, "attach.txt")
+        self.assertContains(resp, "загрузил")
+        self.assertContains(resp, self.tfoms_user.username)
         self.assertContains(resp, "Предварительный ответ")
 
 

@@ -14,6 +14,7 @@ from apps.system.models import (
     MessageThread,
     NewsItem,
     SystemDocument,
+    TaskAction,
     TaskFile,
     TaskJob,
     TaskNote,
@@ -367,7 +368,17 @@ class TaskForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["command"].choices = task_command_choices()
+        builtin_choices = list(task_command_choices())
+        custom_actions = TaskAction.objects.filter(is_active=True).order_by("name")
+        if self.instance.pk and str(self.instance.command).startswith("custom:"):
+            action_id = str(self.instance.command).split(":", 1)[1]
+            if action_id.isdigit():
+                custom_actions = custom_actions | TaskAction.objects.filter(pk=action_id)
+        custom_choices = [
+            (action.command_code, f"{action.name} (пользовательское)")
+            for action in custom_actions.distinct()
+        ]
+        self.fields["command"].choices = builtin_choices + custom_choices
         self.fields["interval_minutes"].help_text = "Интервал автозапуска в минутах"
         self.fields["interval_minutes"].required = False
         self.fields["max_retries"].widget.attrs.update({"min": 0, "max": 10})
@@ -453,6 +464,12 @@ class TaskForm(forms.ModelForm):
             self.add_error("retry_delay_seconds", "Допустимо от 0 до 86 400 секунд.")
         command = cleaned.get("command")
         if command:
+            if str(command).startswith("custom:"):
+                action_id = str(command).split(":", 1)[1]
+                if not action_id.isdigit() or not TaskAction.objects.filter(pk=action_id, is_active=True).exists():
+                    self.add_error("command", "Выберите доступное действие.")
+                cleaned["params"] = {}
+                return cleaned
             definition = get_task_command(command)
             submitted_names = {
                 f"param__{command}__{parameter.key}" for parameter in definition.parameters
@@ -473,6 +490,31 @@ class TaskForm(forms.ModelForm):
     def save(self, commit=True):
         self.instance.params = self.cleaned_data.get("params", {})
         return super().save(commit=commit)
+
+
+class TaskActionForm(forms.ModelForm):
+    """Создание пользовательского действия для задач."""
+
+    class Meta:
+        model = TaskAction
+        fields = ("name", "description")
+        widgets = {
+            "name": forms.TextInput(attrs={"placeholder": "Например: Проверка выгрузки"}),
+            "description": forms.Textarea(
+                attrs={"rows": 3, "placeholder": "Что должен сделать исполнитель при запуске"}
+            ),
+        }
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if not name:
+            raise forms.ValidationError("Укажите наименование действия.")
+        duplicate = TaskAction.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if duplicate.exists():
+            raise forms.ValidationError("Действие с таким названием уже есть.")
+        return name
 
 
 class TaskNoteForm(forms.ModelForm):

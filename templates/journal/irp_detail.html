@@ -9,6 +9,7 @@
     <div class="record-heading__status" aria-label="Статус обращения">
     {% if irp.is_closed %}<span class="badge badge--closed">{{ irp.get_status_display }}</span>
     {% elif irp.is_overdue %}<span class="badge badge--overdue">Просрочено</span>
+    {% elif irp.status == 'preliminary' %}<span class="badge badge--preliminary">{{ irp.get_status_display }}</span>
     {% else %}<span class="badge badge--open">{{ irp.get_status_display }}</span>{% endif %}
     {% if irp.result %}<span class="badge badge--result">{{ irp.get_result_display }}</span>{% endif %}
     </div>

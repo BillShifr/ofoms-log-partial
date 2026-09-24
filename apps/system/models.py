@@ -835,6 +835,36 @@ class TaskRun(models.Model):
         return f"{self.task_id} @ {moment:%Y-%m-%d %H:%M}"
 
 
+class TaskAction(models.Model):
+    """Пользовательское действие, доступное в поле действия автоматизированной задачи."""
+
+    name = models.CharField(max_length=120, unique=True, verbose_name="Наименование")
+    description = models.TextField(blank=True, default="", verbose_name="Описание")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_task_actions",
+        verbose_name="Создал",
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Доступно")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        verbose_name = "Действие задачи"
+        verbose_name_plural = "Действия задач"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def command_code(self) -> str:
+        return f"custom:{self.pk}"
+
+
 class TaskNote(models.Model):
     """Заметка к задаче (PRD v3 §2.11)."""
 

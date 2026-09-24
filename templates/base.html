@@ -52,7 +52,7 @@
     <div class="container nav__shell">
     <div class="nav__scroll"><div class="nav__inner">
       <a class="nav__link {% if active_nav == 'journal' %}nav__link--active{% endif %}"
-         href="{% url 'journal:list' %}">Журнал</a>
+         href="{% url 'journal:list' %}">Регистрация</a>
       {% if can_manage_system %}
       <a class="nav__link {% if active_nav == 'tasks' %}nav__link--active{% endif %}"
          href="{% url 'system:tasks' %}">Задачи</a>

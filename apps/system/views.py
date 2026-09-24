@@ -1855,7 +1855,7 @@ def news_delete(request, pk):
 def _table_meta(table_key: str) -> dict | None:
     if table_key == JOURNAL_TABLE_KEY:
         return {
-            "title": "Журнал обращений",
+            "title": "Обращения",
             "columns": JOURNAL_COLUMNS,
             "allowed_sorts": SORTABLE_FIELDS,
         }

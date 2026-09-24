@@ -32,7 +32,7 @@ from apps.system.validators import (
 EVENT_MODULE_CHOICES = (
     ("auth", "Вход/выход"),
     ("employee", "Пользователи"),
-    ("journal", "Журнал обращений"),
+    ("journal", "Регистрация обращений"),
     ("exchange", "Обмен"),
     ("reports", "Отчётность"),
     ("system", "Система"),

@@ -2,11 +2,11 @@
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
 <header class="page-heading form-page-heading">
-  <div><p class="page-heading__eyebrow">Журнал обращений</p><h1>{{ title }}</h1><p class="page-heading__lead">Заполните сведения по разделам. Обязательные поля отмечены звёздочкой.</p></div>
+  <div><p class="page-heading__eyebrow">Обращения</p><h1>{{ title }}</h1><p class="page-heading__lead">Заполните сведения по разделам. Обязательные поля отмечены звёздочкой.</p></div>
 </header>
 
 <div class="card form-card">
-  <form method="post" data-validate>
+  <form method="post" enctype="multipart/form-data" data-validate>
     {% csrf_token %}
 
     {% if form.non_field_errors %}
@@ -85,6 +85,20 @@
       <div class="field" data-conditional-controller="id_pr_out" data-conditional-values="*"><label>Дата направления</label>{{ form.date_cross }}{{ form.date_cross.errors }}</div>
       <div class="field" data-conditional-controller="id_pr_out" data-conditional-values="*"><label>Время направления</label>{{ form.time_cross }}{{ form.time_cross.errors }}</div>
     </div>
+
+    {% if not irp %}
+    <details class="form-disclosure"{% if attachment_error %} open{% endif %}>
+      <summary class="form-section-heading form-disclosure__summary"><span>07</span><div><h2>Первичное вложение</h2><p>Документ можно прикрепить сразу при регистрации обращения</p></div><span class="form-disclosure__action" aria-hidden="true">Необязательно</span></summary>
+      <div class="form-grid form-disclosure__content">
+        <div class="field span-2">
+          <label for="id_attachment">Файл к обращению</label>
+          <input type="file" name="attachment" id="id_attachment" accept=".doc,.docx,.odt,.ods,.pdf,.rtf,.txt,.xls,.xlsx,.zip">
+          <span class="helptext">Документы и архивы до 20 МБ. Прикреплённый файл сразу появится в карточке обращения.</span>
+          {% if attachment_error %}<span class="field-error">{{ attachment_error }}</span>{% endif %}
+        </div>
+      </div>
+    </details>
+    {% endif %}
 
     <div class="form-actions form-actions--sticky">
       <button class="btn btn--primary" type="submit">Сохранить</button>

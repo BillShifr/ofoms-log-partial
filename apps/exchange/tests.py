@@ -1019,6 +1019,41 @@ class UploadScreenTests(ExchangeTestMixin, TestCase):
         self.assertContains(response, "Ошибка 41")
         self.assertContains(response, 'id="protocol-error-1"')
 
+    def test_protocol_links_existing_accessible_appeal(self):
+        n_irp = str(uuid.uuid4())
+        irp = Irp.objects.create(
+            n_irp=n_irp,
+            irp_type=1,
+            date_create=datetime.date.today(),
+            way=1,
+            how=2,
+            theme=self.theme,
+            otv_t=1,
+            otv_kon=81000,
+            employee_one=self.tfoms,
+            data_plan=datetime.date.today() + datetime.timedelta(days=30),
+            z_f="Протокол",
+        )
+        log = ImportLog.objects.create(
+            org=81000,
+            kind="irp",
+            filename="linked.xml",
+            status="error",
+            rows=0,
+            flcp=(
+                "<?xml version='1.0' encoding='windows-1251'?><FLCP>"
+                f"<PR OSHIB='41' IM_POL='z_f' N_ZAP='{n_irp}' COMMENT='Проверка'/>"
+                "</FLCP>"
+            ),
+        )
+        self.client.force_login(self.tfoms)
+
+        response = self.client.get(reverse("exchange:protocol", args=[log.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("journal:detail", args=[irp.pk]))
+        self.assertContains(response, f">{n_irp}</a>", html=False)
+
     def test_protocol_groups_rows_by_error_code(self):
         log = ImportLog.objects.create(
             org=81000,

@@ -213,6 +213,20 @@ def exchange_protocol(request, pk):
     ):
         raise PermissionDenied
     rows = _parse_flcp(log.flcp)
+    if rows:
+        numbers = {
+            str(row.get("N_ZAP")).strip()
+            for row in rows
+            if row.get("N_ZAP")
+        }
+        irps = Irp.objects.filter(n_irp__in=numbers).only("pk", "n_irp", "employee_one")
+        if request.user.org != TFOMS and not request.user.is_superuser:
+            irps = irps.filter(employee_one__org=request.user.org)
+        irp_by_number = {irp.n_irp: irp.pk for irp in irps}
+        for row in rows:
+            number = str(row.get("N_ZAP") or "").strip()
+            if number in irp_by_number:
+                row["IRP_PK"] = irp_by_number[number]
     protocol_groups = []
     grouped = {}
     for row in rows or []:

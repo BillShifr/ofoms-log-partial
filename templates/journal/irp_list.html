@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load ui_components %}
-{% block title %}Журнал обращений{% endblock %}
+{% block title %}Обращения{% endblock %}
 {% block content %}
 <div class="page-heading">
   <div>
-    <p class="page-heading__eyebrow">Рабочий реестр</p>
+    <p class="page-heading__eyebrow">Регистрация обращений</p>
     <h1>Обращения граждан</h1>
     <p class="page-heading__lead">Регистрация, контроль сроков и обработка обращений в едином окне.</p>
   </div>
@@ -13,6 +13,19 @@
     <span>найдено</span>
   </div>
 </div>
+
+<section class="card registration-actions" aria-labelledby="registration-actions-title">
+  <div>
+    <p class="section-heading__index">Способы регистрации</p>
+    <h2 id="registration-actions-title">Создать обращение или загрузить файл</h2>
+  </div>
+  <div class="registration-actions__buttons">
+    {% if can_journal_create %}<a class="btn btn--accent" href="{% url 'journal:create' %}"><span aria-hidden="true">＋</span> Ввести вручную</a>{% endif %}
+    {% if can_exchange_upload %}<a class="btn btn--primary" href="{% url 'exchange:upload' %}">Загрузить XML/Excel</a>{% endif %}
+    <a class="btn btn--ghost" href="{% url 'exchange:logs' %}">Протоколы загрузок</a>
+    {% if can_manage_system %}<a class="btn btn--ghost" href="{% url 'system:tasks' %}">Автозагрузка из каталога</a>{% endif %}
+  </div>
+</section>
 
 <div class="card mb-2">
   <form method="get" id="journal-filter-form" data-require-input data-require-message="Укажите хотя бы один критерий фильтра">

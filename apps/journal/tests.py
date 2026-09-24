@@ -638,6 +638,10 @@ class JournalScreenTests(TestCase):
         self.client.force_login(self.tfoms_user)
         resp = self.client.get(reverse("journal:list"))
         self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Способы регистрации")
+        self.assertContains(resp, "Ввести вручную")
+        self.assertContains(resp, "Загрузить XML/Excel")
+        self.assertContains(resp, "Протоколы загрузок")
         self.assertContains(resp, "Петров")
         self.assertContains(resp, f'data-href="{reverse("journal:detail", args=[irp.pk])}"')
         self.assertContains(resp, "table-row-link")
@@ -957,6 +961,44 @@ class JournalScreenTests(TestCase):
         self.assertTrue(IrpHistory.objects.filter(irp=irp).exists())
         # заявитель зафиксирован как инициатор создания
         self.assertEqual(irp.employee_one, self.tfoms_user)
+
+    def test_create_accepts_initial_attachment(self):
+        self.client.force_login(self.tfoms_user)
+        with tempfile.TemporaryDirectory() as media_root, override_settings(
+            MEDIA_ROOT=media_root
+        ):
+            resp = self.client.post(
+                reverse("journal:create"),
+                {
+                    "irp_type": 2,
+                    "date_create": datetime.date.today().isoformat(),
+                    "way": 1,
+                    "how": 2,
+                    "theme": self.theme.pk,
+                    "otv_t": 1,
+                    "otv_kon": 81000,
+                    "employee_one": self.tfoms_user.pk,
+                    "line_one": 1,
+                    "data_plan": (
+                        datetime.date.today() + datetime.timedelta(days=30)
+                    ).isoformat(),
+                    "z_f": "С вложением",
+                    "attachment": SimpleUploadedFile(
+                        "statement.txt", b"initial evidence", content_type="text/plain"
+                    ),
+                },
+            )
+
+            self.assertEqual(resp.status_code, 302)
+            irp = Irp.objects.get(z_f="С вложением")
+            attachment = IrpFile.objects.get(irp=irp, answer__isnull=True)
+            self.assertEqual(attachment.uploader, self.tfoms_user)
+            self.assertTrue(Path(media_root, attachment.file.name).exists())
+            self.assertTrue(
+                IrpHistory.objects.filter(
+                    irp=irp, field_name="file", new_value="statement.txt"
+                ).exists()
+            )
 
     def test_create_rolls_back_record_and_history_when_audit_fails(self):
         self.client.force_login(self.tfoms_user)

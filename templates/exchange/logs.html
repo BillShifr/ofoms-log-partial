@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load ui_components %}
-{% block title %}Журнал загрузок обмена{% endblock %}
+{% block title %}Протоколы загрузок{% endblock %}
 {% block content %}
 <header class="page-heading page-heading--action">
-  <div><p class="page-heading__eyebrow">Обмен данными</p><h1>Загрузки файлов</h1><p class="page-heading__lead">История обработки входящих реестров и протоколы проверки</p></div>
-  <div class="page-heading__actions"><a class="btn btn--ghost" href="{% url 'journal:list' %}">← В журнал</a>{% if can_exchange_upload %}<a class="btn btn--primary" href="{% url 'exchange:upload' %}">+ Загрузить файл</a>{% endif %}</div>
+  <div><p class="page-heading__eyebrow">Регистрация обращений</p><h1>Протоколы загрузок</h1><p class="page-heading__lead">История обработки XML/Excel-файлов и результаты форматно-логического контроля</p></div>
+  <div class="page-heading__actions"><a class="btn btn--ghost" href="{% url 'journal:list' %}">← К обращениям</a>{% if can_exchange_upload %}<a class="btn btn--primary" href="{% url 'exchange:upload' %}">+ Загрузить файл</a>{% endif %}</div>
 </header>
 
 <div class="card table-card">

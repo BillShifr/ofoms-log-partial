@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Загрузка файла обмена{% endblock %}
+{% block title %}Загрузка обращений из файла{% endblock %}
 {% block content %}
-<header class="module-heading"><a class="module-heading__back" href="{% url 'exchange:logs' %}">← Журнал загрузок</a><p class="page-heading__eyebrow">Обмен данными</p><h1>Загрузка файла</h1><p>XML или Excel будет автоматически проверен. После обработки откроется подробный протокол ФЛК.</p></header>
+<header class="module-heading"><a class="module-heading__back" href="{% url 'journal:list' %}">← К обращениям</a><p class="page-heading__eyebrow">Регистрация обращений</p><h1>Загрузка XML/Excel</h1><p>Файл будет обработан тем же форматно-логическим контролем, что и ручная регистрация. После обработки откроется подробный протокол ФЛК.</p></header>
 
 <div class="card upload-card">
   <form method="post" enctype="multipart/form-data" id="upload-form"
@@ -15,7 +15,8 @@
     {% for error in form.non_field_errors %}<div class="alert alert--error">{{ error }}</div>{% endfor %}
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Загрузить и обработать</button>
-      <a class="btn btn--ghost" href="{% url 'exchange:logs' %}">Отмена</a>
+      <a class="btn btn--ghost" href="{% url 'exchange:logs' %}">Протоколы загрузок</a>
+      <a class="btn btn--ghost" href="{% url 'journal:list' %}">Отмена</a>
     </div>
   </form>
 </div>

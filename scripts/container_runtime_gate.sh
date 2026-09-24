@@ -23,7 +23,9 @@ docker run --rm \
     test ! -e /app/.ruff_cache
     test ! -e /app/.mypy_cache
     test ! -e /app/tests
+    test -z "$(find /app/apps \( -name 'tests.py' -o -name 'test_*.py' \) -print -quit)"
     test ! -e /app/scripts
+    test ! -e /app/package.json
     test ! -e /app/.git
     test ! -e /app/.env
     test ! -e /app/.env.example

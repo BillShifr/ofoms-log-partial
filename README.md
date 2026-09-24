@@ -30,7 +30,13 @@ CREATE DATABASE ejournal OWNER ejournal;
 
 ## Запуск в Docker
 
+Production Compose подключается только к явно указанному внешнему PostgreSQL и
+перед миграциями выполняет read-only проверку схемы. Старую схему v1 он намеренно
+не изменяет на месте.
+
 ```bash
+cp .env.production.example .env
+# Заполнить секреты, адрес PostgreSQL и публичные имена.
 VCS_REF=$(git rev-parse HEAD) docker compose up --build
 ```
 

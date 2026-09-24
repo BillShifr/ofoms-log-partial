@@ -69,26 +69,18 @@
       </div>
     </details>
 
-    <div class="form-section-heading"><span>05</span><div><h2>Исполнение</h2><p>Ответственные организация и сотрудники</p></div></div>
-    <div class="form-grid">
-      <div class="field"><label>Ответственная организация (тип)</label>{{ form.otv_t }}{{ form.otv_t.errors }}</div>
-      <div class="field"><label>Ответственная организация</label>{{ form.otv_kon }}{{ form.otv_kon.errors }}</div>
-      <div class="field"><label>Принял</label>{{ form.employee_one }}{{ form.employee_one.errors }}{% if form.employee_one.help_text %}<span class="helptext" id="{{ form.employee_one.id_for_label }}_helptext">{{ form.employee_one.help_text }}</span>{% endif %}</div>
-      <div class="field"><label>Линия принятия</label>{{ form.line_one }}{{ form.line_one.errors }}</div>
-      <div class="field"><label>Ответственный</label>{{ form.employee_it }}{{ form.employee_it.errors }}</div>
-      <div class="field"><label>Линия рассмотрения</label>{{ form.line_it }}{{ form.line_it.errors }}</div>
-    </div>
-
-    <div class="form-section-heading"><span>06</span><div><h2>Переадресация</h2><p>Параметры направления обращения</p></div></div>
-    <div class="form-grid">
-      <div class="field"><label>Признак направления</label>{{ form.pr_out }}{{ form.pr_out.errors }}</div>
-      <div class="field" data-conditional-controller="id_pr_out" data-conditional-values="*"><label>Дата направления</label>{{ form.date_cross }}{{ form.date_cross.errors }}</div>
-      <div class="field" data-conditional-controller="id_pr_out" data-conditional-values="*"><label>Время направления</label>{{ form.time_cross }}{{ form.time_cross.errors }}</div>
+    <div class="form-section-heading"><span>05</span><div><h2>Маршрут обращения</h2><p>Регистрация и переадресация разделены</p></div></div>
+    <div class="alert">
+      {% if irp %}
+        Текущий маршрут изменяется только отдельным действием «Переадресовать». Это сохраняет права доступа, статус и историю передачи.
+      {% else %}
+        Принявший сотрудник, его линия и первоначальная ответственная организация будут зафиксированы автоматически по вашей учётной записи и роли.
+      {% endif %}
     </div>
 
     {% if not irp %}
     <details class="form-disclosure"{% if attachment_error %} open{% endif %}>
-      <summary class="form-section-heading form-disclosure__summary"><span>07</span><div><h2>Первичное вложение</h2><p>Документ можно прикрепить сразу при регистрации обращения</p></div><span class="form-disclosure__action" aria-hidden="true">Необязательно</span></summary>
+      <summary class="form-section-heading form-disclosure__summary"><span>06</span><div><h2>Первичное вложение</h2><p>Документ можно прикрепить сразу при регистрации обращения</p></div><span class="form-disclosure__action" aria-hidden="true">Необязательно</span></summary>
       <div class="form-grid form-disclosure__content">
         <div class="field span-2">
           <label for="id_attachment">Файл к обращению</label>

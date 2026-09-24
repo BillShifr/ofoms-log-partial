@@ -693,8 +693,25 @@ class JournalScreenTests(TestCase):
 
         for field_name in ("date_create", "data_plan", "date_close", "z_dr", "in_dr"):
             self.assertEqual(form.fields[field_name].widget.input_type, "date")
-        for field_name in ("time_create", "time_cross"):
-            self.assertEqual(form.fields[field_name].widget.input_type, "time")
+        self.assertEqual(form.fields["time_create"].widget.input_type, "time")
+        redirect_form = IrpRedirectForm(user=self.tfoms_user)
+        self.assertEqual(redirect_form.fields["date_cross"].widget.input_type, "date")
+        self.assertEqual(redirect_form.fields["time_cross"].widget.input_type, "time")
+
+    def test_repeat_appeal_choice_has_human_readable_identity(self):
+        original = self._make_irp(owner=self.smo_user)
+        original.z_f = "Иванов"
+        original.z_i = "Иван"
+        original.save(update_fields=["z_f", "z_i"])
+
+        form = IrpForm(user=self.smo_user)
+        label = form.fields["repeat_of"].label_from_instance(original)
+
+        self.assertIn("Иванов Иван", label)
+        self.assertIn(self.theme.title, label)
+        self.assertIn(original.date_create.strftime("%d.%m.%Y"), label)
+        self.assertIn(original.n_irp, label)
+        self.assertNotEqual(label, original.n_irp)
 
     def test_suggest_runs_in_database_and_preserves_org_scope(self):
         own = self._make_irp(owner=self.smo_user)
@@ -738,7 +755,6 @@ class JournalScreenTests(TestCase):
             reverse("journal:suggest"),
             {"field": "z_f", "q": "глобальный"},
         )
-        create_form = IrpForm(user=root)
         redirect_form = IrpRedirectForm(instance=tfoms_irp, user=root)
 
         self.assertEqual(listing.status_code, 200)
@@ -751,17 +767,13 @@ class JournalScreenTests(TestCase):
         )
         expected_orgs = {81000, 81001, 81007, 81008}
         self.assertEqual(
-            {code for code, _label in create_form.fields["otv_kon"].choices},
-            expected_orgs,
-        )
-        self.assertEqual(
             {code for code, _label in redirect_form.fields["otv_kon"].choices},
             expected_orgs,
         )
         self.assertTrue(
             {self.tfoms_user.pk, self.smo_user.pk}
             <= set(
-                create_form.fields["employee_it"].queryset.values_list(
+                redirect_form.fields["employee_it"].queryset.values_list(
                     "pk", flat=True
                 )
             )
@@ -969,6 +981,36 @@ class JournalScreenTests(TestCase):
         self.assertTrue(IrpHistory.objects.filter(irp=irp).exists())
         # заявитель зафиксирован как инициатор создания
         self.assertEqual(irp.employee_one, self.tfoms_user)
+        self.assertEqual(irp.employee_it, self.tfoms_user)
+        self.assertEqual(irp.line_one, 1)
+        self.assertEqual(irp.line_it, 1)
+        self.assertEqual(irp.otv_kon, self.tfoms_user.org)
+
+    def test_smo_registration_derives_intake_and_processing_route(self):
+        self.client.force_login(self.smo_user)
+        response = self.client.post(
+            reverse("journal:create"),
+            {
+                "irp_type": 1,
+                "date_create": datetime.date.today().isoformat(),
+                "way": 1,
+                "how": 1,
+                "theme": self.theme.pk,
+                "data_plan": (
+                    datetime.date.today() + datetime.timedelta(days=30)
+                ).isoformat(),
+                "z_f": "Маршрут СМО",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        irp = Irp.objects.get(z_f="Маршрут СМО")
+        self.assertEqual(irp.employee_one, self.smo_user)
+        self.assertEqual(irp.employee_it, self.smo_user)
+        self.assertEqual(irp.line_one, 3)
+        self.assertEqual(irp.line_it, 3)
+        self.assertEqual(irp.otv_t, 2)
+        self.assertEqual(irp.otv_kon, self.smo_user.org)
 
     def test_create_accepts_initial_attachment(self):
         self.client.force_login(self.tfoms_user)
@@ -1153,7 +1195,7 @@ class JournalScreenTests(TestCase):
 
         edit_page = self.client.get(reverse("journal:edit", args=[irp.pk]))
         self.assertContains(edit_page, 'name="n_irp"', count=1)
-        self.assertContains(edit_page, "disabled", count=2)
+        self.assertContains(edit_page, "disabled", count=1)
         self.assertContains(
             edit_page, "Уникальный номер фиксируется при регистрации."
         )
@@ -1191,7 +1233,7 @@ class JournalScreenTests(TestCase):
             ).exists()
         )
 
-    def test_smo_cannot_assign_foreign_organization_or_employee(self):
+    def test_regular_edit_ignores_routing_fields(self):
         irp = self._make_irp(owner=self.smo_user)
         foreign = Employee.objects.create_user(
             username="foreign_assignee", password="GoodPass!1", org=81007
@@ -1216,11 +1258,11 @@ class JournalScreenTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
         irp.refresh_from_db()
         self.assertEqual(irp.otv_kon, self.smo_user.org)
         self.assertIsNone(irp.employee_it)
-        self.assertEqual(irp.z_f, "Петров")
+        self.assertEqual(irp.z_f, "Подмена scope")
 
     def test_edit_clears_inapplicable_conditional_fields(self):
         irp = self._make_irp()
@@ -1256,7 +1298,12 @@ class JournalScreenTests(TestCase):
         self.client.force_login(self.tfoms_user)
         response = self.client.get(reverse("journal:create"))
         self.assertContains(response, 'data-conditional-controller="id_irp_type"')
-        self.assertContains(response, 'data-conditional-controller="id_pr_out"', count=2)
+        self.assertNotContains(response, 'data-conditional-controller="id_pr_out"')
+        redirect = self._make_irp()
+        redirect_response = self.client.get(reverse("journal:redirect", args=[redirect.pk]))
+        self.assertContains(
+            redirect_response, 'data-conditional-controller="id_pr_out"', count=2
+        )
         self.assertContains(response, "js/conditional-fields.js")
 
     def test_conditional_fields_css_can_override_field_layout(self):
@@ -1573,10 +1620,9 @@ class RoutingTests(TestCase):
         resp = self.client.post(
             reverse("journal:redirect", args=[irp.pk]),
             {
-                "otv_t": 1,
-                "otv_kon": 81007,
-                "employee_it": self.tfoms_user.pk,
-                "line_it": 1,
+                "otv_kon": self.smo_user.org,
+                "employee_it": self.smo_user.pk,
+                "line_it": 3,
                 "pr_out": 1,
                 "date_cross": datetime.date.today().isoformat(),
                 "time_cross": "12:00",
@@ -1584,10 +1630,14 @@ class RoutingTests(TestCase):
         )
         self.assertEqual(resp.status_code, 302)
         irp.refresh_from_db()
-        self.assertEqual(irp.otv_kon, 81007)
+        self.assertEqual(irp.otv_t, 2)
+        self.assertEqual(irp.otv_kon, self.smo_user.org)
+        self.assertEqual(irp.employee_it, self.smo_user)
+        self.assertEqual(irp.line_it, 3)
         self.assertEqual(irp.pr_out, 1)
         self.assertEqual(irp.status, Irp.Status.REDIRECTED)
         self.assertTrue(IrpHistory.objects.filter(irp=irp, field_name="pr_out").exists())
+        self.assertTrue(IrpHistory.objects.filter(irp=irp, field_name="otv_t").exists())
 
     def test_redirect_rolls_back_route_and_history_when_audit_fails(self):
         irp = self._make_irp()
@@ -1601,10 +1651,9 @@ class RoutingTests(TestCase):
             self.client.post(
                 reverse("journal:redirect", args=[irp.pk]),
                 {
-                    "otv_t": 1,
-                    "otv_kon": 81007,
-                    "employee_it": self.tfoms_user.pk,
-                    "line_it": 1,
+                    "otv_kon": self.smo_user.org,
+                    "employee_it": self.smo_user.pk,
+                    "line_it": 3,
                     "pr_out": 1,
                     "date_cross": datetime.date.today().isoformat(),
                     "time_cross": "12:00",
@@ -1615,6 +1664,58 @@ class RoutingTests(TestCase):
         self.assertEqual(irp.otv_kon, original_org)
         self.assertEqual(irp.status, Irp.Status.REGISTERED)
         self.assertFalse(IrpHistory.objects.filter(irp=irp).exists())
+
+    def test_destination_organization_can_see_redirected_appeal(self):
+        irp = self._make_irp(owner=self.tfoms_user)
+        irp.otv_t = 2
+        irp.otv_kon = self.smo_user.org
+        irp.employee_it = self.smo_user
+        irp.line_it = 3
+        irp.save(update_fields=["otv_t", "otv_kon", "employee_it", "line_it"])
+
+        self.client.force_login(self.smo_user)
+        listing = self.client.get(reverse("journal:list"))
+        detail = self.client.get(reverse("journal:detail", args=[irp.pk]))
+
+        self.assertContains(listing, irp.n_irp)
+        self.assertEqual(detail.status_code, 200)
+
+    def test_unrelated_organization_cannot_see_redirected_appeal(self):
+        unrelated = Employee.objects.create_user(
+            username="routing_unrelated", password="GoodPass!1", org=81007
+        )
+        unrelated.groups.add(Group.objects.get(name="СП1"))
+        irp = self._make_irp(owner=self.tfoms_user)
+        irp.otv_kon = self.smo_user.org
+        irp.employee_it = self.smo_user
+        irp.line_it = 3
+        irp.save(update_fields=["otv_kon", "employee_it", "line_it"])
+
+        self.client.force_login(unrelated)
+        listing = self.client.get(reverse("journal:list"))
+        detail = self.client.get(reverse("journal:detail", args=[irp.pk]))
+
+        self.assertNotContains(listing, irp.n_irp)
+        self.assertEqual(detail.status_code, 403)
+
+    def test_redirect_rejects_mismatched_employee_and_line(self):
+        irp = self._make_irp(owner=self.tfoms_user)
+        self.client.force_login(self.tfoms_user)
+
+        response = self.client.post(
+            reverse("journal:redirect", args=[irp.pk]),
+            {
+                "otv_kon": self.smo_user.org,
+                "employee_it": self.tfoms_user.pk,
+                "line_it": 1,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ответственный сотрудник должен относиться")
+        self.assertContains(response, "Линия рассмотрения не соответствует")
+        irp.refresh_from_db()
+        self.assertEqual(irp.otv_kon, self.tfoms_user.org)
 
     def test_closed_irp_is_terminal_for_mutations(self):
         irp = self._make_irp()

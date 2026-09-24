@@ -80,6 +80,8 @@ jobs:
           DJANGO_SETTINGS_MODULE: config.settings.prod
           SECRET_KEY: ci-only-secret-key-with-more-than-fifty-characters-123456789
           JWT_SECRET: ci-only-jwt-secret-with-more-than-fifty-characters-987654321
+          DB_NAME: ejournal
+          DB_USER: ejournal
           DB_PASSWORD: ci-only-database-password-4827
           DB_HOST: 127.0.0.1
           ALLOWED_HOSTS: localhost,127.0.0.1
@@ -90,7 +92,10 @@ jobs:
           VCS_REF: ${{ github.sha }}
           SECRET_KEY: ci-only-secret-key-with-more-than-fifty-characters-123456789
           JWT_SECRET: ci-only-jwt-secret-with-more-than-fifty-characters-987654321
+          DB_NAME: ejournal
+          DB_USER: ejournal
           DB_PASSWORD: ci-only-database-password-4827
+          DB_HOST: 127.0.0.1
 
   docker:
     runs-on: ubuntu-latest

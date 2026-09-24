@@ -2,8 +2,8 @@
 set -eu
 
 backup_dir=${1:?Usage: RESTORE_CONFIRM=replace-current-state restore_release.sh BACKUP_DIR}
-db_user=${DB_USER:-ejournal}
-db_name=${DB_NAME:-ejournal}
+db_user=${DB_USER:?DB_USER is required}
+db_name=${DB_NAME:?DB_NAME is required}
 lock_file=${BACKUP_RESTORE_LOCK_FILE:-/tmp/ofoms-ejournal-backup-restore.lock}
 
 if [ "${RESTORE_CONFIRM:-}" != "replace-current-state" ]; then
@@ -75,7 +75,7 @@ fi
 )
 tar -tzf "$backup_dir/media.tar.gz" >/dev/null
 tar -tzf "$backup_dir/exchange.tar.gz" >/dev/null
-docker compose exec -T db pg_restore --list \
+docker compose --profile ops run --rm --no-deps -T db-tools pg_restore --list \
   < "$backup_dir/database.dump" >/dev/null
 
 web_container=$(docker compose ps -q -a web)
@@ -90,9 +90,11 @@ if [ "$current_revision" != "$backup_revision" ]; then
 fi
 
 docker compose stop web scheduler
-docker compose exec -T db dropdb -U "$db_user" --if-exists --force "$db_name"
-docker compose exec -T db createdb -U "$db_user" -O "$db_user" "$db_name"
-docker compose exec -T db pg_restore -U "$db_user" -d "$db_name" \
+docker compose --profile ops run --rm --no-deps -T db-tools \
+  dropdb --if-exists --force "$db_name"
+docker compose --profile ops run --rm --no-deps -T db-tools \
+  createdb -O "$db_user" "$db_name"
+docker compose --profile ops run --rm --no-deps -T db-tools pg_restore -d "$db_name" \
   < "$backup_dir/database.dump"
 
 docker compose run --rm --no-deps --entrypoint sh web -c \

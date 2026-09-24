@@ -3,8 +3,7 @@ set -eu
 umask 077
 
 backup_root=${1:?Usage: backup_release.sh BACKUP_ROOT}
-db_user=${DB_USER:-ejournal}
-db_name=${DB_NAME:-ejournal}
+db_name=${DB_NAME:?DB_NAME is required}
 lock_file=${BACKUP_RESTORE_LOCK_FILE:-/tmp/ofoms-ejournal-backup-restore.lock}
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 backup_dir=$backup_root/$timestamp
@@ -85,14 +84,14 @@ backup_staged=1
 writers_stopped=1
 docker compose stop web scheduler
 
-docker compose exec -T db pg_dump -U "$db_user" -d "$db_name" -Fc \
+docker compose --profile ops run --rm --no-deps -T db-tools pg_dump -Fc \
   > "$staging_dir/database.dump"
 docker compose run --rm --no-deps --entrypoint tar web \
   -C /app/media -czf - . > "$staging_dir/media.tar.gz"
 docker compose run --rm --no-deps --entrypoint tar web \
   -C /app/exchange -czf - . > "$staging_dir/exchange.tar.gz"
-db_server_version=$(docker compose exec -T db \
-  psql -U "$db_user" -d "$db_name" -Atqc 'SHOW server_version')
+db_server_version=$(docker compose --profile ops run --rm --no-deps -T db-tools \
+  psql -Atqc 'SHOW server_version')
 
 {
   printf 'BACKUP_FORMAT_VERSION=1\n'

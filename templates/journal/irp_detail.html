@@ -75,9 +75,9 @@
   <div class="section-heading"><div><p class="section-heading__index">04</p><h2>Исполнение</h2></div><span>Ответственные и маршрут</span></div>
   <dl class="detail-list">
     <dt>Ответственная организация</dt><dd>{{ irp.get_otv_t_display }} / {{ irp.get_otv_kon_display }}</dd>
-    <dt>Принял (линия)</dt><dd>{{ irp.employee_one.full_name }}
+    <dt>Принял при регистрации</dt><dd>{{ irp.employee_one.full_name }}
       {% if irp.line_one %}({{ irp.get_line_one_display }}){% endif %}</dd>
-    <dt>Ответственный (линия)</dt><dd>{{ irp.employee_it.full_name|default:"—" }}
+    <dt>Текущий ответственный</dt><dd>{{ irp.employee_it.full_name|default:"—" }}
       {% if irp.line_it %}({{ irp.get_line_it_display }}){% endif %}</dd>
     <dt>Переадресация</dt><dd>{{ irp.get_pr_out_display|default:"—" }}
       {% if irp.date_cross %}<br>{{ irp.date_cross|date:"d.m.Y" }} {{ irp.time_cross|time:"H:i"|default:"" }}{% endif %}</dd>

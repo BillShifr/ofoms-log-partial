@@ -28,7 +28,7 @@ from apps.system.validators import (
     validate_document_file,
 )
 
-# Модули, фиксируемые в журнале событий (для фильтра)
+# модули журнала событий
 EVENT_MODULE_CHOICES = (
     ("auth", "Вход/выход"),
     ("employee", "Пользователи"),

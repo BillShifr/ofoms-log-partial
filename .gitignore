@@ -1,4 +1,4 @@
-# Python
+# python
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -13,22 +13,22 @@ htmlcov/
 coverage.xml
 .artifacts/
 
-# Django
+# django
 *.log
 staticfiles/
 media/
 db.sqlite3
 
-# Помехи IDE
+# ide
 .idea/
 .vscode/
 *.swp
 .DS_Store
 
-# Окружение
+# окружение
 .env
 
-# Файлы обмена входа/выхода (этап 3)
+# файлы обмена
 exchange/in/*
 exchange/out/*
 exchange/archive/*

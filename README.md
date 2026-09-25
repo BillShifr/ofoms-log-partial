@@ -13,9 +13,8 @@
 ## Быстрый старт (разработка)
 
 ```bash
-uv sync               # создание .venv + установка зависимостей
-cp .env.example .env  # параметры окружения (локальная БД ejournal)
-uv run manage.py makemigrations
+uv sync               # создание окружения и установка зависимостей
+cp .env.example .env  # параметры локальной базы
 uv run manage.py migrate
 uv run manage.py createsuperuser
 uv run manage.py runserver
@@ -37,7 +36,7 @@ Production Compose подключается только к явно указа�
 
 ```bash
 cp .env.production.example .env
-# Заполнить секреты, адрес PostgreSQL и публичные имена.
+# заполнить секреты адрес postgresql и публичные имена
 VCS_REF=$(git rev-parse HEAD) docker compose up --build
 ```
 

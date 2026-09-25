@@ -52,7 +52,7 @@ def _browser_origin_allowed(request):
         )
         return referer_origin in trusted_origins
 
-    # Non-browser integrations commonly send neither Fetch Metadata nor Origin.
+    # небраузерные интеграции могут не передавать fetch metadata и origin
     return True
 
 

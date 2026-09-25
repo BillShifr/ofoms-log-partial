@@ -58,7 +58,7 @@ class ArtifactRollback:
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, _exc_value, _traceback):
         if exc_type is None:
             return False
         for path in reversed(self.paths):
@@ -256,7 +256,19 @@ def elem2dict(node):
     return d
 
 
-class XsdExchangeFile:
+class ExchangeArtifactMixin:
+    def _archive(self):
+        return archive_artifact(self.real_file, self._archive_dir, self.org)
+
+    def write_flcp(self, result: ImportResult) -> Path:
+        org_dir = self._out_dir / str(self.org)
+        return write_unique_artifact(
+            org_dir / self.basename,
+            (result.flcp_bytes(),),
+        )
+
+
+class XsdExchangeFile(ExchangeArtifactMixin):
     """Базовая обработка файла: XSD-валидация -> загрузка в БД -> FLCP."""
 
     kind = "xml"
@@ -277,7 +289,7 @@ class XsdExchangeFile:
         self._out_dir = Path(out_dir or settings.EXCHANGE_OUT)
         self._archive_dir = Path(archive_dir or settings.EXCHANGE_ARCHIVE)
 
-    # -- этапы обработки ----------------------------------------------------
+    # этапы обработки
 
     def validate(self):
         """XSD-валидация и разбор XML."""
@@ -346,19 +358,6 @@ class XsdExchangeFile:
             rows=self.rows,
             validated=self.validated,
         )
-
-    # -- каталоги -----------------------------------------------------------
-
-    def _archive(self):
-        return archive_artifact(self.real_file, self._archive_dir, self.org)
-
-    def write_flcp(self, result: ImportResult) -> Path:
-        org_dir = self._out_dir / str(self.org)
-        return write_unique_artifact(
-            org_dir / self.basename,
-            (result.flcp_bytes(),),
-        )
-
 
 class EmployeeXMLFile(XsdExchangeFile):
     """Импорт сотрудников users*.xml (upsert по GUID, v1 load_emploees)."""
@@ -527,7 +526,7 @@ class IrpXMLFile(XsdExchangeFile):
         if "e-mail" in d:
             d["e_mail"] = d.pop("e-mail")
 
-        # Сотрудник, принявший обращение (обязателен)
+        # принявший сотрудник обязателен
         e_one = d.get("employee_1")
         employee_one = Employee.objects.filter(guid=e_one).first()
         if not employee_one:
@@ -547,7 +546,7 @@ class IrpXMLFile(XsdExchangeFile):
             )
             return
 
-        # Ответственный сотрудник (необязателен)
+        # ответственный сотрудник необязателен
         employee_it = None
         e_it = d.get("employee_it")
         if e_it:
@@ -726,7 +725,7 @@ def _parse_time(value):
         return None
 
 
-class ExcelIrpFile:
+class ExcelIrpFile(ExchangeArtifactMixin):
     """Импорт обращений из Excel-файла (структура адаптируется под заказчика).
 
     Первая строка — заголовки (русские подписи), каждая последующая — запись
@@ -736,7 +735,6 @@ class ExcelIrpFile:
     kind = "excel"
     mask = "*.xlsx"
 
-    #: соответствие «Заголовок колонки» -> поле модели
     COLUMNS = {
         "УНр": "n_irp",
         "Вид обращения": "irp_type",
@@ -927,17 +925,6 @@ class ExcelIrpFile:
                 self.errors.append(flc.error_result(str(key).upper(), str(msgs), n_irp))
             return
         self.rows += 1
-
-    def _archive(self):
-        return archive_artifact(self.real_file, self._archive_dir, self.org)
-
-    def write_flcp(self, result: ImportResult) -> Path:
-        org_dir = self._out_dir / str(self.org)
-        return write_unique_artifact(
-            org_dir / self.basename,
-            (result.flcp_bytes(),),
-        )
-
 
 def _excel_row_to_irp(raw: dict) -> dict:
     """Экселевская строка -> словарь модели c типами (через normalize)."""

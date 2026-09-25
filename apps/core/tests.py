@@ -778,7 +778,7 @@ class ProductionSettingsTests(TestCase):
         self.assertNotIn("COPY --from=ghcr.io/astral-sh/uv", dockerfile)
         self.assertNotIn("uv:latest", dockerfile)
         self.assertIn("image: postgres:17-alpine@sha256:", compose)
-        self.assertIn("image: postgres:16-alpine@sha256:", workflow)
+        self.assertIn("image: postgres:17-alpine@sha256:", workflow)
         action_refs = re.findall(r"^\s*-?\s*uses:\s+([^\s#]+)", workflow, re.MULTILINE)
         self.assertTrue(action_refs)
         self.assertEqual(
@@ -1127,7 +1127,7 @@ class FailedLoginLockTests(TestCase):
         for _ in range(limit):
             self.user.record_failed_login()
         self.assertTrue(self.user.is_locked)
-        # аутентификация заблокированного возвращает None
+        # заблокированный пользователь не проходит аутентификацию
         got = authenticate(username="operator", password="GoodPass!1")
         self.assertIsNone(got)
 
@@ -2310,7 +2310,7 @@ class TemplateHygieneTests(TestCase):
         css = (Path(settings.BASE_DIR) / "static/css/portal.css").read_text(
             encoding="utf-8"
         )
-        component_css = css.split("/* ---------- Минимальный сброс ---------- */", 1)[1]
+        component_css = css.split("/* базовый сброс */", 1)[1]
         fallback_color = re.compile(
             r"var\(\s*--[a-z0-9-]+\s*,\s*(?:#[0-9a-fA-F]{3,8}|rgba?\()"
         )

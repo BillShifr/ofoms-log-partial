@@ -1,4 +1,3 @@
-// Progressive infinite scroll for the journal. Server pagination remains the fallback.
 (function () {
   var activeObserver = null;
 

@@ -83,7 +83,7 @@ def irp_list(request):
     _require_capability(request, JOURNAL_READ)
     qs = Irp.objects.select_related("theme", "employee_one", "employee_it")
 
-    # СМО видят только свои обращения (принцип v1 get_queryset)
+    # смо видят обращения только своей организации
     qs = visible_irps_for_user(request.user, qs)
 
     form = IrpFilterForm(request.GET or None)
@@ -125,7 +125,7 @@ def irp_list(request):
     columns_by_key = {c["key"]: c for c in JOURNAL_COLUMNS}
     cols = [dict(columns_by_key[key]) for key in visible_keys if key in columns_by_key]
 
-    # Сортировка: явный параметр запроса > персональная настройка > по умолчанию
+    # параметр запроса имеет приоритет над настройкой пользователя
     sort = request.GET.get("sort")
     if sort is None:
         pref_sort = pref.sorting or {}
@@ -381,7 +381,7 @@ def irp_edit(request, pk):
             irp = _get_irp_for_user(request, pk, for_update=True)
             _require_mutable(irp)
             form = IrpForm(request.POST, instance=irp, user=request.user)
-            # ModelForm мутирует instance при валидации — снимок до is_valid()
+            # снимок создается до изменения instance модельной формой
             before = {f: getattr(irp, f) for f in form.fields}
             if form.is_valid():
                 old = {f: before[f] for f in form.changed_data}

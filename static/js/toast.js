@@ -1,5 +1,3 @@
-// Новый новостной UX: тосты (уведомления) из Django messages.
-// Автоскрытие 5 c, ручное закрытие, типы: успех/ошибка/предупреждение/инфо.
 (function () {
   function toast(text, type) {
     var box = document.querySelector('.toast-container');

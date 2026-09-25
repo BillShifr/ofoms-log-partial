@@ -866,7 +866,7 @@ class LiveFlowsTests(LiveServerTestCase):
                 self.end_headers()
                 self.wfile.write(body)
 
-            def log_message(self, format, *args):
+            def log_message(self, _format, *args):
                 return
 
         repository = ThreadingHTTPServer(("127.0.0.1", 0), RepositoryHandler)

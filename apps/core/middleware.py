@@ -141,7 +141,7 @@ class AuditMiddleware:
         else:
             status = 200
 
-        # Логируем вход/выход и все не-GET запросы (изменения данных)
+        # аудит включает вход выход и запросы изменения данных
         event_type = None
         actor = user_before
         if request.path in _LOGIN_PATHS and request.method == "POST":

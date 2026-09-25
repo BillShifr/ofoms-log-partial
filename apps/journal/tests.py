@@ -898,7 +898,7 @@ class JournalScreenTests(TestCase):
         self.assertIn("data-infinite-retry", script)
 
     def test_filter_finds_cyrillic_case_insensitive(self):
-        # Локаль PG = C: __icontains не сворачивает кириллицу — ищем через fold
+        # локаль pg c требует fold для поиска кириллицы
         self._make_irp()
         self.client.force_login(self.tfoms_user)
         resp = self.client.get(reverse("journal:list"), {"z_f": "петров"})

@@ -1,9 +1,3 @@
-/* ==============================================================
-   ИС «Единый электронный журнал обращений граждан» v2
-   Дизайн-система ofoms.ru (сверено с bundle.css)
-   Токены: палитра, шрифты Golos Text / Unbounded, радиусы, тени.
-   ============================================================== */
-
 @font-face {
   font-family: "DejaVu Sans Local";
   src: url("../fonts/DejaVuSans.ttf") format("truetype");
@@ -19,7 +13,7 @@
   font-display: swap;
 }
 
-/* ---------- Токены (светлая тема) ---------- */
+/* токены светлой темы */
 :root {
   --ink: #0e2433;
   --primary: #0b5394;
@@ -71,7 +65,7 @@
   --table-scrollbar: color-mix(in srgb, var(--primary) 45%, var(--line));
 }
 
-/* ---------- Тёмная тема ---------- */
+/* темная тема */
 html[data-theme="dark"] {
   --ink: #e6eef5;
   --primary: #78bfff;
@@ -102,7 +96,7 @@ html[data-theme="dark"] .header__user-role { color: #9ccfff; }
 
 .btn--active { outline: 2px solid var(--primary); outline-offset: 1px; }
 
-/* Режим контраста имеет приоритет над выбранной цветовой темой. */
+/* контраст имеет приоритет над цветовой темой */
 html[data-contrast="white"] {
   color-scheme: light;
   --ink: #000;
@@ -150,7 +144,7 @@ html[data-contrast="black"] {
   --shadow: none;
 }
 
-/* ---------- Минимальный сброс ---------- */
+/* базовый сброс */
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; font-size: var(--fs); }
 body {
@@ -170,7 +164,7 @@ h1 { font-size: clamp(1.65rem, 2.1vw, 2.1rem); letter-spacing: 0; }
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* ---------- Доступность ---------- */
+/* доступность */
 .skip-link {
   position: absolute;
   left: -999px;
@@ -188,7 +182,7 @@ a:hover { text-decoration: underline; }
   border-radius: 4px;
 }
 
-/* ---------- Каркас ---------- */
+/* каркас */
 .container {
   width: 100%;
   max-width: var(--wrap);
@@ -198,7 +192,7 @@ a:hover { text-decoration: underline; }
 .main { padding: 32px 20px 64px; flex: 1; animation: fadeIn .25s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: none;} }
 
-/* ---------- Шапка ---------- */
+/* шапка */
 .header {
   position: sticky;
   top: 0;
@@ -235,7 +229,7 @@ a:hover { text-decoration: underline; }
 .theme-switch__btn:hover, .theme-switch__btn.btn--active { background: var(--card); color: var(--primary); box-shadow: 0 1px 5px rgba(14,36,51,.12); }
 .theme-switch__btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-/* ---------- Меню ---------- */
+/* меню */
 .nav { background: #143f70; box-shadow: inset 0 -1px rgba(255,255,255,.08); }
 .nav__shell { display: flex; align-items: stretch; min-width: 0; overflow: visible; }
 .nav__scroll {
@@ -278,7 +272,7 @@ a:hover { text-decoration: underline; }
 .nav__menu-link { padding: 9px 11px; border-radius: 8px; color: var(--ink); font-size: .88rem; white-space: nowrap; }
 .nav__menu-link:hover, .nav__menu-link--active { background: var(--chip-blue); color: var(--primary); text-decoration: none; }
 
-/* ---------- Кнопки ---------- */
+/* кнопки */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -310,7 +304,7 @@ a:hover { text-decoration: underline; }
   font-size: 1rem;
 }
 
-/* ---------- Бейджи ---------- */
+/* бейджи */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -336,7 +330,7 @@ a:hover { text-decoration: underline; }
 .badge--running { background: var(--chip-blue); color: var(--primary); }
 .badge--cancelled { background: var(--chip-blue); color: var(--ink); opacity: .75; }
 
-/* ---------- Сообщения ---------- */
+/* сообщения */
 .messages { display: grid; gap: 10px; margin-bottom: 22px; }
 .alert {
   padding: 12px 16px;
@@ -348,7 +342,7 @@ a:hover { text-decoration: underline; }
 .alert--error { border-color: var(--danger); color: var(--danger); }
 .alert--warning { border-color: var(--warn); color: var(--warn); }
 
-/* ---------- Карточки ---------- */
+/* карточки */
 .card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -381,7 +375,7 @@ a:hover { text-decoration: underline; }
 .login-card__fields { grid-template-columns: 1fr; text-align: left; }
 .login-card__actions .btn { width: 100%; justify-content: center; }
 
-/* ---------- Таблицы ---------- */
+/* таблицы */
 .table-card { padding: 0 0 16px; overflow: hidden; }
 .table-toolbar {
   display: flex;
@@ -681,7 +675,7 @@ table.data th.task-cell--actions,
 table.data td.task-cell--actions { width: 168px; max-width: 168px; }
 .table-empty { padding: 40px 20px !important; text-align: center !important; }
 
-/* ---------- Формы ---------- */
+/* формы */
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px 20px; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field[hidden] { display: none; }
@@ -749,7 +743,7 @@ table.data td.task-cell--actions { width: 168px; max-width: 168px; }
 }
 .registration-actions__buttons .btn { justify-content: center; }
 
-/* ---------- Карточка обращения и длинные формы ---------- */
+/* карточка обращения и длинные формы */
 .record-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 22px; }
 .record-heading h1 { margin: 0; overflow-wrap: anywhere; }
 .record-heading__copy { min-width: 0; }
@@ -825,7 +819,7 @@ table.data td.task-cell--actions { width: 168px; max-width: 168px; }
 .management-form > form { padding-bottom: 0; }
 .option-group { display: flex; gap: 8px; flex-wrap: wrap; }
 
-/* ---------- Фильтры ---------- */
+/* фильтры */
 .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .filters .field > label {
   min-height: 2.55em;
@@ -944,7 +938,7 @@ table.data td.task-cell--actions { width: 168px; max-width: 168px; }
 }
 .field-help-link { width: fit-content; font-size: .82rem; font-weight: 650; }
 
-/* ---------- Вкладки (карточка задачи, 2.11) ---------- */
+/* вкладки */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap: wrap; }
 .tab { padding: 10px 16px; border: none; background: none; cursor: pointer; font: inherit;
   color: var(--ink); border-bottom: 2px solid transparent; }
@@ -975,7 +969,7 @@ table.data td.task-cell--actions { width: 168px; max-width: 168px; }
   cursor: pointer;
 }
 
-/* ---------- Пагинация ---------- */
+/* пагинация */
 .pagination { display: flex; gap: 6px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
 .pagination a, .pagination span {
   padding: 6px 12px;
@@ -994,7 +988,7 @@ table.data td.task-cell--actions { width: 168px; max-width: 168px; }
 .infinite-scroll__status { margin: 0; color: var(--muted); font-size: .88rem; }
 .infinite-scroll__sentinel { width: 100%; height: 1px; }
 
-/* ---------- Раскрытие деталей строки таблицы ---------- */
+/* детали строки таблицы */
 tr.row-detail > td {
   background: var(--accent-bg, var(--bg));
   color: inherit;
@@ -1006,7 +1000,7 @@ tr.row-detail > td {
 }
 tbody tr.js-event-row { cursor: pointer; }
 
-/* ---------- Подвал ---------- */
+/* подвал */
 .footer { border-top: 1px solid var(--line); background: var(--card); margin-top: 40px; }
 .footer__inner {
   display: flex;
@@ -1018,7 +1012,7 @@ tbody tr.js-event-row { cursor: pointer; }
   opacity: .8;
 }
 
-/* ---------- Утилиты ---------- */
+/* утилиты */
 .mt-1 { margin-top: 8px; } .mt-2 { margin-top: 16px; } .mt-3 { margin-top: 24px; }
 .mb-2 { margin-bottom: 16px; }
 .text-muted { color: inherit; opacity: .75; }
@@ -1044,7 +1038,7 @@ tbody tr.js-event-row { cursor: pointer; }
 .dl dd { margin: 0; }
 @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } .dl { grid-template-columns: 1fr; } }
 
-/* ---------- Этап 4: маршрутизация и ответы ---------- */
+/* маршрутизация и ответы */
 .answer { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; background: color-mix(in srgb, var(--bg) 34%, var(--card)); }
 .answer .flex { justify-content: space-between; margin-bottom: 6px; }
 .answer p { margin: 0; }
@@ -1110,7 +1104,7 @@ tbody tr.js-event-row { cursor: pointer; }
   table.data th { position: static; }
 }
 
-/* ---------- Этап 5: отчётность ---------- */
+/* отчетность */
 .reports-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: stretch; }
 .report-card { display: flex; flex-direction: column; height: 100%; min-height: 280px; padding: 18px 20px; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
 .report-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
@@ -1148,7 +1142,7 @@ tbody tr.js-event-row { cursor: pointer; }
   font-weight: 650;
 }
 
-/* ---------- Документация (вики) ---------- */
+/* документация */
 .cat-icon {
   display: inline-flex; align-items: center; justify-content: center;
   width: 46px; height: 46px; border-radius: 12px;
@@ -1232,7 +1226,7 @@ tbody tr.js-event-row { cursor: pointer; }
 .filter-form { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
 .filter-form .field { flex: 1; min-width: 190px; }
 
-/* ---------- Автозаполнение (2.0.6) ---------- */
+/* автозаполнение */
 .autocomplete-host { position: relative; }
 .autocomplete { z-index: 2200; max-height: 240px; overflow-y: auto;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg);
@@ -1245,11 +1239,11 @@ tbody tr.js-event-row { cursor: pointer; }
 .autocomplete--anchored { position: absolute; inset-inline: 0; top: calc(100% + 4px); }
 .participant-field { position: relative; }
 
-/* ---------- Клиентская валидация (2.0.4) ---------- */
+/* клиентская валидация */
 .validation-tip { display: block; margin-top: 4px; color: var(--danger); font-size: .82rem; }
 .is-invalid { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
 
-/* ---------- Accordion / Collapsible (2.2, 2.10) ---------- */
+/* раскрывающиеся блоки */
 .collapsible {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -1295,7 +1289,7 @@ tbody tr.js-event-row { cursor: pointer; }
 .collapsible--sm .collapsible__toggle::after { display: none; }
 .row-total td { font-weight: 700; border-top: 2px solid var(--table-border); }
 
-/* ---------- Версия для слабовидящих (А/А+/А++) ---------- */
+/* режимы доступности */
 body.vis {
   letter-spacing: 0.05em;
   word-spacing: 0.1em;
@@ -1307,7 +1301,7 @@ body.vis-huge { font-size: 26px; }
 body.vis-hc { filter: grayscale(1) contrast(1.15); }
 body.vis-black { --ink: #000; --bg: #fff; --card: #fff; --line: #000; display: block; }
 
-/* ---------- Общесистемные модули (Этап 6) ---------- */
+/* системные модули */
 .nav__sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
 .nav__badge {
   display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px;
@@ -1337,7 +1331,7 @@ table.data.th-sticky td:first-child { position: sticky; left: 0; background: var
 table.data.th-sticky th:first-child { z-index: 4; }
 .task-log-row td { font-size: .78rem; background: color-mix(in srgb, var(--bg) 45%, var(--card)); }
 
-/* ---------- Тосты (Этап v3, 2.0.2) ---------- */
+/* уведомления */
 .toast-container {
   position: fixed;
   right: 20px;
@@ -1384,7 +1378,7 @@ table.data.th-sticky th:first-child { z-index: 4; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes toastOut { to { opacity: 0; transform: translateY(12px); } }
 
-/* ---------- DataTable (v3, 2.0.3 / 2.0.8) ---------- */
+/* таблицы данных */
 table.data tbody tr[data-href] { cursor: pointer; }
 th.data-sort { cursor: pointer; user-select: none; white-space: nowrap; }
 th.data-sort a { color: inherit; text-decoration: none; }
@@ -1422,7 +1416,7 @@ th.data-sort[aria-sort="descending"]::after {
 }
 th.data-sort:hover { background: var(--chip-green); }
 td.cell-long { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* ---------- Мессенджер (PRD v3 §2.6) ---------- */
+/* мессенджер */
 .messenger { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
 .messenger__side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .messenger__main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -1532,7 +1526,7 @@ table.data .control-group__heading th {
 .attachment-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px;
   border: 1px dashed var(--line); border-radius: 999px; font-size: .82rem; background: var(--surface); }
 
-/* ---------- Новости (PRD v3 §2.7) ---------- */
+/* новости */
 .news-grid { align-items: stretch; grid-auto-rows: 1fr; }
 .news-card { position: relative; display: flex; min-height: 0; flex-direction: column; justify-content: space-between; }
 .news-card--pinned { border-color: var(--primary);}
@@ -1578,7 +1572,7 @@ table.data .control-group__heading th {
   .docs-row__actions { justify-content: flex-start; }
 }
 
-/* ---------- Адаптивность (2.0.1) ---------- */
+/* адаптивность */
 @media (min-width: 1920px) { :root { --wrap: 1440px; --fs: 18px; } }
 @media (min-width: 1440px) and (max-width: 1919px) { :root { --wrap: 1320px; } }
 @media (max-width: 1380px) {

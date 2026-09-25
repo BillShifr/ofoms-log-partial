@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Shared Docker/Podman adapter for production scripts.
+# общий адаптер docker и podman
 if [ -z "${CONTAINER_ENGINE:-}" ]; then
   if command -v podman >/dev/null 2>&1; then
     CONTAINER_ENGINE=podman

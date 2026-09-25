@@ -8,9 +8,7 @@ if [ -f "$bundle_dir/SHA256SUMS" ]; then
 fi
 . "$script_dir/lib/container_engine.sh"
 
-# Compose reads .env itself, but a direct Podman pull does not. Export the
-# dedicated auth file so manual deployments and the systemd unit use the same
-# registry credentials without copying them into the deployment bundle.
+# podman pull получает путь к registry auth из серверного env
 if [ -z "${REGISTRY_AUTH_FILE:-}" ] && [ -f "$bundle_dir/.env" ]; then
   REGISTRY_AUTH_FILE=$(sed -n 's/^REGISTRY_AUTH_FILE=//p' "$bundle_dir/.env")
   export REGISTRY_AUTH_FILE
@@ -71,8 +69,7 @@ if [ "$legacy_upgrade" = true ]; then
     < "$backup_file" >/dev/null
 fi
 
-# Do not rely on podman-compose depends_on ordering. Stop every writer and run
-# each deployment phase explicitly, checking its exit status before continuing.
+# этапы запуска выполняются явно без зависимости от порядка podman compose
 compose stop web scheduler >/dev/null 2>&1 || true
 compose run --rm --no-deps volume-init
 compose run --rm --no-deps migrate

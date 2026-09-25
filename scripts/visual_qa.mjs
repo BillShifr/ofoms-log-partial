@@ -529,25 +529,23 @@ try {
     for (const route of printRoutes) route[1] = route[1].replaceAll("{journalId}", journalMatch[1]);
   }
 
-  for (const [width, height] of viewports) {
-    await command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
-    for (const [name, path] of routes) {
-      const errorStart = browserErrors.length;
-      await navigate(`${baseUrl}${path}`);
-      await evaluate(`document.documentElement.dataset.theme='light'; document.documentElement.dataset.font='base'; document.documentElement.dataset.contrast='default'`);
-      await prepareRoute(name);
-      await settleAnimations();
-      const metrics = await evaluate(`(() => ({
+  async function captureRoute(width, height, name, path, theme, font, contrast) {
+    const errorStart = browserErrors.length;
+    await navigate(`${baseUrl}${path}`);
+    await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}; document.documentElement.dataset.font=${JSON.stringify(font)}; document.documentElement.dataset.contrast=${JSON.stringify(contrast)}`);
+    await prepareRoute(name);
+    await settleAnimations();
+    const metrics = await evaluate(`(() => ({
         path: location.pathname,
         title: document.title,
         httpStatus: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
         forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
         documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-      navOverflow: (() => {
-        const nav = document.querySelector('.nav__scroll');
-        return Boolean(nav) && getComputedStyle(nav).overflowX === 'visible' &&
-          nav.scrollWidth > nav.clientWidth + 1;
-      })(),
+        navOverflow: (() => {
+          const nav = document.querySelector('.nav__scroll');
+          return Boolean(nav) && getComputedStyle(nav).overflowX === 'visible' &&
+            nav.scrollWidth > nav.clientWidth + 1;
+        })(),
         appliedMode: {
           theme: document.documentElement.dataset.theme || null,
           font: document.documentElement.dataset.font || null,
@@ -562,19 +560,28 @@ try {
         })),
         width: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth
-      }))()`);
-      metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
-      metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
-      metrics.collapsibleLayout = await measureCollapsibleLayout();
-      metrics.formContainment = await measureFormContainment();
-      metrics.accessMatrixLayout = name === "user-form" ? await measureAccessMatrixLayout() : null;
-      metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
-      metrics.sharedTableStyles = await measureSharedTableStyles(name);
-      metrics.browserErrors = browserErrors.slice(errorStart);
-      const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
-      const filename = `${name}-${width}x${height}-light.png`;
-      await writeFile(join(outputDir, filename), Buffer.from(shot.data, "base64"));
-      results.push({ name, viewport: `${width}x${height}`, theme: "light", font: "base", ...metrics, screenshot: filename });
+    }))()`);
+    metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
+    metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
+    metrics.collapsibleLayout = await measureCollapsibleLayout();
+    metrics.formContainment = await measureFormContainment();
+    metrics.accessMatrixLayout = name === "user-form" ? await measureAccessMatrixLayout() : null;
+    metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
+    metrics.sharedTableStyles = await measureSharedTableStyles(name);
+    metrics.browserErrors = browserErrors.slice(errorStart);
+    const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
+    const suffix = theme === "light" && font === "base" && contrast === "default"
+      ? "light"
+      : `${theme}-${font}-${contrast}`;
+    const filename = `${name}-${width}x${height}-${suffix}.png`;
+    await writeFile(join(outputDir, filename), Buffer.from(shot.data, "base64"));
+    results.push({ name, viewport: `${width}x${height}`, theme, font, contrast, ...metrics, screenshot: filename });
+  }
+
+  for (const [width, height] of viewports) {
+    await command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    for (const [name, path] of routes) {
+      await captureRoute(width, height, name, path, "light", "base", "default");
     }
   }
 
@@ -582,49 +589,7 @@ try {
     for (const [width, height] of sampledModeViewports) {
       await command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
       for (const [name, path] of routes) {
-        const errorStart = browserErrors.length;
-        await navigate(`${baseUrl}${path}`);
-        await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}; document.documentElement.dataset.font=${JSON.stringify(font)}; document.documentElement.dataset.contrast=${JSON.stringify(contrast)}`);
-        await prepareRoute(name);
-        await settleAnimations();
-      const metrics = await evaluate(`(() => ({
-          path: location.pathname,
-          title: document.title,
-          httpStatus: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
-          forbidden: document.querySelector('.error-page__code')?.textContent.trim() === '403',
-          documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-          navOverflow: (() => {
-            const nav = document.querySelector('.nav__scroll');
-            return Boolean(nav) && getComputedStyle(nav).overflowX === 'visible' &&
-              nav.scrollWidth > nav.clientWidth + 1;
-          })(),
-          appliedMode: {
-            theme: document.documentElement.dataset.theme || null,
-            font: document.documentElement.dataset.font || null,
-            contrast: document.documentElement.dataset.contrast || null
-          },
-          activeAnimations: document.getAnimations().filter((animation) => animation.playState === 'running').length,
-          tablePalette: [...document.querySelectorAll('table.data tbody tr')].slice(0, 4).map((row) => ({
-            row: getComputedStyle(row).backgroundColor,
-            firstCell: row.cells[0] ? getComputedStyle(row.cells[0]).backgroundColor : null,
-            middleCell: row.cells[1] ? getComputedStyle(row.cells[1]).backgroundColor : null,
-            lastCell: row.cells.length ? getComputedStyle(row.cells[row.cells.length - 1]).backgroundColor : null
-          })),
-          width: document.documentElement.clientWidth,
-          scrollWidth: document.documentElement.scrollWidth
-        }))()`);
-        metrics.journalLayout = name === "journal" ? await measureJournalLayout() : null;
-        metrics.taskLayout = name === "tasks" ? await measureTaskLayout() : null;
-        metrics.collapsibleLayout = await measureCollapsibleLayout();
-        metrics.formContainment = await measureFormContainment();
-        metrics.accessMatrixLayout = name === "user-form" ? await measureAccessMatrixLayout() : null;
-        metrics.responsiveTable = responsiveRouteNames.has(name) ? await measureResponsiveTable() : null;
-        metrics.sharedTableStyles = await measureSharedTableStyles(name);
-        metrics.browserErrors = browserErrors.slice(errorStart);
-        const shot = await command("Page.captureScreenshot", { format: "png", fromSurface: true });
-        const filename = `${name}-${width}x${height}-${theme}-${font}-${contrast}.png`;
-        await writeFile(join(outputDir, filename), Buffer.from(shot.data, "base64"));
-        results.push({ name, viewport: `${width}x${height}`, theme, font, contrast, ...metrics, screenshot: filename });
+        await captureRoute(width, height, name, path, theme, font, contrast);
       }
     }
   }

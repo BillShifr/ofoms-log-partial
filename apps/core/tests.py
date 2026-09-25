@@ -627,6 +627,26 @@ class ProductionSettingsTests(TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("DB_", result.stderr)
 
+    def test_production_requires_explicit_opt_in_for_database_without_tls(self):
+        rejected = self._import_settings(
+            "database-secret-4827-strong",
+            extra_environment={"DB_SSLMODE": "disable"},
+        )
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertIn("ALLOW_INSECURE_DB_CONNECTION", rejected.stderr)
+
+        accepted = self._import_settings(
+            "database-secret-4827-strong",
+            "from config.settings.prod import DATABASES; "
+            "print(DATABASES['default']['OPTIONS']['sslmode'])",
+            {
+                "DB_SSLMODE": "disable",
+                "ALLOW_INSECURE_DB_CONNECTION": "true",
+            },
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertEqual(accepted.stdout.strip(), "disable")
+
     def test_production_trusts_tls_terminator_scheme_by_default(self):
         result = self._import_settings(
             "database-secret-4827-strong",
@@ -945,8 +965,14 @@ class ProductionSettingsTests(TestCase):
         compose = (settings.BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
 
         self.assertIn("  migrate:\n    <<: *app-security", compose)
+        self.assertIn("manage.py upgrade_legacy_database", compose)
+        self.assertIn("ALLOW_LEGACY_INPLACE_UPGRADE", compose)
         self.assertIn("manage.py production_db_preflight", compose)
         self.assertIn("manage.py migrate --noinput", compose)
+        self.assertLess(
+            compose.index("manage.py upgrade_legacy_database"),
+            compose.index("manage.py production_db_preflight"),
+        )
         self.assertLess(
             compose.index("manage.py production_db_preflight"),
             compose.index("manage.py migrate --noinput"),

@@ -169,7 +169,7 @@ class IrpTheme(models.Model):
     """Тема обращения. Версионируемый справочник (актуальна версия 3)."""
 
     code_name = models.CharField("Код темы", max_length=14)
-    title = models.CharField(max_length=255, verbose_name="Название")
+    title = models.CharField(max_length=2000, verbose_name="Название")
     version = models.IntegerField("Версия справочника", default=1)
 
     class Meta:

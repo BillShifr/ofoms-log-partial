@@ -52,6 +52,7 @@ services:
       DB_HOST: ${DB_HOST:?DB_HOST is required}
       DB_PORT: ${DB_PORT:-5432}
       DB_SSLMODE: ${DB_SSLMODE:-require}
+      ALLOW_INSECURE_DB_CONNECTION: ${ALLOW_INSECURE_DB_CONNECTION:-false}
       DB_SSLROOTCERT: ${DB_SSLROOTCERT:-}
       DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
       DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-4}
@@ -113,9 +114,14 @@ services:
       - sh
       - -c
       - >-
+        if [ "$${ALLOW_LEGACY_INPLACE_UPGRADE:-false}" = "true" ]; then
+        .venv/bin/python manage.py upgrade_legacy_database
+        --confirm upgrade-journal-v1-in-place; fi &&
         .venv/bin/python manage.py production_db_preflight &&
         .venv/bin/python manage.py migrate --noinput
-    environment: *web_env
+    environment:
+      <<: *web_env
+      ALLOW_LEGACY_INPLACE_UPGRADE: ${ALLOW_LEGACY_INPLACE_UPGRADE:-false}
     restart: "no"
     logging: *default-logging
 

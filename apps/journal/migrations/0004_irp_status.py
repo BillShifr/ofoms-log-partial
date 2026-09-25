@@ -3,16 +3,12 @@ from django.db import migrations, models
 
 def derive_status(apps, schema_editor):
     Irp = apps.get_model("journal", "Irp")
-    for irp in Irp.objects.all().iterator():
-        if irp.date_close:
-            status = "closed"
-        elif irp.answers.filter(is_preliminary=True).exists():
-            status = "preliminary"
-        elif irp.date_cross or irp.pr_out:
-            status = "redirected"
-        else:
-            status = "registered"
-        Irp.objects.filter(pk=irp.pk).update(status=status)
+    Irp.objects.all().update(status="registered")
+    Irp.objects.filter(models.Q(date_cross__isnull=False) | models.Q(pr_out__isnull=False)).update(
+        status="redirected"
+    )
+    Irp.objects.filter(answers__is_preliminary=True).update(status="preliminary")
+    Irp.objects.filter(date_close__isnull=False).update(status="closed")
 
 
 class Migration(migrations.Migration):

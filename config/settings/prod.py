@@ -184,9 +184,14 @@ DB_POOL_MAX_SIZE = _bounded_int("DB_POOL_MAX_SIZE", 4, minimum=1, maximum=50)
 DB_POOL_TIMEOUT = _bounded_int("DB_POOL_TIMEOUT", 3, minimum=1, maximum=60)
 DB_CONNECT_TIMEOUT = _bounded_int("DB_CONNECT_TIMEOUT", 3, minimum=1, maximum=60)
 DB_SSLMODE = os.getenv("DB_SSLMODE", "require").strip().lower()
-if DB_SSLMODE not in {"require", "verify-ca", "verify-full"}:
+ALLOW_INSECURE_DB_CONNECTION = _boolean_env("ALLOW_INSECURE_DB_CONNECTION", False)
+if DB_SSLMODE not in {"disable", "require", "verify-ca", "verify-full"}:
     raise ImproperlyConfigured(
-        "DB_SSLMODE must be require, verify-ca, or verify-full in production."
+        "DB_SSLMODE must be disable, require, verify-ca, or verify-full in production."
+    )
+if DB_SSLMODE == "disable" and not ALLOW_INSECURE_DB_CONNECTION:
+    raise ImproperlyConfigured(
+        "DB_SSLMODE=disable requires ALLOW_INSECURE_DB_CONNECTION=true."
     )
 DB_SSLROOTCERT = os.getenv("DB_SSLROOTCERT", "").strip()
 if DB_SSLMODE in {"verify-ca", "verify-full"} and not DB_SSLROOTCERT:

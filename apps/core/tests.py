@@ -937,6 +937,8 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("compose stop web scheduler", deploy)
         self.assertIn("VCS_REF does not match the deployment bundle", deploy)
         self.assertIn("LEGACY_UPGRADE_BACKUP_FILE is required", deploy)
+        self.assertIn("REGISTRY_AUTH_FILE=$(sed", deploy)
+        self.assertIn("REGISTRY_AUTH_FILE is not readable", deploy)
         self.assertIn("db-tools pg_restore --list", deploy)
         self.assertLess(
             deploy.index("compose run --rm --no-deps migrate"),

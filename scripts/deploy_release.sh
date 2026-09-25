@@ -8,6 +8,24 @@ if [ -f "$bundle_dir/SHA256SUMS" ]; then
 fi
 . "$script_dir/lib/container_engine.sh"
 
+# Compose reads .env itself, but a direct Podman pull does not. Export the
+# dedicated auth file so manual deployments and the systemd unit use the same
+# registry credentials without copying them into the deployment bundle.
+if [ -z "${REGISTRY_AUTH_FILE:-}" ] && [ -f "$bundle_dir/.env" ]; then
+  REGISTRY_AUTH_FILE=$(sed -n 's/^REGISTRY_AUTH_FILE=//p' "$bundle_dir/.env")
+  export REGISTRY_AUTH_FILE
+fi
+if [ "$CONTAINER_ENGINE" = podman ] && [ -n "${REGISTRY_AUTH_FILE:-}" ]; then
+  case "$REGISTRY_AUTH_FILE" in
+    /*) ;;
+    *) echo >&2 "REGISTRY_AUTH_FILE must be absolute"; exit 1 ;;
+  esac
+  test -r "$REGISTRY_AUTH_FILE" || {
+    echo >&2 "REGISTRY_AUTH_FILE is not readable: $REGISTRY_AUTH_FILE"
+    exit 1
+  }
+fi
+
 if [ -f "$bundle_dir/RELEASE" ]; then
   bundle_revision=$(sed -n 's/^VCS_REF=//p' "$bundle_dir/RELEASE")
   if [ -n "${VCS_REF:-}" ] && [ "$VCS_REF" != "$bundle_revision" ]; then

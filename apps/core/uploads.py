@@ -12,7 +12,7 @@ class BoundedUploadHandler(FileUploadHandler):
     """Останавливает multipart, прежде чем файл переполнит временный том."""
 
     def handle_raw_input(
-        self, _input_data, META, content_length, boundary, encoding=None
+        self, input_data, META, content_length, boundary, encoding=None
     ):
         if (
             content_length is not None

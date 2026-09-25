@@ -249,7 +249,7 @@ class ExchangeTestMixin:
             username="smo", password="GoodPass!1", org=81001
         )
         self.smo.groups.add(Group.objects.get(name="СП1"))
-        # Временные каталоги обмена (не трогаем рабочие exchange/)
+        # временные каталоги не затрагивают рабочий exchange
         self.in_dir = tempfile.mkdtemp()
         self.out_dir = tempfile.mkdtemp()
         self.arch_dir = tempfile.mkdtemp()
@@ -438,9 +438,9 @@ class EmployeeImportTests(ExchangeTestMixin, TestCase):
                 guid=uuid.UUID("00000000-0000-0000-0000-000000000002")
             ).exists()
         )
-        # активность по умолчанию выключена (v1)
+        # активность по умолчанию выключена как в v1
         self.assertFalse(self.emp1.is_active)
-        # повторная загрузка (upsert) не плодит дубли
+        # повторная загрузка не создает дубли
         path.write_bytes(SAMPLE_USERS)
         imp2 = EmployeeXMLFile(81000, path, **self._imp_kwargs())
         imp2.process()
@@ -463,7 +463,7 @@ class IrpImportTests(ExchangeTestMixin, TestCase):
         self.assertTrue(out.ok, out.errors)
         self.assertEqual(out.rows, 1)
         irp = Irp.objects.get(employee_one=self.emp1)
-        # заголовок сохранён в XmlFiles
+        # заголовок сохранен в xmlfiles
         from apps.journal.models import XmlFiles
 
         self.assertEqual(XmlFiles.objects.count(), 1)
@@ -1152,7 +1152,7 @@ class UploadPostTests(ExchangeTestMixin, TestCase):
         self.assertTrue(
             (self._arch / "81000" / "users260514001.xml").exists()
         )
-        # два пользователя загружены (новый + обновлённый по GUID)
+        # новый пользователь создан а существующий обновлен по guid
         self.assertEqual(Employee.objects.count(), 4)  # 2 фикстуры + 2 из файла
 
     def test_upload_database_changes_roll_back_when_audit_fails(self):

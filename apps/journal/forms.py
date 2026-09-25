@@ -64,7 +64,7 @@ class IrpForm(forms.ModelForm):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        # Темы — актуальная версия (3), как в v1
+        # актуальная версия тем совпадает с v1
         self.fields["theme"].queryset = IrpTheme.objects.filter(version=3)
         if user is not None:
             if self.instance.pk is None and self.instance.employee_one_id is None:
@@ -92,9 +92,7 @@ class IrpForm(forms.ModelForm):
                 )
             self.fields["repeat_of"].queryset = repeats.order_by("-date_create", "-pk")
             if self.instance.pk is None:
-                # По умолчанию: исполнитель = текущий пользователь,
-                # организация-ответственный = организация пользователя
-                # Уникальный номер генерируется сервером при отсутствии явного
+                # исполнитель и организация по умолчанию берутся из текущего пользователя
                 self.fields["n_irp"].required = False
                 self.fields["n_irp"].initial = str(uuid.uuid4())
                 self.fields["date_create"].initial = datetime.date.today()
@@ -131,7 +129,7 @@ class IrpForm(forms.ModelForm):
 
     def clean_n_irp(self):
         value = self.cleaned_data.get("n_irp")
-        # При регистрации без явного номера генерируем UUID (как в v1)
+        # номер без явного значения генерируется как uuid
         if self.instance.pk is None and not value:
             value = str(uuid.uuid4())
             self.cleaned_data["n_irp"] = value
@@ -139,8 +137,7 @@ class IrpForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        # Неактивные условные поля браузер может прислать со старым значением.
-        # Нормализуем их до единого доменного ФЛК модели.
+        # неактивные условные поля нормализуются перед доменной проверкой
         if cleaned.get("irp_type") != 2:
             cleaned["zh_d"] = None
         return cleaned

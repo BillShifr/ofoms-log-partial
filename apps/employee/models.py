@@ -13,7 +13,7 @@ from django.db import models
 from django.db.models import Case, ExpressionWrapper, F, Value, When
 from django.utils import timezone
 
-# Организации участников ОМС (коды ЕМИАС/реестров — совместимость с v1)
+# коды организаций сохраняют совместимость с v1
 ORGS = (
     (81000, "ТФОМС"),
     (81001, "СОГАЗ - МЕД"),

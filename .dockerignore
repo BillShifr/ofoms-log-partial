@@ -33,6 +33,8 @@ tests
 **/tests.py
 **/test_*.py
 scripts
+deploy
+dist
 .github
 .idea
 .vscode

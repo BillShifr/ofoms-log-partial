@@ -184,9 +184,14 @@ DB_POOL_MAX_SIZE = _bounded_int("DB_POOL_MAX_SIZE", 4, minimum=1, maximum=50)
 DB_POOL_TIMEOUT = _bounded_int("DB_POOL_TIMEOUT", 3, minimum=1, maximum=60)
 DB_CONNECT_TIMEOUT = _bounded_int("DB_CONNECT_TIMEOUT", 3, minimum=1, maximum=60)
 DB_SSLMODE = os.getenv("DB_SSLMODE", "require").strip().lower()
-if DB_SSLMODE not in {"require", "verify-ca", "verify-full"}:
+ALLOW_INSECURE_DB_CONNECTION = _boolean_env("ALLOW_INSECURE_DB_CONNECTION", False)
+if DB_SSLMODE not in {"disable", "require", "verify-ca", "verify-full"}:
     raise ImproperlyConfigured(
-        "DB_SSLMODE must be require, verify-ca, or verify-full in production."
+        "DB_SSLMODE must be disable, require, verify-ca, or verify-full in production."
+    )
+if DB_SSLMODE == "disable" and not ALLOW_INSECURE_DB_CONNECTION:
+    raise ImproperlyConfigured(
+        "DB_SSLMODE=disable requires ALLOW_INSECURE_DB_CONNECTION=true."
     )
 DB_SSLROOTCERT = os.getenv("DB_SSLROOTCERT", "").strip()
 if DB_SSLMODE in {"verify-ca", "verify-full"} and not DB_SSLROOTCERT:
@@ -223,8 +228,7 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = bool(SECURE_HSTS_SECONDS)
 SECURE_HSTS_PRELOAD = bool(SECURE_HSTS_SECONDS)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
-# Production topology terminates TLS at a trusted reverse proxy. The proxy must
-# overwrite (not append) this header; the Compose port is loopback-bound by default.
+# доверенный reverse proxy завершает tls и перезаписывает заголовок
 TRUST_PROXY_SSL_HEADER = _boolean_env("TRUST_PROXY_SSL_HEADER", True)
 TRUST_PROXY_CLIENT_IP_HEADER = _boolean_env("TRUST_PROXY_CLIENT_IP_HEADER", True)
 TRUSTED_PROXY_IPS = _trusted_proxy_networks(
@@ -233,13 +237,13 @@ TRUSTED_PROXY_IPS = _trusted_proxy_networks(
 if TRUST_PROXY_SSL_HEADER:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# Пути ОС внутри контейнера
+# пути внутри контейнера
 STATIC_ROOT = os.getenv("STATIC_ROOT", "/app/staticfiles")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/app/media")
 
 EXCHANGE_ROOT = os.getenv("EXCHANGE_ROOT", "/app/exchange")
 
-# База — из окружения (docker-compose)
+# база из окружения compose
 DATABASES["default"].update(  # noqa: F405
     {
         "NAME": os.getenv("DB_NAME", "ejournal"),
@@ -264,4 +268,4 @@ DATABASES["default"].update(  # noqa: F405
     }
 )
 
-# AuditMiddleware already belongs to the shared middleware chain in base.py.
+# audit middleware уже задан в базовых настройках

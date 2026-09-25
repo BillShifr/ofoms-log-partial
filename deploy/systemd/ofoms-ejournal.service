@@ -1,0 +1,19 @@
+[Unit]
+Description=OFOMS electronic journal containers
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h/apps/ofoms-ejournal
+Environment=CONTAINER_ENGINE=podman
+Environment=DEPLOY_PULL=false
+EnvironmentFile=%h/apps/ofoms-ejournal/.env
+ExecStart=/bin/sh %h/apps/ofoms-ejournal/scripts/deploy_release.sh
+ExecStop=/usr/bin/podman compose stop web scheduler
+TimeoutStartSec=900
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target

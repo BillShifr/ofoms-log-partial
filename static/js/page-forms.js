@@ -380,6 +380,39 @@
     delete button.dataset.originalLabel;
   }
 
+  function submitJsonForm(form) {
+    return fetch(form.action, {
+      method: "POST",
+      body: new FormData(form),
+      credentials: "same-origin",
+      headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok || !data.ok) throw data;
+        return data;
+      });
+    });
+  }
+
+  function resetDialogForm(form) {
+    form.reset();
+    var dialog = form.closest("dialog");
+    if (dialog && typeof dialog.close === "function") dialog.close();
+  }
+
+  function showJsonFormErrors(errorBox, data, fallback) {
+    var messages = [];
+    Object.keys((data && data.errors) || {}).forEach(function (field) {
+      data.errors[field].forEach(function (error) {
+        messages.push(error.message || String(error));
+      });
+    });
+    if (errorBox) {
+      errorBox.textContent = messages.join(" ") || fallback;
+      errorBox.hidden = false;
+    }
+  }
+
   function initGlobalActions() {
     document.addEventListener("click", function (event) {
       var toggle = event.target.closest("[data-control-group-toggle]");
@@ -404,17 +437,7 @@
         errorBox.hidden = true;
         errorBox.textContent = "";
       }
-      fetch(form.action, {
-        method: "POST",
-        body: new FormData(form),
-        credentials: "same-origin",
-        headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
-      }).then(function (response) {
-        return response.json().then(function (data) {
-          if (!response.ok || !data.ok) throw data;
-          return data;
-        });
-      }).then(function (data) {
+      submitJsonForm(form).then(function (data) {
         document.querySelectorAll('select[name="theme"]').forEach(function (select) {
           var option = document.createElement("option");
           option.value = String(data.id);
@@ -422,21 +445,10 @@
           option.selected = select.closest("form[data-validate]") !== null;
           select.appendChild(option);
         });
-        form.reset();
-        var dialog = form.closest("dialog");
-        if (dialog && typeof dialog.close === "function") dialog.close();
+        resetDialogForm(form);
         if (window.showToast) window.showToast("Тема создана и доступна в списке.", "success");
       }).catch(function (data) {
-        var messages = [];
-        Object.keys((data && data.errors) || {}).forEach(function (field) {
-          data.errors[field].forEach(function (error) {
-            messages.push(error.message || String(error));
-          });
-        });
-        if (errorBox) {
-          errorBox.textContent = messages.join(" ") || "Не удалось создать тему.";
-          errorBox.hidden = false;
-        }
+        showJsonFormErrors(errorBox, data, "Не удалось создать тему.");
       }).finally(function () {
         restoreSubmitButton(form);
       });
@@ -451,17 +463,7 @@
         errorBox.hidden = true;
         errorBox.textContent = "";
       }
-      fetch(form.action, {
-        method: "POST",
-        body: new FormData(form),
-        credentials: "same-origin",
-        headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
-      }).then(function (response) {
-        return response.json().then(function (data) {
-          if (!response.ok || !data.ok) throw data;
-          return data;
-        });
-      }).then(function (data) {
+      submitJsonForm(form).then(function (data) {
         document.querySelectorAll('select[name="command"]').forEach(function (select) {
           var option = document.createElement("option");
           option.value = String(data.id);
@@ -470,21 +472,10 @@
           select.appendChild(option);
           select.dispatchEvent(new Event("change", { bubbles: true }));
         });
-        form.reset();
-        var dialog = form.closest("dialog");
-        if (dialog && typeof dialog.close === "function") dialog.close();
+        resetDialogForm(form);
         if (window.showToast) window.showToast("Действие создано и выбрано в задаче.", "success");
       }).catch(function (data) {
-        var messages = [];
-        Object.keys((data && data.errors) || {}).forEach(function (field) {
-          data.errors[field].forEach(function (error) {
-            messages.push(error.message || String(error));
-          });
-        });
-        if (errorBox) {
-          errorBox.textContent = messages.join(" ") || "Не удалось создать действие.";
-          errorBox.hidden = false;
-        }
+        showJsonFormErrors(errorBox, data, "Не удалось создать действие.");
       }).finally(function () {
         restoreSubmitButton(form);
       });

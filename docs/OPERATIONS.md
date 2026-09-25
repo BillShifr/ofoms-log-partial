@@ -2,8 +2,9 @@
 
 ## Предварительные условия
 
-- Linux-хост с Docker Engine и Docker Compose v2;
-- внешний PostgreSQL 14+, доступный с Docker-хоста и контейнерной сети;
+- Linux-хост с rootless Podman 5+ и podman-compose 1.4+;
+- `loginctl enable-linger` для эксплуатационного пользователя;
+- внешний PostgreSQL 17, доступный с хоста и контейнерной сети;
 - TLS-терминатор перед портом приложения;
 - отдельные случайные значения `SECRET_KEY` и `JWT_SECRET` длиной не менее 50 символов;
 - случайный пароль `DB_PASSWORD` длиной не менее 16 символов, отличный от имени БД и пользователя.
@@ -14,16 +15,16 @@ Production использует встроенный Django/psycopg pool. По �
 
 ```bash
 pg_isready -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -U "$DB_USER"
-docker compose --profile ops run --rm --no-deps db-tools psql -Atqc \
+podman compose --profile ops run --rm --no-deps db-tools psql -Atqc \
   'SELECT current_database(), current_user, version()'
-docker compose run --rm --no-deps migrate \
+podman compose run --rm --no-deps migrate \
   .venv/bin/python manage.py production_db_preflight
 ```
 
 Последняя команда только читает метаданные и не применяет миграции. Не запускайте штатный
 `migrate` до успешного preflight и резервной копии источника.
 
-Скопируйте `.env.production.example` в `.env`, замените все значения `change-me` и укажите публичные имена в `ALLOWED_HOSTS` без схемы и пути, например `journal.example.ru,admin.internal.example.ru`. `DB_NAME`, `DB_USER`, `DB_PASSWORD` и `DB_HOST` обязательны: Compose не запускает скрытую локальную БД и не подменяет ошибочно заданный production endpoint. Пустой список хостов, `*`, URL и значения с пробелами запрещены. Без безопасных `SECRET_KEY`, `JWT_SECRET` и `DB_PASSWORD` production settings и Compose завершаются с ошибкой до запуска сервисов. Production требует шифрование подключения к PostgreSQL: `DB_SSLMODE=require` является минимальным режимом, а `verify-ca`/`verify-full` требуют смонтированного CA-файла и `DB_SSLROOTCERT`. Production defaults включают secure cookies, HTTPS redirect и HSTS. Web-сессия завершается при закрытии браузера и после восьми часов бездействия; каждый запрос сдвигает срок, а `SESSION_COOKIE_AGE` позволяет задать от 300 до 43200 секунд. `MAX_FAILED_LOGIN_ATTEMPTS` принимает только 1–10: значение выше десяти нарушает обязательную блокировку, а нулевое блокирует все учётные записи. Compose передаёт оба параметра в web и scheduler. Булевы security-переменные принимают только `true/false`, `1/0` или `yes/no`; опечатка останавливает startup вместо неявного отключения защиты. HSTS допускает 0–63072000 секунд. `LOG_LEVEL` в production ограничен значениями `INFO`, `WARNING`, `ERROR`, `CRITICAL`: `DEBUG` запрещён, чтобы SQL и персональные данные не попадали в агрегируемые контейнерные логи.
+Скопируйте `.env.production.example` в `.env`, замените все значения `change-me` и укажите публичные имена в `ALLOWED_HOSTS` без схемы и пути, например `journal.example.ru,admin.internal.example.ru`. `DB_NAME`, `DB_USER`, `DB_PASSWORD` и `DB_HOST` обязательны: Compose не запускает скрытую локальную БД и не подменяет ошибочно заданный production endpoint. Пустой список хостов, `*`, URL и значения с пробелами запрещены. Без безопасных `SECRET_KEY`, `JWT_SECRET` и `DB_PASSWORD` production settings и Compose завершаются с ошибкой до запуска сервисов. Production по умолчанию требует `DB_SSLMODE=require`; `verify-ca`/`verify-full` требуют смонтированного CA-файла и `DB_SSLROOTCERT`. Для внутреннего PostgreSQL без TLS допускается только явная пара `DB_SSLMODE=disable` и `ALLOW_INSECURE_DB_CONNECTION=true`; исключение необходимо убрать после включения TLS на сервере БД. Production defaults включают secure cookies, HTTPS redirect и HSTS. Web-сессия завершается при закрытии браузера и после восьми часов бездействия; каждый запрос сдвигает срок, а `SESSION_COOKIE_AGE` позволяет задать от 300 до 43200 секунд. `MAX_FAILED_LOGIN_ATTEMPTS` принимает только 1–10: значение выше десяти нарушает обязательную блокировку, а нулевое блокирует все учётные записи. Compose передаёт оба параметра в web и scheduler. Булевы security-переменные принимают только `true/false`, `1/0` или `yes/no`; опечатка останавливает startup вместо неявного отключения защиты. HSTS допускает 0–63072000 секунд. `LOG_LEVEL` в production ограничен значениями `INFO`, `WARNING`, `ERROR`, `CRITICAL`: `DEBUG` запрещён, чтобы SQL и персональные данные не попадали в агрегируемые контейнерные логи.
 
 Штатная схема предполагает TLS-терминатор перед Gunicorn. Он обязан **перезаписывать** `X-Forwarded-Proto` значением `https` и `X-Forwarded-For` одним IP-адресом исходного клиента, а не дописывать значения к входящим заголовкам. Django доверяет им при `TRUST_PROXY_SSL_HEADER=True` и `TRUST_PROXY_CLIENT_IP_HEADER=True`, только если непосредственный сетевой peer входит в `TRUSTED_PROXY_IPS`; второй заголовок используется обязательным журналом событий. По умолчанию разрешены лишь loopback `127.0.0.1/32,::1/128`. Для proxy на Docker host или отдельном узле укажите точный видимый контейнеру IP/CIDR, не добавляя клиентские сети. Заголовки от остальных peers удаляются до `SecurityMiddleware`; цепочка адресов и синтаксически неверный IP игнорируются с fallback на сетевой адрес proxy. Отключать настройки следует только при завершении TLS самим application server либо отсутствии доверенной передачи client IP. Compose по умолчанию публикует Gunicorn лишь на `127.0.0.1:8000`, чтобы внешний клиент не мог обойти proxy. Для proxy на отдельном хосте `WEB_BIND_ADDRESS` можно заменить адресом изолированного внутреннего интерфейса; открывать порт в недоверенную сеть нельзя.
 
@@ -75,17 +76,60 @@ POST-операции карточки автоматизированного з
 
 ## Запуск и обновление
 
+На сервер передаётся только сформированный CI архив `ofoms-ejournal-deploy-<SHA>.tar.gz`.
+Исходники приложения и Git checkout на сервере не нужны. Распакуйте архив в
+`~/apps/ofoms-ejournal`, создайте `.env` из `.env.example`, выполните `chmod 600 .env` и
+авторизуйтесь read-only токеном registry в постоянный rootless auth-файл:
+
 ```bash
-export VCS_REF=<полный SHA проверенного main-образа>
-docker compose config --quiet
-docker compose pull web
-sh scripts/verify_release_image.sh
-docker compose up -d --no-build
-docker compose ps
-docker compose logs --tail=200 web scheduler
+mkdir -p "$HOME/.config/containers"
+chmod 700 "$HOME/.config/containers"
+podman login --authfile "$HOME/.config/containers/auth.json" docker.io
+chmod 600 "$HOME/.config/containers/auth.json"
 ```
 
-Одноразовый сервис `migrate` сначала запускает `production_db_preflight`, затем применяет схему и обязан успешно завершиться до запуска `web`. Preflight разрешает пустую БД и схему v2 с корректной историей Django migrations, но останавливает запуск при обнаружении старой `journal.portal.tfoms` или частично созданной неизвестной схемы. Старую БД необходимо мигрировать в отдельную чистую БД v2; in-place преобразование запрещено. Миграции не входят в startup-команду Gunicorn, поэтому параллельный перезапуск web-процессов не создаёт конкурирующих schema writers. `scheduler` начинает работу только после ready-состояния `web` и через команду `run_scheduler` раз в минуту вызывает `run_tasks`; SIGTERM/SIGINT останавливает его после текущего цикла. Для web и scheduler действует `restart: unless-stopped`, а web/scheduler получают 75 секунд на штатное завершение. `GET /healthz` проверяет только живой HTTP-процесс, а `GET /readyz` выполняет `SELECT 1` в основной БД и возвращает 503 при потере соединения. Compose обращается к readiness с внутренним доверенным `X-Forwarded-Proto: https` и принимает только HTTP 200, поэтому HTTPS redirect не может дать ложный healthy.
+Путь `REGISTRY_AUTH_FILE` в `.env` должен указывать на этот файл.
+
+```bash
+cd "$HOME/apps/ofoms-ejournal"
+CONTAINER_ENGINE=podman sh scripts/deploy_release.sh
+```
+
+Скрипт сам загружает immutable SHA-образ, проверяет OCI revision, останавливает writers,
+последовательно выполняет `volume-init` и `migrate`, ждёт healthy-состояния `web` и только
+затем запускает scheduler. Он намеренно не полагается на `depends_on` podman-compose.
+
+Для запуска после reboot установите приложенный user-unit:
+
+```bash
+mkdir -p "$HOME/.config/systemd/user"
+cp systemd/ofoms-ejournal.service "$HOME/.config/systemd/user/"
+systemctl --user daemon-reload
+systemctl --user enable --now ofoms-ejournal.service
+```
+
+Одноразовый сервис `migrate` при явном флаге сначала запускает bridge-upgrade v1, затем `production_db_preflight` и Django migrations; он обязан успешно завершиться до запуска `web`. Bridge работает под PostgreSQL advisory lock, проверяет историю миграций и противоречивые данные до DDL, а преобразование выполняет одной транзакцией. Неизвестная или частично созданная схема отклоняется. Миграции не входят в startup-команду Gunicorn, поэтому параллельный перезапуск web-процессов не создаёт конкурирующих schema writers. `scheduler` начинает работу только после ready-состояния `web`.
+
+Первый запуск на существующей БД `journal`:
+
+1. Остановить все старые writers и сделать полный custom-format `pg_dump` PostgreSQL 17:
+
+   ```bash
+   podman run --rm -i docker.io/library/postgres:17-alpine \
+     pg_dump "host=192.168.1.239 port=5432 dbname=journal user=journal sslmode=disable" \
+     -W -Fc > "$HOME/backups/journal-before-v2.dump"
+   podman run --rm -i docker.io/library/postgres:17-alpine \
+     pg_restore --list < "$HOME/backups/journal-before-v2.dump" >/dev/null
+   sha256sum "$HOME/backups/journal-before-v2.dump"
+   ```
+
+2. Проверить восстановление копии и выполнить на ней полный запуск нового image.
+3. Установить `ALLOW_LEGACY_INPLACE_UPGRADE=true` и абсолютный
+   `LEGACY_UPGRADE_BACKUP_FILE=/home/vladislav/backups/journal-before-v2.dump` только на первый запуск.
+4. Выполнить `CONTAINER_ENGINE=podman sh scripts/deploy_release.sh`.
+5. Вернуть `ALLOW_LEGACY_INPLACE_UPGRADE=false` и хранить исходный backup до приёмки.
+
+Upgrade сохраняет старый код темы в `journal_irptheme.legacy_code`, создаёт числовой ключ, перепривязывает обращения, добавляет поля защиты пользователей и таблицу истории. При ошибке аудита транзакция не начинается, а лог содержит категории и количества проблемных строк.
 
 Перед `web` Compose запускает одноразовый `volume-init`: он назначает рабочим каталогам `media` и `exchange` UID/GID 10001 и завершается. Init-контейнер работает с read-only root filesystem, без возможности повышения привилегий и со сброшенными capabilities, кроме единственной необходимой `CHOWN`; root используется только для подготовки подключённых data volumes. Gunicorn и scheduler постоянно работают без root-прав, без Linux capabilities и возможности повышения привилегий; root filesystem доступна только для чтения. Запись разрешена в именованные volumes `media`/`exchange` и ограниченный 256-МБ `tmpfs` `/tmp`. Размер временного тома оставляет запас над продуктовым лимитом обучающего видео 200 МБ; уменьшать его ниже этого значения нельзя. Первый Django upload handler отклоняет multipart `Content-Length` свыше 201 МБ до разбора и немедленно останавливает chunked-файл после 200 МБ, не дочитывая остаток; ответ HTTP 413 формируется до прикладного view. В одном запросе допускается только один файл. Новые каталоги организаций в `exchange` получают режим `0700`, а входные, архивные и FLCP-файлы — `0600`; внешняя система автозагрузки обязана передавать файлы владельцу UID/GID 10001 либо допускать смену режима этим пользователем. Reverse proxy должен устанавливать совместимый или более строгий request-body limit. Если внешний bind mount не допускает `chown`/`chmod`, запуск или обработка останавливаются до исправления прав на host вместо работы с избыточно открытыми данными.
 
@@ -93,31 +137,28 @@ Runtime image не содержит build-инструмент `uv`, тесто�
 
 CI загружает собранный image в локальный Docker daemon runner, выполняет `scripts/container_runtime_gate.sh` и только после успешной проверки публикует tag из `main`. Gate подтверждает отсутствие build/test content, непривилегированность основного runtime, read-only rootfs, размер `/tmp`, а также минимальный `CHOWN`-контракт init-контейнера. Сборка без выполнения этого gate не считается готовой к публикации.
 
-Каждая проверенная сборка `main` публикуется одновременно как `frozendevs/tfoms-ejournal:<полный-git-sha>` и `latest`. Для установки и rollback используйте SHA-tag; `latest` предназначен только как указатель на последнюю проверенную версию. OCI label `org.opencontainers.image.revision` обязан совпадать с SHA-tag и проверяется до push: `docker image inspect frozendevs/tfoms-ejournal:<sha> --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'`.
+Каждая проверенная сборка `main` публикуется одновременно как `frozendevs/tfoms-ejournal:<полный-git-sha>` и `latest`. Для установки и rollback используйте SHA-tag; `latest` предназначен только как указатель на последнюю проверенную версию. OCI label `org.opencontainers.image.revision` обязан совпадать с SHA-tag и проверяется до push: `podman image inspect frozendevs/tfoms-ejournal:<sha> --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'`.
 Compose также требует `VCS_REF` и передаёт его всем четырём сборкам приложения. Dockerfile
 принимает только полный 40-символьный lowercase Git SHA, поэтому локальная или production-сборка
 без доказуемой ревизии завершается до создания runtime-образа.
 Все application-сервисы (`volume-init`, `migrate`, `web`, `scheduler`) ссылаются на один
-immutable `frozendevs/tfoms-ejournal:${VCS_REF}`. Команда `docker compose pull web` загружает
+immutable `frozendevs/tfoms-ejournal:${VCS_REF}`. Команда `podman compose pull web` загружает
 этот общий образ, а `up --no-build` гарантирует, что production не подменит проверенный artifact
 локальной сборкой. `build` используется только для разработки и release-проверки исходников.
 Между pull и запуском `verify_release_image.sh` сверяет все четыре resolved image reference,
 OCI revision и hardened runtime-контракт. Несовпадение останавливает обновление до изменения
 работающих контейнеров.
 
-Для обновления сначала создайте резервную копию, затем:
+Для обновления сначала создайте резервную копию, распакуйте новый deployment bundle поверх
+старого (сохранив `.env`), затем:
 
 ```bash
-git pull --ff-only
-export VCS_REF=<полный SHA нового проверенного main-образа>
-docker compose pull web
-sh scripts/verify_release_image.sh
-docker compose up -d --no-build
-docker compose ps
+CONTAINER_ENGINE=podman sh scripts/deploy_release.sh
 ```
 
-Для отката установите `VCS_REF` в SHA предыдущего проверенного образа, повторите `pull web` и
-`up -d --no-build`. Перед этим проверьте совместимость старого приложения с текущей схемой.
+Для отката используйте сохранённый deployment bundle предыдущего SHA и запустите его
+`scripts/deploy_release.sh`. Подмена только `VCS_REF` запрещена: SHA в `.env`, `RELEASE`, OCI
+label и составе bundle должны совпадать. Перед этим проверьте совместимость старого приложения с текущей схемой.
 Откат миграций допускается только после проверки обратимости конкретной миграции и наличия
 свежей резервной копии.
 
@@ -174,13 +215,13 @@ Restore до удаления данных проверяет полный сп�
 
 Редактирование новости и удаление новостей/документов сериализуются блокировкой актуальной строки. Предметное событие фиксируется в той же транзакции: при отказе удаления запись остаётся доступной, а ложное событие `DELETE` не попадает в журнал.
 
-- `docker compose ps`: `web` должен быть healthy, `scheduler` — running, `migrate` — exited (0);
+- `podman compose ps`: `web` должен быть healthy, `scheduler` — running, `migrate` — exited (0);
 - `curl -fsS https://<host>/healthz` проверяет liveness, `curl -fsS https://<host>/readyz` — готовность приложения и PostgreSQL;
-- `docker compose logs web`: HTTP/WSGI ошибки и миграции;
-- `docker compose logs scheduler`: результаты автоматизированных заданий;
+- `podman compose logs web`: HTTP/WSGI ошибки и миграции;
+- `podman compose logs scheduler`: результаты автоматизированных заданий;
 - модуль «События»: действия пользователей и результаты операций;
 - модуль «Задачи»: последний результат и лог каждого задания.
 
-Compose использует `json-file` с ротацией: пять файлов по 10 МБ на сервис и сжатие архивных сегментов. Для четырёх сервисов локальный верхний предел несжатых container logs составляет около 200 МБ. Централизованный сбор при необходимости настраивается на уровне Docker host; отключать локальную ротацию при этом не следует. Проверка текущего расхода: `docker system df -v` и `docker inspect --format '{{.LogPath}}' <container>`.
+Compose использует совместимый с Podman `json-file` с ограничением сегмента 10 МБ. Политика хранения и централизованный сбор настраиваются на уровне сервера; проверка текущего расхода: `podman system df -v` и `podman inspect --format '{{.LogPath}}' <container>`.
 
-Зависший запуск старше `TASK_STALE_AFTER_SECONDS` автоматически закрывается как ошибочный. Production принимает таймаут от 300 до 86400 секунд и останавливает startup при ошибочном значении, чтобы scheduler не закрывал живые процессы немедленно и не оставлял зависшие процессы навсегда. Ручная диагностика без запуска новых заданий: `docker compose exec web .venv/bin/python manage.py run_tasks --recover-only`.
+Зависший запуск старше `TASK_STALE_AFTER_SECONDS` автоматически закрывается как ошибочный. Production принимает таймаут от 300 до 86400 секунд и останавливает startup при ошибочном значении, чтобы scheduler не закрывал живые процессы немедленно и не оставлял зависшие процессы навсегда. Ручная диагностика без запуска новых заданий: `podman compose exec web .venv/bin/python manage.py run_tasks --recover-only`.

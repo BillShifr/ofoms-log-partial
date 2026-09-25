@@ -20,14 +20,14 @@ JOURNAL_COLUMNS = [
     {"key": "status", "label": "Статус", "group": "", "sortable": False},
 ]
 
-# Сортировка по реквизитам, допустимым в запросе к БД
+# доступные пользователю поля сортировки
 SORTABLE_FIELDS = {
     c["key"]: c
     for c in JOURNAL_COLUMNS
     if c["sortable"]
 }
 
-# Реквизиты, по которым физически можно сортировать (поле модели/выражение)
+# поля и выражения сортировки в базе
 ALLOWED_SORTS = {
     "id", "-id",
     "date_create", "-date_create",

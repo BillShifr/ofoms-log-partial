@@ -19,8 +19,8 @@ WORKDIR /app
 RUN groupadd --gid 10001 app && \
     useradd --uid 10001 --gid app --no-create-home --home-dir /app --shell /usr/sbin/nologin app
 
-# Сначала копируем файлы зависимостей — слой кешируется (пересборка быстрее).
-# uv монтируется только на время build step и не остаётся в runtime image.
+# зависимости копируются отдельно для кеширования слоя
+# uv доступен только на этапе сборки
 COPY pyproject.toml uv.lock README.md ./
 RUN --mount=from=uv-tools,source=/uv,target=/usr/local/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \

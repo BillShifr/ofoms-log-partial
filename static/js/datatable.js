@@ -1,6 +1,3 @@
-// Единый компонент DataTable: клик по всей строке, сортировка, тултипы, resize.
-// Разметка: table.data[data-client-sort] — сортировка по th без вложенных ссылок;
-// tr[data-href] — переход по строке; [data-tip] — кастомный тултип.
 (function () {
   var dynamicSheets = {};
 

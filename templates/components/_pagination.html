@@ -1,0 +1,7 @@
+{% if page.paginator.num_pages > 1 %}
+<div class="pagination">
+  {% if page.has_previous %}<a href="{% querystring page=page.previous_page_number %}">‹ Назад</a>{% endif %}
+  <span class="current">Стр. {{ page.number }} из {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a href="{% querystring page=page.next_page_number %}">Вперёд ›</a>{% endif %}
+</div>
+{% endif %}

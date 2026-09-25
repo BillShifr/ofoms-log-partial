@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+        image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
         env:
           POSTGRES_DB: ejournal
           POSTGRES_USER: ejournal
@@ -85,6 +85,7 @@ jobs:
           DB_PASSWORD: ci-only-database-password-4827
           DB_HOST: 127.0.0.1
           ALLOWED_HOSTS: localhost,127.0.0.1
+          TRUSTED_PROXY_IPS: 127.0.0.1/32,::1/128
 
       - name: Compose configuration
         run: docker compose config --quiet
@@ -96,6 +97,8 @@ jobs:
           DB_USER: ejournal
           DB_PASSWORD: ci-only-database-password-4827
           DB_HOST: 127.0.0.1
+          ALLOWED_HOSTS: localhost,127.0.0.1
+          TRUSTED_PROXY_IPS: 127.0.0.1/32,::1/128
 
   docker:
     runs-on: ubuntu-latest
@@ -116,6 +119,10 @@ jobs:
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
+            if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+              echo >&2 "Docker Hub credentials are required for main releases"
+              exit 1
+            fi
           fi
 
       - name: Docker Login
@@ -136,10 +143,27 @@ jobs:
             frozendevs/tfoms-ejournal:latest
 
       - name: Verify runtime image
+        env:
+          CONTAINER_ENGINE: docker
         run: >-
           sh scripts/container_runtime_gate.sh
           frozendevs/tfoms-ejournal:${{ github.sha }}
           ${{ github.sha }}
+
+      - name: Build deployment bundle
+        run: |
+          mkdir -p dist
+          sh scripts/package_deployment_bundle.sh \
+            "${{ github.sha }}" \
+            "dist/ofoms-ejournal-deploy-${{ github.sha }}.tar.gz"
+
+      - name: Publish deployment bundle
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: ofoms-ejournal-deploy-${{ github.sha }}
+          path: dist/ofoms-ejournal-deploy-${{ github.sha }}.tar.gz
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Push verified runtime image
         if: github.ref == 'refs/heads/main' && steps.registry.outputs.available == 'true'

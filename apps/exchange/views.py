@@ -82,7 +82,7 @@ def exchange_upload(request):
 def _process_upload(user, org, uploaded, artifacts: ArtifactRollback) -> ImportLog:
     from django.conf import settings
 
-    # Безопасное имя файла (без путей) — только имя
+    # путь удаляется из имени файла
     safe_name = os.path.basename(uploaded.name or "file")
     in_org = settings.EXCHANGE_IN / str(org)
     dest = write_unique_artifact(in_org / safe_name, uploaded.chunks())

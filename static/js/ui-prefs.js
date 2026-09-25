@@ -1,4 +1,3 @@
-// Тема и контраст доступны прямо из шапки и сохраняются в localStorage.
 (function () {
   var THEME_KEY = 'ui:theme';
   var CONTRAST_KEY = 'ui:contrast';

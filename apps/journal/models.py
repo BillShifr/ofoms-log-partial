@@ -15,9 +15,7 @@ from apps.core.storage import delete_field_file_after_commit
 from apps.employee.models import ORGS, Employee
 from apps.system.validators import validate_attachment_file
 
-# ---------------------------------------------------------------------------
-# Справочники (коды закреплены форматом обмена, МИС/реестрами)
-# ---------------------------------------------------------------------------
+# коды справочников закреплены форматами обмена
 IRP_TYPES = (
     (1, "Консультация"),
     (2, "Жалоба"),
@@ -169,7 +167,7 @@ class IrpTheme(models.Model):
     """Тема обращения. Версионируемый справочник (актуальна версия 3)."""
 
     code_name = models.CharField("Код темы", max_length=14)
-    title = models.CharField(max_length=255, verbose_name="Название")
+    title = models.CharField(max_length=2000, verbose_name="Название")
     version = models.IntegerField("Версия справочника", default=1)
 
     class Meta:
@@ -271,7 +269,7 @@ class Irp(models.Model):
         verbose_name="Статус",
     )
 
-    # ---- Заявитель (z_*) ----
+    # заявитель
     z_f = models.CharField(max_length=40, blank=True, null=True, verbose_name="Фамилия")
     z_i = models.CharField(max_length=40, blank=True, null=True, verbose_name="Имя")
     z_o = models.CharField(max_length=40, blank=True, null=True, verbose_name="Отчество")
@@ -292,7 +290,7 @@ class Irp(models.Model):
         max_length=200, blank=True, null=True, verbose_name="E-mail заявителя"
     )
 
-    # ---- Застрахованный (in_*) ----
+    # застрахованный
     in_f = models.CharField(max_length=40, blank=True, null=True, verbose_name="Фамилия")
     in_i = models.CharField(max_length=40, blank=True, null=True, verbose_name="Имя")
     in_o = models.CharField(max_length=40, blank=True, null=True, verbose_name="Отчество")
@@ -308,7 +306,7 @@ class Irp(models.Model):
     in_docser = models.CharField(max_length=10, blank=True, null=True, verbose_name="Серия")
     in_docnum = models.CharField(max_length=20, blank=True, null=True, verbose_name="Номер")
 
-    # ---- Переадресация (Приложение №10: date_cross/time_cross, pr_out) ----
+    # переадресация
     pr_out = models.SmallIntegerField(
         blank=True, null=True, choices=PR_OUT, verbose_name="Признак направления"
     )

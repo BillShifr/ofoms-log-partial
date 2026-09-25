@@ -11,12 +11,10 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Загрузка конфигурации окружения
+# конфигурация окружения
 load_dotenv(BASE_DIR / ".env")
 
-# ---------------------------------------------------------------------------
-# Безопасность
-# ---------------------------------------------------------------------------
+# безопасность
 SECRET_KEY = os.getenv(
     "SECRET_KEY", "django-insecure-change-me-in-production-9f1c2a3b4d5e6f7a8b9c"
 )
@@ -29,9 +27,7 @@ ALLOWED_HOSTS = [
     if h.strip()
 ]
 
-# ---------------------------------------------------------------------------
-# Приложения (INSTALLED_APPS)
-# ---------------------------------------------------------------------------
+# приложения
 DJANGO_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -59,9 +55,7 @@ LOCAL_APPS = [
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
-# ---------------------------------------------------------------------------
-# Middleware
-# ---------------------------------------------------------------------------
+# middleware
 MIDDLEWARE = [
     "apps.core.middleware.TrustedProxyClientIPMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -75,7 +69,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.core.middleware.ContentSecurityPolicyMiddleware",
     "apps.core.middleware.SensitiveResponseCacheMiddleware",
-    # Приказ ФСТЭК № 17 (2 класс): аудит действий пользователя
+    # аудит действий пользователя
     "apps.core.middleware.AuditMiddleware",
     "apps.core.middleware.UploadLimitResponseMiddleware",
 ]
@@ -125,9 +119,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-# ---------------------------------------------------------------------------
-# База данных (PostgreSQL, ТЗ разд.4/5)
-# ---------------------------------------------------------------------------
+# база данных
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -140,9 +132,7 @@ DATABASES = {
     }
 }
 
-# ---------------------------------------------------------------------------
-# Модель пользователя и аутентификация
-# ---------------------------------------------------------------------------
+# пользователь и аутентификация
 AUTH_USER_MODEL = "employee.Employee"
 
 LOGIN_URL = "login"
@@ -153,13 +143,12 @@ AUTHENTICATION_BACKENDS = [
     "apps.core.auth.TFOMSAuthBackend",
 ]
 
-# В dev/tests X-Forwarded-For считается недоверенным. Production включает его
-# только вместе с контрактом reverse proxy, который обязан перезаписывать header.
+# forwarded for включается только при доверенном reverse proxy
 TRUST_PROXY_CLIENT_IP_HEADER = False
 TRUST_PROXY_SSL_HEADER = False
 TRUSTED_PROXY_IPS = ("127.0.0.1/32", "::1/128")
 
-# Парольная политика (ТЗ разд. 3.1): ≥8 символов, верх/низ/цифры/спецсимволы.
+# парольная политика
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -180,15 +169,15 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Блокировка доступа после N неудачных попыток (ТЗ разд. 3.1)
+# блокировка после неудачных попыток
 SECURITY_MAX_FAILED_LOGIN_ATTEMPTS = int(os.getenv("MAX_FAILED_LOGIN_ATTEMPTS", "10"))
-SECURITY_FAILED_LOGIN_MEMORY = 15 * 60  # окно (сек) для накопления неудачных попыток
+SECURITY_FAILED_LOGIN_MEMORY = 15 * 60  # окно накопления неудачных попыток
 
-# Сквозная авторизация: временные токены
+# временные токены авторизации
 JWT_SECRET = os.getenv("JWT_SECRET", SECRET_KEY)
 JWT_ALGORITHM = "HS256"
 JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "ejournal").strip() or "ejournal"
-JWT_TTL = int(os.getenv("JWT_TTL", "300"))  # сек — жизнь временного токена
+JWT_TTL = int(os.getenv("JWT_TTL", "300"))  # срок жизни токена в секундах
 TOKEN_LOGIN_TRUSTED_ORIGINS = tuple(
     origin.strip()
     for origin in os.getenv("TOKEN_LOGIN_TRUSTED_ORIGINS", "").split(",")
@@ -200,17 +189,13 @@ ACCOUNT_REPOSITORY_TOKEN = os.getenv("ACCOUNT_REPOSITORY_TOKEN", "").strip()
 ACCOUNT_REPOSITORY_TIMEOUT = int(os.getenv("ACCOUNT_REPOSITORY_TIMEOUT", "5"))
 TASK_STALE_AFTER_SECONDS = int(os.getenv("TASK_STALE_AFTER_SECONDS", "3600"))
 
-# ---------------------------------------------------------------------------
-# Локализация
-# ---------------------------------------------------------------------------
+# локализация
 LANGUAGE_CODE = "ru-RU"
 TIME_ZONE = "Asia/Yekaterinburg"
 USE_I18N = True
 USE_TZ = False
 
-# ---------------------------------------------------------------------------
-# Статика и медиа
-# ---------------------------------------------------------------------------
+# статика и медиа
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
@@ -224,7 +209,7 @@ STORAGES = {
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Файлы обмена (см. Этап 3, каталоги v1: exchange/{in,out,archive}/<org>)
+# файлы обмена по организациям
 EXCHANGE_ROOT = BASE_DIR / "exchange"
 EXCHANGE_IN = EXCHANGE_ROOT / "in"
 EXCHANGE_OUT = EXCHANGE_ROOT / "out"
@@ -233,9 +218,7 @@ EXCHANGE_ARCHIVE = EXCHANGE_ROOT / "archive"
 for _dir in (EXCHANGE_IN, EXCHANGE_OUT, EXCHANGE_ARCHIVE, MEDIA_ROOT):
     _dir.mkdir(parents=True, exist_ok=True)
 
-# ---------------------------------------------------------------------------
-# Логирование
-# ---------------------------------------------------------------------------
+# логирование
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOGGING = {
     "version": 1,
@@ -258,7 +241,7 @@ LOGGING = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Системные параметры, видимые в шаблонах (core.context_processors.system_meta)
+# системные параметры шаблонов
 SYSTEM_META = {
     "SYSTEM_TITLE": "Единый электронный журнал обращений граждан",
     "SYSTEM_SHORT_TITLE": "ЭЖ обращений граждан",
@@ -266,7 +249,7 @@ SYSTEM_META = {
     "SITE_URL": os.getenv("SITE_URL", "http://localhost:8000"),
 }
 
-# Домен информационного ресурса (письмо ФФОМС: защищённый ресурс ТФОМС)
+# параметры защищенного ресурса
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"

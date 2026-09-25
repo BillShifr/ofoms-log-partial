@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$script_dir/lib/container_engine.sh"
+
 expected_revision=${VCS_REF:?VCS_REF must be the full Git commit SHA}
 case "$expected_revision" in
   *[!0-9a-f]*|'')
@@ -13,8 +16,8 @@ if [ "${#expected_revision}" -ne 40 ]; then
   exit 1
 fi
 
-image_name="frozendevs/tfoms-ejournal:$expected_revision"
-resolved_images=$(docker compose config --images)
+image_name="docker.io/frozendevs/tfoms-ejournal:$expected_revision"
+resolved_images=$(compose config | awk '/^[[:space:]]+image:/ {gsub(/"/, "", $2); print $2}')
 application_count=$(printf '%s\n' "$resolved_images" | awk -v image="$image_name" '
   $0 == image { count += 1 }
   END { print count + 0 }
@@ -24,7 +27,7 @@ if [ "$application_count" -ne 4 ]; then
   exit 1
 fi
 if printf '%s\n' "$resolved_images" | awk '
-  /^frozendevs\/tfoms-ejournal:/ { count += 1 }
+  /^(docker\.io\/)?frozendevs\/tfoms-ejournal:/ { count += 1 }
   END { exit count == 4 ? 0 : 1 }
 '; then
   :
@@ -33,6 +36,5 @@ else
   exit 1
 fi
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 sh "$script_dir/container_runtime_gate.sh" "$image_name" "$expected_revision"
 printf 'Verified release image %s\n' "$image_name"

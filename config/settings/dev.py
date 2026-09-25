@@ -10,16 +10,16 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-# Локальная база по умолчанию
+# локальная база
 DATABASES["default"]["NAME"] = "ejournal"  # noqa: F405
 DATABASES["default"]["USER"] = "ejournal"  # noqa: F405
 DATABASES["default"]["PASSWORD"] = "ejournal"  # noqa: F405
 DATABASES["default"]["HOST"] = "localhost"  # noqa: F405
 
-# Email: вывод в консоль
+# email выводится в консоль
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-# В dev/test не собираем manifest — отдаём статику как есть (быстрый запуск)
+# статика в dev и test отдается без manifest
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {

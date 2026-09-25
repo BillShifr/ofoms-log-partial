@@ -28,8 +28,7 @@ def classify_schema(tables: set[str], theme_columns: dict[str, str]) -> str:
     if not EXPECTED_TABLES.issubset(tables):
         return "unknown"
 
-    # v1 stores the theme primary key in the varchar column `code`; v2 uses a
-    # generated bigint `id` and treats (code_name, version) as the natural key.
+    # v1 хранит ключ темы в code а v2 использует id и естественный составной ключ
     if theme_columns.get("code") in {"character varying", "text"}:
         return "legacy"
     if (

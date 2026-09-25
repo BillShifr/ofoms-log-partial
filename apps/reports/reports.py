@@ -73,9 +73,7 @@ class Report:
         return [key for key, _ in self.columns]
 
 
-# ---------------------------------------------------------------------------
-# Вспомогательные преобразователи справочников
-# ---------------------------------------------------------------------------
+# преобразование справочников
 
 def _label(choices, value):
     if value is None:
@@ -151,9 +149,7 @@ def has_report_data(user_org: int, filters: ReportFilters) -> bool:
     return _base(user_org, filters).exists()
 
 
-# ---------------------------------------------------------------------------
-# Прил. №1 — Количество поступивших обращений
-# ---------------------------------------------------------------------------
+# приложение 1 количество поступивших обращений
 
 def r1_by_volume(user_org: int, filters: ReportFilters):
     monthly = _monthly(filters)
@@ -183,9 +179,7 @@ def r1_by_volume(user_org: int, filters: ReportFilters):
     return rows
 
 
-# ---------------------------------------------------------------------------
-# Прил. №2 — Обращения ЗЛ по виду обращения
-# ---------------------------------------------------------------------------
+# приложение 2 обращения по виду
 
 def r2_by_type(user_org: int, filters: ReportFilters):
     duration = ExpressionWrapper(
@@ -228,9 +222,7 @@ def r2_by_type(user_org: int, filters: ReportFilters):
     return rows
 
 
-# ---------------------------------------------------------------------------
-# Прил. №3 — Досудебная и судебная защита прав ЗЛ по причинам обращений
-# ---------------------------------------------------------------------------
+# приложение 3 защита прав по причинам обращений
 
 def r3_protection(user_org: int, filters: ReportFilters):
     grouped = _base(user_org, filters).filter(
@@ -267,9 +259,7 @@ def r3_protection(user_org: int, filters: ReportFilters):
     return rows
 
 
-# ---------------------------------------------------------------------------
-# Прил. №4 — Жалобы и причины
-# ---------------------------------------------------------------------------
+# приложение 4 жалобы и причины
 
 def r4_complaints(user_org: int, filters: ReportFilters):
     grouped = list(
@@ -302,9 +292,7 @@ def r4_complaints(user_org: int, filters: ReportFilters):
     return rows
 
 
-# ---------------------------------------------------------------------------
-# Прил. №5 — Заявления
-# ---------------------------------------------------------------------------
+# приложение 5 заявления
 
 def r5_applications(user_org: int, filters: ReportFilters):
     monthly = _monthly(filters)
@@ -332,9 +320,7 @@ def r5_applications(user_org: int, filters: ReportFilters):
     return rows
 
 
-# ---------------------------------------------------------------------------
-# Прил. №6 — Обращение за разъяснением
-# ---------------------------------------------------------------------------
+# приложение 6 обращения за разъяснением
 
 def r6_clarification(user_org: int, filters: ReportFilters):
     grouped = _base(user_org, filters).filter(irp_type=1).values(
@@ -368,9 +354,7 @@ def r6_clarification(user_org: int, filters: ReportFilters):
     return rows
 
 
-# ---------------------------------------------------------------------------
-# Прил. №7 и №8 — Горячая линия (жалобы / консультации)
-# ---------------------------------------------------------------------------
+# приложения 7 и 8 горячая линия
 
 def _hotline(irp_type: int, user_org: int, filters: ReportFilters):
     monthly = _monthly(filters)
@@ -410,9 +394,7 @@ def r8_hotline_consultations(user_org: int, filters: ReportFilters):
     return _hotline(1, user_org, filters)
 
 
-# ---------------------------------------------------------------------------
-# Прил. №9 — Обращения граждан (персональный список)
-# ---------------------------------------------------------------------------
+# приложение 9 обращения граждан
 
 def r9_personal(user_org: int, filters: ReportFilters):
     qs = _base(user_org, filters).select_related("theme", "employee_it")
@@ -439,9 +421,7 @@ def r9_personal(user_org: int, filters: ReportFilters):
     ]
 
 
-# ---------------------------------------------------------------------------
-# Реестр отчётов
-# ---------------------------------------------------------------------------
+# реестр отчетов
 
 REPORTS: list[Report] = [
     Report(

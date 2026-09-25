@@ -13,9 +13,8 @@
 ## Быстрый старт (разработка)
 
 ```bash
-uv sync               # создание .venv + установка зависимостей
-cp .env.example .env  # параметры окружения (локальная БД ejournal)
-uv run manage.py makemigrations
+uv sync               # создание окружения и установка зависимостей
+cp .env.example .env  # параметры локальной базы
 uv run manage.py migrate
 uv run manage.py createsuperuser
 uv run manage.py runserver
@@ -28,17 +27,23 @@ CREATE USER ejournal WITH PASSWORD 'ejournal';
 CREATE DATABASE ejournal OWNER ejournal;
 ```
 
-## Запуск в Docker
+## Контейнерный запуск
 
 Production Compose подключается только к явно указанному внешнему PostgreSQL и
-перед миграциями выполняет read-only проверку схемы. Старую схему v1 он намеренно
-не изменяет на месте.
+перед миграциями проверяет схему. Подтверждённая схема v1 может быть однократно
+преобразована на месте после полного backup и репетиции восстановления; без
+явного `ALLOW_LEGACY_INPLACE_UPGRADE=true` она остаётся заблокированной.
 
 ```bash
 cp .env.production.example .env
-# Заполнить секреты, адрес PostgreSQL и публичные имена.
+# заполнить секреты адрес postgresql и публичные имена
 VCS_REF=$(git rev-parse HEAD) docker compose up --build
 ```
+
+Команда выше предназначена только для локальной release-проверки исходников. Production-сервер
+не выполняет Git checkout и не собирает образ: GitHub Actions публикует проверенный SHA-образ и
+архив `ofoms-ejournal-deploy-<SHA>.tar.gz`, после чего rootless Podman запускает
+`scripts/deploy_release.sh` из этого архива. Полная процедура описана в `docs/OPERATIONS.md`.
 
 Compose запускает отдельный сервис `scheduler`, который раз в минуту вызывает
 `manage.py run_tasks`. Зависшие дольше `TASK_STALE_AFTER_SECONDS` запуски перед

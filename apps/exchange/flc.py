@@ -12,7 +12,7 @@ from lxml import etree
 from apps.journal.models import Irp, IrpTheme
 from apps.journal.validation import validate_irp_business_rules
 
-# Код ошибки в протоколе ФЛК
+# код ошибки в протоколе флк
 FLCP_OK = "0"
 FLCP_ERROR = "41"
 

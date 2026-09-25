@@ -828,6 +828,7 @@ class ProductionSettingsTests(TestCase):
             "sh scripts/container_runtime_gate.sh",
             workflow[verify_index:push_index],
         )
+        self.assertIn("CONTAINER_ENGINE: docker", workflow[verify_index:push_index])
         self.assertIn("frozendevs/tfoms-ejournal:${{ github.sha }}", workflow)
         self.assertIn("build-args: VCS_REF=${{ github.sha }}", workflow)
         self.assertIn("VCS_REF: ${{ github.sha }}", workflow)

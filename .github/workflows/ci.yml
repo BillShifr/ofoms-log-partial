@@ -143,6 +143,8 @@ jobs:
             frozendevs/tfoms-ejournal:latest
 
       - name: Verify runtime image
+        env:
+          CONTAINER_ENGINE: docker
         run: >-
           sh scripts/container_runtime_gate.sh
           frozendevs/tfoms-ejournal:${{ github.sha }}

@@ -1,15 +1,18 @@
 #!/bin/sh
 set -eu
 
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$script_dir/lib/container_engine.sh"
+
 image_name=${1:?Usage: container_runtime_gate.sh IMAGE}
 expected_revision=${2:?Usage: container_runtime_gate.sh IMAGE EXPECTED_REVISION}
 
-actual_revision=$(docker image inspect \
+actual_revision=$(container_engine image inspect \
   --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
   "$image_name")
 test "$actual_revision" = "$expected_revision"
 
-docker run --rm \
+container_engine run --rm \
   --network none \
   --read-only \
   --tmpfs /tmp:size=256m,mode=1777 \
@@ -25,6 +28,7 @@ docker run --rm \
     test ! -e /app/tests
     test -z "$(find /app/apps \( -name 'tests.py' -o -name 'test_*.py' \) -print -quit)"
     test ! -e /app/scripts
+    test ! -e /app/deploy
     test ! -e /app/package.json
     test ! -e /app/.git
     test ! -e /app/.env
@@ -46,14 +50,14 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-docker run --rm \
+container_engine run --rm \
   --network none \
   --user 0:0 \
   --read-only \
   --security-opt no-new-privileges \
   --cap-drop ALL \
   --cap-add CHOWN \
-  --mount "type=bind,src=$probe_dir,dst=/probe" \
+  --volume "$probe_dir:/probe:Z" \
   "$image_name" \
   sh -c '
     touch /probe/owned

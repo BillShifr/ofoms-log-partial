@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$script_dir/lib/container_engine.sh"
+
 backup_dir=${1:?Usage: RESTORE_CONFIRM=replace-current-state restore_release.sh BACKUP_DIR}
 db_user=${DB_USER:?DB_USER is required}
 db_name=${DB_NAME:?DB_NAME is required}
@@ -75,13 +78,13 @@ fi
 )
 tar -tzf "$backup_dir/media.tar.gz" >/dev/null
 tar -tzf "$backup_dir/exchange.tar.gz" >/dev/null
-docker compose --profile ops run --rm --no-deps -T db-tools pg_restore --list \
+compose --profile ops run --rm --no-deps -T db-tools pg_restore --list \
   < "$backup_dir/database.dump" >/dev/null
 
-web_container=$(docker compose ps -q -a web)
+web_container=$(compose ps -q -a web)
 test -n "$web_container"
-web_image=$(docker inspect --format '{{.Image}}' "$web_container")
-current_revision=$(docker image inspect \
+web_image=$(container_engine inspect --format '{{.Image}}' "$web_container")
+current_revision=$(container_engine image inspect \
   --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
   "$web_image")
 if [ "$current_revision" != "$backup_revision" ]; then
@@ -89,21 +92,20 @@ if [ "$current_revision" != "$backup_revision" ]; then
   exit 1
 fi
 
-docker compose stop web scheduler
-docker compose --profile ops run --rm --no-deps -T db-tools \
+compose stop web scheduler
+compose --profile ops run --rm --no-deps -T db-tools \
   dropdb --if-exists --force "$db_name"
-docker compose --profile ops run --rm --no-deps -T db-tools \
+compose --profile ops run --rm --no-deps -T db-tools \
   createdb -O "$db_user" "$db_name"
-docker compose --profile ops run --rm --no-deps -T db-tools pg_restore -d "$db_name" \
+compose --profile ops run --rm --no-deps -T db-tools pg_restore -d "$db_name" \
   < "$backup_dir/database.dump"
 
-docker compose run --rm --no-deps --entrypoint sh web -c \
+compose run --rm --no-deps --entrypoint sh web -c \
   'find /app/media -mindepth 1 -delete && tar -C /app/media -xzf -' \
   < "$backup_dir/media.tar.gz"
-docker compose run --rm --no-deps --entrypoint sh web -c \
+compose run --rm --no-deps --entrypoint sh web -c \
   'find /app/exchange -mindepth 1 -delete && tar -C /app/exchange -xzf -' \
   < "$backup_dir/exchange.tar.gz"
 
-docker compose run --rm --no-deps migrate
-docker compose up -d --no-deps --no-build web scheduler
+DEPLOY_PULL=false sh "$script_dir/deploy_release.sh"
 printf 'Restore completed from: %s\n' "$backup_dir"

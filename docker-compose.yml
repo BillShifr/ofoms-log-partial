@@ -2,8 +2,6 @@ x-logging: &default-logging
   driver: json-file
   options:
     max-size: "10m"
-    max-file: "5"
-    compress: "true"
 
 x-app-build: &app-build
   context: .
@@ -21,7 +19,7 @@ x-app-security: &app-security
 
 services:
   volume-init:
-    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
+    image: docker.io/frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
     build: *app-build
     user: "0:0"
     read_only: true
@@ -40,7 +38,7 @@ services:
 
   web:
     <<: *app-security
-    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
+    image: docker.io/frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
     build: *app-build
     init: true
     command: [".venv/bin/gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60"]
@@ -67,7 +65,7 @@ services:
       ACCOUNT_REPOSITORY_URL: ${ACCOUNT_REPOSITORY_URL:-}
       ACCOUNT_REPOSITORY_TOKEN: ${ACCOUNT_REPOSITORY_TOKEN:-}
       ACCOUNT_REPOSITORY_TIMEOUT: ${ACCOUNT_REPOSITORY_TIMEOUT:-5}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:?ALLOWED_HOSTS is required}
       DEBUG: "False"
       MAX_FAILED_LOGIN_ATTEMPTS: ${MAX_FAILED_LOGIN_ATTEMPTS:-10}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-True}
@@ -75,7 +73,7 @@ services:
       SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-True}
       TRUST_PROXY_SSL_HEADER: ${TRUST_PROXY_SSL_HEADER:-True}
       TRUST_PROXY_CLIENT_IP_HEADER: ${TRUST_PROXY_CLIENT_IP_HEADER:-True}
-      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-127.0.0.1/32,::1/128}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:?TRUSTED_PROXY_IPS is required}
       SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-31536000}
       TASK_STALE_AFTER_SECONDS: ${TASK_STALE_AFTER_SECONDS:-3600}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -108,7 +106,7 @@ services:
 
   migrate:
     <<: *app-security
-    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
+    image: docker.io/frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
     build: *app-build
     command:
       - sh
@@ -126,7 +124,7 @@ services:
     logging: *default-logging
 
   db-tools:
-    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     profiles: ["ops"]
     environment:
       PGDATABASE: ${DB_NAME:?DB_NAME is required}
@@ -147,7 +145,7 @@ services:
 
   scheduler:
     <<: *app-security
-    image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
+    image: docker.io/frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}
     build: *app-build
     init: true
     command: [".venv/bin/python", "manage.py", "run_scheduler", "--interval", "60"]

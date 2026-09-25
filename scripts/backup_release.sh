@@ -2,6 +2,9 @@
 set -eu
 umask 077
 
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$script_dir/lib/container_engine.sh"
+
 backup_root=${1:?Usage: backup_release.sh BACKUP_ROOT}
 db_name=${DB_NAME:?DB_NAME is required}
 lock_file=${BACKUP_RESTORE_LOCK_FILE:-/tmp/ofoms-ejournal-backup-restore.lock}
@@ -21,18 +24,18 @@ flock -n 9 || {
   exit 1
 }
 
-web_container=$(docker compose ps -q -a web)
-scheduler_container=$(docker compose ps -q -a scheduler)
+web_container=$(compose ps -q -a web)
+scheduler_container=$(compose ps -q -a scheduler)
 test -n "$web_container"
 test -n "$scheduler_container"
 for container in "$web_container" "$scheduler_container"; do
-  if [ "$(docker inspect --format '{{.State.Running}}' "$container")" != "true" ]; then
+  if [ "$(container_engine inspect --format '{{.State.Running}}' "$container")" != "true" ]; then
     echo >&2 "Backup requires both web and scheduler to be running"
     exit 1
   fi
 done
-web_image=$(docker inspect --format '{{.Image}}' "$web_container")
-revision=$(docker image inspect \
+web_image=$(container_engine inspect --format '{{.Image}}' "$web_container")
+revision=$(container_engine image inspect \
   --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
   "$web_image")
 case "$revision" in
@@ -50,7 +53,7 @@ cleanup() {
   status=$?
   trap - EXIT HUP INT TERM
   if [ "$writers_stopped" -eq 1 ]; then
-    if ! docker start "$web_container" "$scheduler_container" >/dev/null; then
+    if ! container_engine start "$web_container" "$scheduler_container" >/dev/null; then
       echo >&2 "Failed to restart application writers"
       status=1
     fi
@@ -82,15 +85,15 @@ mkdir "$staging_dir"
 backup_staged=1
 
 writers_stopped=1
-docker compose stop web scheduler
+compose stop web scheduler
 
-docker compose --profile ops run --rm --no-deps -T db-tools pg_dump -Fc \
+compose --profile ops run --rm --no-deps -T db-tools pg_dump -Fc \
   > "$staging_dir/database.dump"
-docker compose run --rm --no-deps --entrypoint tar web \
+compose run --rm --no-deps --entrypoint tar web \
   -C /app/media -czf - . > "$staging_dir/media.tar.gz"
-docker compose run --rm --no-deps --entrypoint tar web \
+compose run --rm --no-deps --entrypoint tar web \
   -C /app/exchange -czf - . > "$staging_dir/exchange.tar.gz"
-db_server_version=$(docker compose --profile ops run --rm --no-deps -T db-tools \
+db_server_version=$(compose --profile ops run --rm --no-deps -T db-tools \
   psql -Atqc 'SHOW server_version')
 
 {
@@ -109,6 +112,6 @@ db_server_version=$(docker compose --profile ops run --rm --no-deps -T db-tools 
 mv "$staging_dir" "$backup_dir"
 backup_staged=0
 
-docker start "$web_container" "$scheduler_container" >/dev/null
+container_engine start "$web_container" "$scheduler_container" >/dev/null
 writers_stopped=0
 printf 'Backup created: %s\n' "$backup_dir"

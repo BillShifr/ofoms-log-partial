@@ -741,7 +741,7 @@ class ProductionSettingsTests(TestCase):
 
         self.assertIn("${WEB_BIND_ADDRESS:-127.0.0.1}:8000:8000", compose)
         self.assertIn("TRUST_PROXY_SSL_HEADER: ${TRUST_PROXY_SSL_HEADER:-True}", compose)
-        self.assertIn("TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-127.0.0.1/32,::1/128}", compose)
+        self.assertIn("TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:?TRUSTED_PROXY_IPS is required}", compose)
         self.assertLess(
             compose.index("TRUSTED_PROXY_IPS:"),
             compose.index("ports:"),
@@ -777,7 +777,7 @@ class ProductionSettingsTests(TestCase):
         )
         self.assertNotIn("COPY --from=ghcr.io/astral-sh/uv", dockerfile)
         self.assertNotIn("uv:latest", dockerfile)
-        self.assertIn("image: postgres:16-alpine@sha256:", compose)
+        self.assertIn("image: postgres:17-alpine@sha256:", compose)
         self.assertIn("image: postgres:16-alpine@sha256:", workflow)
         action_refs = re.findall(r"^\s*-?\s*uses:\s+([^\s#]+)", workflow, re.MULTILINE)
         self.assertTrue(action_refs)
@@ -793,6 +793,8 @@ class ProductionSettingsTests(TestCase):
             self.assertIn(path, dockerignore)
         for path in (
             "scripts",
+            "deploy",
+            "dist",
             ".env*",
             "*.pem",
             "*.key",
@@ -849,14 +851,14 @@ class ProductionSettingsTests(TestCase):
         self.assertEqual(compose.count("build: *app-build"), 4)
         self.assertEqual(
             compose.count(
-                "image: frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}"
+                "image: docker.io/frozendevs/tfoms-ejournal:${VCS_REF:?VCS_REF must be the full Git commit SHA}"
             ),
             4,
         )
-        self.assertIn("docker compose config --images", release_gate)
+        self.assertIn("compose config", release_gate)
         self.assertIn('application_count" -ne 4', release_gate)
         self.assertIn('container_runtime_gate.sh" "$image_name" "$expected_revision"', release_gate)
-        self.assertIn('image_name="frozendevs/tfoms-ejournal:$expected_revision"', release_gate)
+        self.assertIn('image_name="docker.io/frozendevs/tfoms-ejournal:$expected_revision"', release_gate)
 
     def test_ci_uses_least_privilege_and_bounded_jobs(self):
         workflow = (settings.BASE_DIR / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
@@ -870,18 +872,18 @@ class ProductionSettingsTests(TestCase):
         backup = (settings.BASE_DIR / "scripts" / "backup_release.sh").read_text(encoding="utf-8")
         restore = (settings.BASE_DIR / "scripts" / "restore_release.sh").read_text(encoding="utf-8")
 
-        self.assertIn("docker compose stop web scheduler", backup)
-        self.assertIn("web_container=$(docker compose ps -q -a web)", backup)
-        self.assertIn("scheduler_container=$(docker compose ps -q -a scheduler)", backup)
+        self.assertIn("compose stop web scheduler", backup)
+        self.assertIn("web_container=$(compose ps -q -a web)", backup)
+        self.assertIn("scheduler_container=$(compose ps -q -a scheduler)", backup)
         self.assertEqual(
-            backup.count('docker start "$web_container" "$scheduler_container"'), 2
+            backup.count('container_engine start "$web_container" "$scheduler_container"'), 2
         )
-        self.assertNotIn("docker compose up", backup)
+        self.assertNotIn("compose up", backup)
         self.assertIn("trap cleanup EXIT HUP INT TERM", backup)
         self.assertIn("trap - EXIT HUP INT TERM", backup)
         self.assertIn("--profile ops run --rm --no-deps -T db-tools pg_dump", backup)
-        self.assertNotIn("docker compose exec -T db", backup)
-        self.assertEqual(backup.count("docker compose run --rm --no-deps"), 2)
+        self.assertNotIn("compose exec -T db", backup)
+        self.assertEqual(backup.count("compose run --rm --no-deps"), 2)
         self.assertIn(
             "sha256sum MANIFEST database.dump media.tar.gz exchange.tar.gz", backup
         )
@@ -899,13 +901,13 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("Backup requires both web and scheduler to be running", backup)
         self.assertLess(
             backup.index("writers_stopped=1"),
-            backup.index("docker compose stop web scheduler"),
+            backup.index("compose stop web scheduler"),
         )
         self.assertIn("Failed to restart application writers", backup)
         self.assertIn("Failed to remove backup staging directory", backup)
         self.assertLess(
             backup.index('mv "$staging_dir" "$backup_dir"'),
-            backup.index('docker start "$web_container" "$scheduler_container"',
+            backup.index('container_engine start "$web_container" "$scheduler_container"',
                          backup.index('mv "$staging_dir" "$backup_dir"')),
         )
         self.assertNotIn("ofoms-log-partial_media", backup)
@@ -921,11 +923,37 @@ class ProductionSettingsTests(TestCase):
         self.assertIn("Unsupported backup format version", restore)
         self.assertIn("dropdb", restore)
         self.assertIn("--if-exists --force", restore)
-        self.assertIn("docker compose run --rm --no-deps migrate", restore)
-        self.assertIn(
-            "docker compose up -d --no-deps --no-build web scheduler", restore
-        )
+        self.assertIn('DEPLOY_PULL=false sh "$script_dir/deploy_release.sh"', restore)
         self.assertNotIn("trap", restore)
+
+    def test_podman_deployment_is_staged_and_systemd_managed(self):
+        adapter = (settings.BASE_DIR / "scripts/lib/container_engine.sh").read_text()
+        deploy = (settings.BASE_DIR / "scripts/deploy_release.sh").read_text()
+        unit = (settings.BASE_DIR / "deploy/systemd/ofoms-ejournal.service").read_text()
+        nginx = (settings.BASE_DIR / "deploy/nginx/ofoms-ejournal.conf").read_text()
+        workflow = (settings.BASE_DIR / ".github/workflows/ci.yml").read_text()
+
+        self.assertIn("CONTAINER_ENGINE=podman", adapter)
+        self.assertIn("compose stop web scheduler", deploy)
+        self.assertIn("VCS_REF does not match the deployment bundle", deploy)
+        self.assertIn("LEGACY_UPGRADE_BACKUP_FILE is required", deploy)
+        self.assertIn("db-tools pg_restore --list", deploy)
+        self.assertLess(
+            deploy.index("compose run --rm --no-deps migrate"),
+            deploy.index("compose up -d --no-deps --no-build web"),
+        )
+        self.assertLess(
+            deploy.index("Web readiness timeout"),
+            deploy.index("compose up -d --no-deps --no-build scheduler"),
+        )
+        self.assertNotIn("condition: service_", deploy)
+        self.assertIn("WantedBy=default.target", unit)
+        self.assertIn("TimeoutStartSec=900", unit)
+        self.assertIn("proxy_pass http://127.0.0.1:8000", nginx)
+        self.assertIn("Build deployment bundle", workflow)
+        self.assertIn(
+            "Docker Hub credentials are required for main releases", workflow
+        )
 
     def test_application_image_uses_unprivileged_runtime_user(self):
         dockerfile = (settings.BASE_DIR / "Dockerfile").read_text(encoding="utf-8")
@@ -991,8 +1019,8 @@ class ProductionSettingsTests(TestCase):
 
         self.assertIn("x-logging: &default-logging", compose)
         self.assertIn('max-size: "10m"', compose)
-        self.assertIn('max-file: "5"', compose)
-        self.assertIn('compress: "true"', compose)
+        self.assertNotIn('max-file:', compose)
+        self.assertNotIn('compress:', compose)
         self.assertEqual(compose.count("logging: *default-logging"), 5)
 
     def test_compose_hardens_long_running_application_services(self):

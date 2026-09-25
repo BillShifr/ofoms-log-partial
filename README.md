@@ -28,7 +28,7 @@ CREATE USER ejournal WITH PASSWORD 'ejournal';
 CREATE DATABASE ejournal OWNER ejournal;
 ```
 
-## Запуск в Docker
+## Контейнерный запуск
 
 Production Compose подключается только к явно указанному внешнему PostgreSQL и
 перед миграциями проверяет схему. Подтверждённая схема v1 может быть однократно
@@ -40,6 +40,11 @@ cp .env.production.example .env
 # Заполнить секреты, адрес PostgreSQL и публичные имена.
 VCS_REF=$(git rev-parse HEAD) docker compose up --build
 ```
+
+Команда выше предназначена только для локальной release-проверки исходников. Production-сервер
+не выполняет Git checkout и не собирает образ: GitHub Actions публикует проверенный SHA-образ и
+архив `ofoms-ejournal-deploy-<SHA>.tar.gz`, после чего rootless Podman запускает
+`scripts/deploy_release.sh` из этого архива. Полная процедура описана в `docs/OPERATIONS.md`.
 
 Compose запускает отдельный сервис `scheduler`, который раз в минуту вызывает
 `manage.py run_tasks`. Зависшие дольше `TASK_STALE_AFTER_SECONDS` запуски перед
